@@ -46,25 +46,84 @@ export function TranscriptInput() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const lines = text.split('\n').filter((l) => l.trim());
 
-      // Parse CSV - each row is one transcript
-      const parsedTranscripts = lines.slice(1).map((line, index) => {
-        // Simple CSV parsing - handle quoted fields
-        const transcript = line.trim();
+      // Parse CSV properly - handle quoted cells that may contain newlines
+      const rows: string[] = [];
+      let currentRow = '';
+      let insideQuotes = false;
 
-        // Parse the transcript into conversation lines
-        const conversationLines = transcript.split(/(?=\[(?:BOT|CUSTOMER)\]:)/i).filter((l) => l.trim());
-        const parsedLines = conversationLines.map((convLine) => {
-          const match = convLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
-          if (match) {
-            return {
-              speaker: match[1].toLowerCase() as 'bot' | 'customer',
-              text: match[2].trim(),
-            };
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+
+        if (char === '"') {
+          insideQuotes = !insideQuotes;
+        } else if (char === '\n' && !insideQuotes) {
+          if (currentRow.trim()) {
+            rows.push(currentRow.trim());
           }
-          return { speaker: 'customer' as const, text: convLine.trim() };
-        });
+          currentRow = '';
+        } else {
+          currentRow += char;
+        }
+      }
+
+      // Add last row if exists
+      if (currentRow.trim()) {
+        rows.push(currentRow.trim());
+      }
+
+      // Skip header row and parse transcripts
+      const parsedTranscripts = rows.slice(1).map((row, index) => {
+        // Remove surrounding quotes if present
+        let transcriptText = row.trim();
+        if (transcriptText.startsWith('"') && transcriptText.endsWith('"')) {
+          transcriptText = transcriptText.slice(1, -1);
+        }
+
+        // Parse transcript based on speaker indicators
+        // "setup user" = bot, phone number pattern = customer
+        const lines = transcriptText.split('\n');
+        const parsedLines = [];
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          // Check if line starts with "setup user" (bot)
+          if (trimmedLine.toLowerCase().startsWith('setup user')) {
+            // Extract timestamp and text: "setup user 00:00:00 Text here"
+            const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})?\s*(.+)/i);
+            if (match) {
+              parsedLines.push({
+                speaker: 'bot' as const,
+                text: match[2] || trimmedLine,
+                timestamp: match[1] || undefined,
+              });
+            }
+          }
+          // Check if line starts with phone number (customer)
+          else if (/^\d{10,}/.test(trimmedLine)) {
+            // Extract: "919820203664 00:00:01 Text here"
+            const match = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})?\s*(.+)/);
+            if (match) {
+              parsedLines.push({
+                speaker: 'customer' as const,
+                text: match[3] || trimmedLine,
+                timestamp: match[2] || undefined,
+              });
+            }
+          }
+          // Fallback: try old [BOT]/[CUSTOMER] format
+          else if (trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i)) {
+            const m = trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+            if (m) {
+              parsedLines.push({
+                speaker: m[1].toLowerCase() as 'bot' | 'customer',
+                text: m[2].trim(),
+              });
+            }
+          }
+        }
 
         return {
           id: `csv-call-${index + 1}`,
