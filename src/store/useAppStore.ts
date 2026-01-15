@@ -6,25 +6,28 @@ import {
   CheckType,
   Transcript,
   AnalysisResult,
-  FixSuggestions,
   IssueType,
   Severity,
+  DetectedIssue,
 } from '@/types';
 import {
   defaultChecks,
   demoTranscript,
   defaultReferenceScript,
-  demoIssues,
-  demoScriptFixes,
-  demoGeneralFixes,
-  demoBatchTranscripts,
 } from '@/data/demoData';
+import { analyzeTranscript, generateFixSuggestions } from '@/services/openai';
 
 const initialState = {
   transcripts: [demoTranscript],
   referenceScript: defaultReferenceScript,
   referenceEnabled: true,
+  knowledgeBase: '',
+  knowledgeBaseEnabled: false,
   checks: defaultChecks,
+  openaiConfig: {
+    apiKey: '',
+    model: 'gpt-4.1-mini',
+  },
   isRunning: false,
   runProgress: 0,
   currentStep: 'input' as const,
@@ -49,6 +52,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       set({ checks });
     }
+  },
+
+  setKnowledgeBase: (kb: string) => set({ knowledgeBase: kb }),
+
+  setKnowledgeBaseEnabled: (enabled: boolean) => set({ knowledgeBaseEnabled: enabled }),
+
+  setOpenAIConfig: (config) => {
+    const currentConfig = get().openaiConfig;
+    set({ openaiConfig: { ...currentConfig, ...config } });
   },
 
   toggleCheck: (checkId: CheckType) => {
@@ -97,125 +109,129 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysis: async () => {
-    set({ isRunning: true, runProgress: 0, currentStep: 'running' });
+    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig } = get();
 
-    const { transcripts, checks, referenceEnabled } = get();
+    // Get API key from environment variable - check both possible names
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
 
-    // Simulate analysis with progress updates
-    for (let i = 0; i <= 100; i += 5) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      set({ runProgress: i });
+    // Validate OpenAI configuration
+    if (!apiKey.trim()) {
+      alert('OpenAI API key is not configured. Please set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in your environment variables.');
+      return;
     }
 
-    // Filter issues based on enabled checks and reference availability
-    const enabledCheckTypes = checks
-      .filter((c) => c.enabled)
-      .map((c) => c.id);
+    set({ isRunning: true, runProgress: 0, currentStep: 'running' });
 
-    const issueTypeMapping: Record<CheckType, IssueType[]> = {
-      flow_compliance: ['flow_deviation'],
-      repetition: ['repetition_loop'],
-      language_alignment: ['language_mismatch'],
-      restart_reset: ['mid_call_restart'],
-      general_quality: ['quality_issue'],
-    };
+    try {
+      const allIssues: DetectedIssue[] = [];
+      const totalTranscripts = transcripts.length;
 
-    const allowedIssueTypes = enabledCheckTypes.flatMap(
-      (ct) => issueTypeMapping[ct] || []
-    );
+      // Analyze each transcript
+      for (let i = 0; i < totalTranscripts; i++) {
+        const transcript = transcripts[i];
+        const progress = Math.floor(((i + 1) / totalTranscripts) * 90); // Reserve last 10% for aggregation
+        set({ runProgress: progress });
 
-    // If reference is disabled, remove flow_deviation issues
-    const filteredIssueTypes = referenceEnabled
-      ? allowedIssueTypes
-      : allowedIssueTypes.filter((t) => t !== 'flow_deviation');
+        try {
+          const issues = await analyzeTranscript(
+            apiKey,
+            openaiConfig.model,
+            transcript,
+            checks,
+            referenceEnabled ? referenceScript : null,
+            knowledgeBaseEnabled ? knowledgeBase : null
+          );
+          allIssues.push(...issues);
+        } catch (error) {
+          console.error(`Error analyzing transcript ${transcript.id}:`, error);
+          // Continue with other transcripts
+        }
+      }
 
-    // Filter demo issues based on which checks are enabled
-    const filteredIssues = demoIssues.filter((issue) =>
-      filteredIssueTypes.includes(issue.type)
-    );
+      set({ runProgress: 95 });
 
-    // Calculate analytics
-    const totalCalls = demoBatchTranscripts.length;
-    const callsWithIssues = new Set(filteredIssues.map((i) => i.callId)).size;
+      // Calculate analytics
+      const totalCalls = transcripts.length;
+      const callsWithIssues = new Set(allIssues.map((i) => i.callId)).size;
 
-    const issuesByType: Record<IssueType, number> = {
-      flow_deviation: 0,
-      repetition_loop: 0,
-      language_mismatch: 0,
-      mid_call_restart: 0,
-      quality_issue: 0,
-    };
+      const issuesByType: Record<IssueType, number> = {
+        flow_deviation: 0,
+        repetition_loop: 0,
+        language_mismatch: 0,
+        mid_call_restart: 0,
+        quality_issue: 0,
+      };
 
-    const severityDistribution: Record<Severity, number> = {
-      low: 0,
-      medium: 0,
-      high: 0,
-      critical: 0,
-    };
+      const severityDistribution: Record<Severity, number> = {
+        low: 0,
+        medium: 0,
+        high: 0,
+        critical: 0,
+      };
 
-    filteredIssues.forEach((issue) => {
-      issuesByType[issue.type]++;
-      severityDistribution[issue.severity]++;
-    });
+      allIssues.forEach((issue) => {
+        issuesByType[issue.type]++;
+        severityDistribution[issue.severity]++;
+      });
 
-    const languageMismatchRate =
-      totalCalls > 0
-        ? (issuesByType.language_mismatch / totalCalls) * 100
-        : 0;
+      const languageMismatchRate =
+        totalCalls > 0
+          ? (issuesByType.language_mismatch / totalCalls) * 100
+          : 0;
 
-    const results: AnalysisResult = {
-      totalCalls,
-      callsWithIssues,
-      issues: filteredIssues,
-      issuesByType,
-      severityDistribution,
-      languageMismatchRate,
-    };
+      const results: AnalysisResult = {
+        totalCalls,
+        callsWithIssues,
+        issues: allIssues,
+        issuesByType,
+        severityDistribution,
+        languageMismatchRate,
+      };
 
-    set({
-      isRunning: false,
-      runProgress: 100,
-      currentStep: 'results',
-      results,
-    });
+      set({
+        isRunning: false,
+        runProgress: 100,
+        currentStep: 'results',
+        results,
+      });
+    } catch (error) {
+      console.error('Error during analysis:', error);
+      set({ isRunning: false, runProgress: 0 });
+      alert(`Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   },
 
-  generateFixes: () => {
-    const { results, referenceEnabled, checks } = get();
+  generateFixes: async () => {
+    const { results, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, transcripts, openaiConfig } = get();
     if (!results) return;
 
-    const flowComplianceEnabled = checks.find(
-      (c) => c.id === 'flow_compliance'
-    )?.enabled;
-    const generalQualityEnabled = checks.find(
-      (c) => c.id === 'general_quality'
-    )?.enabled;
+    // Get API key from environment variable - check both possible names
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
 
-    // Filter fixes based on what ran
-    const scriptFixes =
-      referenceEnabled && flowComplianceEnabled
-        ? demoScriptFixes.filter((fix) =>
-            results.issues.some((issue) =>
-              fix.relatedIssueIds.includes(issue.id)
-            )
-          )
-        : [];
+    // Validate OpenAI configuration
+    if (!apiKey.trim()) {
+      alert('OpenAI API key is not configured. Please set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in your environment variables.');
+      return;
+    }
 
-    // General fixes for all transcript-only checks
-    const generalFixes = generalQualityEnabled
-      ? demoGeneralFixes.filter((fix) =>
-          results.issues.some((issue) =>
-            fix.relatedIssueIds.includes(issue.id)
-          )
-        )
-      : [];
+    set({ isRunning: true, runProgress: 0 });
 
-    const fixes: FixSuggestions = {
-      scriptFixes,
-      generalFixes,
-    };
+    try {
+      const fixes = await generateFixSuggestions(
+        apiKey,
+        openaiConfig.model,
+        results.issues,
+        transcripts,
+        referenceEnabled ? referenceScript : null,
+        knowledgeBaseEnabled ? knowledgeBase : null
+      );
 
-    set({ fixes, currentStep: 'fixes' });
+      set({ fixes, currentStep: 'fixes', isRunning: false });
+    } catch (error) {
+      console.error('Error generating fixes:', error);
+      set({ isRunning: false });
+      alert(`Failed to generate fixes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   },
 
   setSelectedCallId: (id: string | null) => set({ selectedCallId: id }),

@@ -77,12 +77,22 @@ export interface FixSuggestions {
   generalFixes: Fix[];
 }
 
+export interface OpenAIConfig {
+  apiKey: string;
+  model: string;
+}
+
 export interface AppState {
   // Input state
   transcripts: Transcript[];
   referenceScript: string;
   referenceEnabled: boolean;
+  knowledgeBase: string;
+  knowledgeBaseEnabled: boolean;
   checks: CheckConfig[];
+
+  // OpenAI configuration
+  openaiConfig: OpenAIConfig;
 
   // Run state
   isRunning: boolean;
@@ -98,6 +108,9 @@ export interface AppState {
   setTranscripts: (transcripts: Transcript[]) => void;
   setReferenceScript: (script: string) => void;
   setReferenceEnabled: (enabled: boolean) => void;
+  setKnowledgeBase: (kb: string) => void;
+  setKnowledgeBaseEnabled: (enabled: boolean) => void;
+  setOpenAIConfig: (config: Partial<OpenAIConfig>) => void;
   toggleCheck: (checkId: CheckType) => void;
   updateCheckInstructions: (checkId: CheckType, instructions: string) => void;
   resetCheckInstructions: (checkId: CheckType) => void;

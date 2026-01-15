@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Upload, RotateCcw, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { demoTranscript, demoBatchTranscripts, demoCSVContent } from '@/data/demoData';
+import { demoTranscript, demoCSVContent } from '@/data/demoData';
 
 export function TranscriptInput() {
   const { transcripts, setTranscripts } = useAppStore();
@@ -39,8 +39,47 @@ export function TranscriptInput() {
     ]);
   };
 
-  const loadDemoData = () => {
-    setTranscripts(demoBatchTranscripts);
+  const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter((l) => l.trim());
+
+      // Parse CSV - each row is one transcript
+      const parsedTranscripts = lines.slice(1).map((line, index) => {
+        // Simple CSV parsing - handle quoted fields
+        const transcript = line.trim();
+
+        // Parse the transcript into conversation lines
+        const conversationLines = transcript.split(/(?=\[(?:BOT|CUSTOMER)\]:)/i).filter((l) => l.trim());
+        const parsedLines = conversationLines.map((convLine) => {
+          const match = convLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+          if (match) {
+            return {
+              speaker: match[1].toLowerCase() as 'bot' | 'customer',
+              text: match[2].trim(),
+            };
+          }
+          return { speaker: 'customer' as const, text: convLine.trim() };
+        });
+
+        return {
+          id: `csv-call-${index + 1}`,
+          lines: parsedLines,
+          metadata: {
+            date: new Date().toISOString().split('T')[0],
+            source: 'csv-upload'
+          },
+        };
+      }).filter(t => t.lines.length > 0);
+
+      setTranscripts(parsedTranscripts);
+    };
+
+    reader.readAsText(file);
   };
 
   const downloadDemoCSV = () => {
@@ -149,31 +188,34 @@ export function TranscriptInput() {
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <button
-                  onClick={loadDemoData}
-                  className="btn-primary flex items-center gap-2"
-                >
+                <label className="btn-primary flex items-center gap-2 cursor-pointer">
                   <Upload className="w-4 h-4" />
-                  Load Demo Dataset (5 calls)
-                </button>
+                  Upload CSV File
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCSVUpload}
+                    className="hidden"
+                  />
+                </label>
                 <button
                   onClick={downloadDemoCSV}
                   className="btn-secondary flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Download Demo CSV
+                  Download Sample CSV
                 </button>
               </div>
 
               <div className="glass-card-subtle p-4">
                 <p className="text-sm text-[var(--color-slate-300)] mb-2">
-                  Demo dataset includes calls with:
+                  CSV Format:
                 </p>
                 <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
-                  <li>Flow deviation (skipped verification steps)</li>
-                  <li>Repetition loops (bot repeating same suggestion)</li>
-                  <li>Language mismatch (customer switches to Hindi)</li>
-                  <li>Mid-call restart (bot greeting again mid-conversation)</li>
+                  <li>Each row contains one complete call transcript</li>
+                  <li>Format each message as: [BOT]: message or [CUSTOMER]: message</li>
+                  <li>Example: [BOT]: Hello! [CUSTOMER]: Hi there [BOT]: How can I help?</li>
+                  <li>First row should be header: &quot;transcript&quot;</li>
                 </ul>
               </div>
 

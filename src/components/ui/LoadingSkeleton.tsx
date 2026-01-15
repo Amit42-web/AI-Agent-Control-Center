@@ -5,6 +5,9 @@ interface LoadingSkeletonProps {
   lines?: number;
 }
 
+// Predefined widths to avoid Math.random during render
+const SKELETON_WIDTHS = [85, 95, 75, 90, 80, 88, 92, 78, 83, 87];
+
 export function LoadingSkeleton({ className = '', lines = 1 }: LoadingSkeletonProps) {
   return (
     <div className={`space-y-3 ${className}`}>
@@ -12,7 +15,7 @@ export function LoadingSkeleton({ className = '', lines = 1 }: LoadingSkeletonPr
         <div
           key={i}
           className="skeleton h-4"
-          style={{ width: `${Math.random() * 30 + 70}%` }}
+          style={{ width: `${SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]}%` }}
         />
       ))}
     </div>

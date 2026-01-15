@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { Header } from '@/components/ui/Header';
 import { Footer } from '@/components/ui/Footer';
 import { TranscriptInput } from '@/components/wizard/TranscriptInput';
 import { ReferenceScript } from '@/components/wizard/ReferenceScript';
+import { KnowledgeBase } from '@/components/wizard/KnowledgeBase';
 import { ChecksConfig } from '@/components/wizard/ChecksConfig';
+import { OpenAIConfig } from '@/components/wizard/OpenAIConfig';
 import { RunButton } from '@/components/wizard/RunButton';
 import { KPICards } from '@/components/results/KPICards';
 import { Charts } from '@/components/results/Charts';
@@ -15,15 +16,8 @@ import { IssueTable } from '@/components/results/IssueTable';
 import { CallViewer } from '@/components/results/CallViewer';
 import { FixesPanel } from '@/components/fixes/FixesPanel';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
-import { demoBatchTranscripts } from '@/data/demoData';
 
 function RunWizardPage() {
-  const { setTranscripts } = useAppStore();
-
-  // Load demo batch data by default
-  useEffect(() => {
-    setTranscripts(demoBatchTranscripts);
-  }, [setTranscripts]);
 
   return (
     <motion.div
@@ -39,8 +33,10 @@ function RunWizardPage() {
         </p>
       </div>
 
+      <OpenAIConfig />
       <TranscriptInput />
       <ReferenceScript />
+      <KnowledgeBase />
       <ChecksConfig />
       <RunButton />
     </motion.div>
@@ -79,7 +75,7 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes } = useAppStore();
+  const { goToStep, generateFixes, isRunning } = useAppStore();
 
   const handleGenerateFixes = () => {
     generateFixes();
@@ -110,9 +106,19 @@ function ResultsPage() {
           <button
             className="btn-primary flex items-center gap-2"
             onClick={handleGenerateFixes}
+            disabled={isRunning}
           >
-            Next: Generate Fixes
-            <ArrowRight className="w-4 h-4" />
+            {isRunning ? (
+              <>
+                <Sparkles className="w-4 h-4 animate-pulse" />
+                Generating Fixes...
+              </>
+            ) : (
+              <>
+                Next: Generate Fixes
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

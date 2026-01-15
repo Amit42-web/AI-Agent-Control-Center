@@ -375,57 +375,21 @@ export const demoGeneralFixes: Fix[] = [
   },
 ];
 
-// CSV format demo data string
-export const demoCSVContent = `call_id,timestamp,speaker,text,language
-demo-001,00:00,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-001,00:05,customer,"Hi, I need help with my internet connection. It keeps dropping.",en
-demo-001,00:10,bot,"I understand you're having connectivity issues. Let me help you troubleshoot that.",en
-demo-001,00:15,customer,"Yes please, it's been happening for two days now.",en
-demo-001,00:20,bot,"Please restart your router by unplugging it for 30 seconds.",en
-demo-001,00:25,customer,"I already tried that three times.",en
-demo-001,00:30,bot,"I see. Have you tried restarting your router?",en
-demo-001,00:35,customer,"Yes, I just told you I did that already.",en
-demo-001,00:40,bot,"I understand. Let me suggest restarting your router by unplugging it for 30 seconds.",en
-demo-001,00:45,customer,"Are you even listening? I said I already restarted it multiple times!",en
-demo-001,00:50,bot,"I apologize for the confusion. Have you tried power cycling your router?",en
-demo-001,00:55,customer,"Yeh kya ho raha hai? Mujhe Hindi mein baat karni hai.",hi
-demo-001,01:00,bot,"I understand you're frustrated. Let me check your account details.",en
-demo-001,01:05,customer,"Main Hindi mein baat kar raha hoon, aap English mein kyun jawab de rahe ho?",hi
-demo-001,01:10,bot,"Could you please provide your account number so I can look into this further?",en
-demo-001,01:15,customer,"Fine, my account number is 12345678.",en
-demo-001,01:20,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-001,01:25,customer,"What? We were already talking! Why are you greeting me again?",en
-demo-001,01:30,bot,"I apologize for any confusion. How may I help you today?",en
-demo-001,01:35,customer,"This is ridiculous. I want to speak to a human.",en
-demo-001,01:40,bot,"I understand your frustration. Let me transfer you to a human agent. Please hold.",en
-demo-002,00:00,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-002,00:05,customer,"I want to cancel my subscription.",en
-demo-002,00:10,bot,"I'm sorry to hear that. Your subscription has been cancelled.",en
-demo-002,00:15,customer,"Wait, don't you need to verify my identity first?",en
-demo-002,00:20,bot,"You're right, I apologize. Can I have your account number?",en
-demo-002,00:25,customer,"Mera account number 98765432 hai.",hi
-demo-002,00:30,bot,"Thank you. I've located your account. Are you sure you want to cancel?",en
-demo-003,00:00,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-003,00:05,customer,"My bill seems too high this month.",en
-demo-003,00:10,bot,"I'd be happy to help review your bill. Let me pull up your account.",en
-demo-003,00:15,customer,"Sure, take your time.",en
-demo-003,00:20,bot,"I'd be happy to help review your bill. Let me pull up your account.",en
-demo-003,00:25,customer,"You just said that...",en
-demo-003,00:30,bot,"I apologize. I'd be happy to help review your bill.",en
-demo-003,00:35,customer,"This bot is broken.",en
-demo-004,00:00,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-004,00:05,customer,"I need to update my address.",en
-demo-004,00:10,bot,"Of course! I can help you with that. What is your new address?",en
-demo-004,00:15,customer,"123 Main Street, Apt 4B, New York, NY 10001",en
-demo-004,00:20,bot,"Thank you. I've updated your address to 123 Main Street, Apt 4B, New York, NY 10001.",en
-demo-004,00:25,customer,"Great, thanks!",en
-demo-004,00:30,bot,"You're welcome! Is there anything else I can help you with?",en
-demo-004,00:35,customer,"No, that's all. Thanks!",en
-demo-004,00:40,bot,"Thank you for contacting TechSupport. Have a great day!",en
-demo-005,00:00,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-005,00:05,customer,"My payment didn't go through.",en
-demo-005,00:10,bot,"I'm sorry to hear about the payment issue. Let me check that for you.",en
-demo-005,00:15,bot,"Hello! Welcome to TechSupport. How can I assist you today?",en
-demo-005,00:20,customer,"Uhh what? We were just talking about my payment.",en
-demo-005,00:25,bot,"I apologize for the confusion. Could you tell me what you need help with?",en
-demo-005,00:30,customer,"Never mind, this is useless.",en`;
+// CSV format demo data - each row contains one complete call transcript
+// Format matches user's actual data: one "Transcript" column, each cell has full call transcript
+export const demoCSVContent = `Transcript
+outbound Call to 919820203664
+setup user 00:00:00 Namaste!
+919820203664 00:00:01 the person
+setup user 00:00:01 This is
+919820203664 00:00:02 outbound Call to 919525823316
+setup user 00:00:01 Namaste! This is Meera calling on behalf of RBL Bank on a recorded line. Am I speaking with PRINCE KUMAR Ji?
+919525823316 00:00:13 hi
+919525823316 00:00:14 hindi speaking
+outbound Call to 919813066672
+setup user 00:00:00 Namaste!
+919813066672 00:00:00 namaste
+outbound Call to 918810324889
+setup user 00:00:00 Namaste! This is Meera calling on behalf of RBL Bank on a recorded line. Am I speaking with MS SHWETA MAHAWAR Ji?
+[BOT]: Hello! Welcome to TechSupport. How can I assist you today? [CUSTOMER]: Hi, I need help with my internet connection. It keeps dropping. [BOT]: I understand you're having connectivity issues. Let me help you troubleshoot that. [CUSTOMER]: Yes please, it's been happening for two days now. [BOT]: Please restart your router by unplugging it for 30 seconds. [CUSTOMER]: I already tried that three times. [BOT]: I see. Have you tried restarting your router? [CUSTOMER]: Yes, I just told you I did that already. [BOT]: I understand. Let me suggest restarting your router by unplugging it for 30 seconds. [CUSTOMER]: Are you even listening? I said I already restarted it multiple times! [BOT]: I apologize for the confusion. Have you tried power cycling your router? [CUSTOMER]: Yeh kya ho raha hai? Mujhe Hindi mein baat karni hai. [BOT]: I understand you're frustrated. Let me check your account details. [CUSTOMER]: Main Hindi mein baat kar raha hoon, aap English mein kyun jawab de rahe ho? [BOT]: Could you please provide your account number so I can look into this further? [CUSTOMER]: Fine, my account number is 12345678. [BOT]: Hello! Welcome to TechSupport. How can I assist you today? [CUSTOMER]: What? We were already talking! Why are you greeting me again? [BOT]: I apologize for any confusion. How may I help you today? [CUSTOMER]: This is ridiculous. I want to speak to a human. [BOT]: I understand your frustration. Let me transfer you to a human agent. Please hold.
+[BOT]: Hello! Welcome to TechSupport. How can I assist you today? [CUSTOMER]: I want to cancel my subscription. [BOT]: I'm sorry to hear that. Your subscription has been cancelled. [CUSTOMER]: Wait, don't you need to verify my identity first? [BOT]: You're right, I apologize. Can I have your account number? [CUSTOMER]: Mera account number 98765432 hai. [BOT]: Thank you. I've located your account. Are you sure you want to cancel?`;

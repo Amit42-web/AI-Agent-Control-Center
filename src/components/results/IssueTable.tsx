@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Filter, ExternalLink, Search } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { IssueType, Severity, DetectedIssue } from '@/types';
+import { IssueType, Severity } from '@/types';
 
 const issueTypeLabels: Record<IssueType, string> = {
   flow_deviation: 'Flow Deviation',

@@ -12,6 +12,7 @@ import {
   Pie,
   Cell,
   Legend,
+  LabelList,
 } from 'recharts';
 import { useAppStore } from '@/store/useAppStore';
 import { IssueType, Severity } from '@/types';
@@ -33,6 +34,67 @@ const severityColors: Record<Severity, string> = {
 
 const issueColors: string[] = ['#3b82f6', '#8b5cf6', '#14b8a6', '#f59e0b', '#f43f5e'];
 
+// Custom Tooltip component - defined outside to avoid recreation on every render
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="glass-card p-3 text-sm">
+        <p className="text-white font-medium">{payload[0].name}</p>
+        <p className="text-[var(--color-slate-400)]">{payload[0].value} issues</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom Label component for pie charts to show percentages
+const renderPieLabel = ({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  percent,
+}: {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  percent?: number;
+}) => {
+  // Guard clause: return null if any required value is undefined
+  if (
+    cx === undefined ||
+    cy === undefined ||
+    midAngle === undefined ||
+    innerRadius === undefined ||
+    outerRadius === undefined ||
+    percent === undefined
+  ) {
+    return null;
+  }
+
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      fontSize={14}
+      fontWeight={700}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
 export function Charts() {
   const { results } = useAppStore();
 
@@ -40,7 +102,7 @@ export function Charts() {
 
   // Issue by type data
   const issuesByTypeData = Object.entries(results.issuesByType)
-    .filter(([_, count]) => count > 0)
+    .filter(([, count]) => count > 0)
     .map(([type, count], index) => ({
       name: issueTypeLabels[type as IssueType],
       value: count,
@@ -49,7 +111,7 @@ export function Charts() {
 
   // Severity distribution data
   const severityData = Object.entries(results.severityDistribution)
-    .filter(([_, count]) => count > 0)
+    .filter(([, count]) => count > 0)
     .map(([severity, count]) => ({
       name: severity.charAt(0).toUpperCase() + severity.slice(1),
       value: count,
@@ -69,18 +131,6 @@ export function Charts() {
       fill: '#10b981',
     },
   ];
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="glass-card p-3 text-sm">
-          <p className="text-white font-medium">{payload[0].name}</p>
-          <p className="text-[var(--color-slate-400)]">{payload[0].value} issues</p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -107,6 +157,13 @@ export function Charts() {
               {issuesByTypeData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
+              <LabelList
+                dataKey="value"
+                position="right"
+                fill="#ffffff"
+                fontSize={12}
+                fontWeight={600}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -130,6 +187,8 @@ export function Charts() {
               outerRadius={90}
               paddingAngle={2}
               dataKey="value"
+              label={renderPieLabel}
+              labelLine={false}
             >
               {severityData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -163,6 +222,8 @@ export function Charts() {
               outerRadius={90}
               paddingAngle={2}
               dataKey="value"
+              label={renderPieLabel}
+              labelLine={false}
             >
               {callsData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
