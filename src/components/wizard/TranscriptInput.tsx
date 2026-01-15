@@ -47,6 +47,8 @@ export function TranscriptInput() {
     reader.onload = (e) => {
       const text = e.target?.result as string;
 
+      console.log('CSV file loaded, total length:', text.length);
+
       // Parse CSV properly - handle quoted cells that may contain newlines
       const rows: string[] = [];
       let currentRow = '';
@@ -54,15 +56,26 @@ export function TranscriptInput() {
 
       for (let i = 0; i < text.length; i++) {
         const char = text[i];
+        const nextChar = text[i + 1];
 
         if (char === '"') {
-          insideQuotes = !insideQuotes;
-        } else if (char === '\n' && !insideQuotes) {
+          // Handle escaped quotes ""
+          if (nextChar === '"') {
+            currentRow += '"';
+            i++; // Skip next quote
+          } else {
+            insideQuotes = !insideQuotes;
+          }
+        } else if ((char === '\n' || (char === '\r' && nextChar === '\n')) && !insideQuotes) {
           if (currentRow.trim()) {
             rows.push(currentRow.trim());
           }
           currentRow = '';
-        } else {
+          // Skip \r\n combination
+          if (char === '\r' && nextChar === '\n') {
+            i++;
+          }
+        } else if (char !== '\r') { // Skip standalone \r
           currentRow += char;
         }
       }
@@ -72,6 +85,8 @@ export function TranscriptInput() {
         rows.push(currentRow.trim());
       }
 
+      console.log(`Parsed ${rows.length} rows from CSV (including header)`);
+
       // Skip header row and parse transcripts
       const parsedTranscripts = rows.slice(1).map((row, index) => {
         // Remove surrounding quotes if present
@@ -80,10 +95,15 @@ export function TranscriptInput() {
           transcriptText = transcriptText.slice(1, -1);
         }
 
+        console.log(`\nParsing transcript ${index + 1}:`);
+        console.log('First 200 chars:', transcriptText.substring(0, 200));
+
         // Parse transcript based on speaker indicators
         // "setup user" = bot, phone number pattern = customer
         const lines = transcriptText.split('\n');
         const parsedLines = [];
+
+        console.log(`Split into ${lines.length} lines`);
 
         for (const line of lines) {
           const trimmedLine = line.trim();
@@ -134,12 +154,14 @@ export function TranscriptInput() {
           }
 
           if (!parsed && trimmedLine) {
-            console.warn('Line did not match any pattern and was skipped:', trimmedLine);
+            console.warn('Line did not match any pattern and was skipped:', trimmedLine.substring(0, 100));
           }
         }
 
         if (parsedLines.length === 0) {
           console.warn('No lines were parsed from transcript. First 200 chars:', transcriptText.substring(0, 200));
+        } else {
+          console.log(`Successfully parsed ${parsedLines.length} lines`);
         }
 
         return {
@@ -152,10 +174,111 @@ export function TranscriptInput() {
         };
       }).filter(t => t.lines.length > 0);
 
+      console.log(`\nFinal result: ${parsedTranscripts.length} valid transcripts`);
       setTranscripts(parsedTranscripts);
     };
 
     reader.readAsText(file);
+  };
+
+  const handleTextFilesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    console.log(`Loading ${files.length} text file(s)`);
+
+    const parsedTranscripts: any[] = [];
+    let filesProcessed = 0;
+
+    Array.from(files).forEach((file, fileIndex) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const transcriptText = e.target?.result as string;
+
+        console.log(`\nProcessing text file: ${file.name}`);
+        console.log('First 200 chars:', transcriptText.substring(0, 200));
+
+        // Parse transcript based on speaker indicators
+        const lines = transcriptText.split('\n');
+        const parsedLines = [];
+
+        console.log(`Split into ${lines.length} lines`);
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          let parsed = false;
+
+          // Check if line starts with "setup user" (bot)
+          if (trimmedLine.toLowerCase().startsWith('setup user')) {
+            const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})?\s*(.*)/i);
+            if (match && match[2]) {
+              parsedLines.push({
+                speaker: 'bot' as const,
+                text: match[2].trim(),
+                timestamp: match[1] || undefined,
+              });
+              parsed = true;
+            } else {
+              console.warn('Setup user line found but failed to parse:', trimmedLine);
+            }
+          }
+          // Check if line starts with phone number (customer)
+          else if (/^\d{10,}/.test(trimmedLine)) {
+            const match = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})?\s*(.*)/);
+            if (match && match[3]) {
+              parsedLines.push({
+                speaker: 'customer' as const,
+                text: match[3].trim(),
+                timestamp: match[2] || undefined,
+              });
+              parsed = true;
+            } else {
+              console.warn('Phone number line found but failed to parse:', trimmedLine);
+            }
+          }
+          // Fallback: try old [BOT]/[CUSTOMER] format
+          else if (trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i)) {
+            const m = trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+            if (m) {
+              parsedLines.push({
+                speaker: m[1].toLowerCase() as 'bot' | 'customer',
+                text: m[2].trim(),
+              });
+              parsed = true;
+            }
+          }
+
+          if (!parsed && trimmedLine) {
+            console.warn('Line did not match any pattern:', trimmedLine.substring(0, 100));
+          }
+        }
+
+        if (parsedLines.length > 0) {
+          parsedTranscripts.push({
+            id: `txt-call-${fileIndex + 1}`,
+            lines: parsedLines,
+            metadata: {
+              date: new Date().toISOString().split('T')[0],
+              source: 'txt-upload',
+              filename: file.name,
+            },
+          });
+          console.log(`Successfully parsed ${parsedLines.length} lines from ${file.name}`);
+        } else {
+          console.warn(`No lines were parsed from ${file.name}`);
+        }
+
+        filesProcessed++;
+        if (filesProcessed === files.length) {
+          console.log(`\nAll files processed. Total transcripts: ${parsedTranscripts.length}`);
+          setTranscripts(parsedTranscripts);
+        }
+      };
+
+      reader.readAsText(file);
+    });
   };
 
   const downloadDemoCSV = () => {
@@ -263,7 +386,7 @@ export function TranscriptInput() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <label className="btn-primary flex items-center gap-2 cursor-pointer">
                   <Upload className="w-4 h-4" />
                   Upload CSV File
@@ -274,6 +397,19 @@ export function TranscriptInput() {
                     className="hidden"
                   />
                 </label>
+
+                <label className="btn-primary flex items-center gap-2 cursor-pointer">
+                  <FileText className="w-4 h-4" />
+                  Upload Text Files
+                  <input
+                    type="file"
+                    accept=".txt"
+                    multiple
+                    onChange={handleTextFilesUpload}
+                    className="hidden"
+                  />
+                </label>
+
                 <button
                   onClick={downloadDemoCSV}
                   className="btn-secondary flex items-center gap-2"
@@ -283,16 +419,29 @@ export function TranscriptInput() {
                 </button>
               </div>
 
-              <div className="glass-card-subtle p-4">
-                <p className="text-sm text-[var(--color-slate-300)] mb-2">
-                  CSV Format:
-                </p>
-                <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
-                  <li>Each row contains one complete call transcript</li>
-                  <li>Format each message as: [BOT]: message or [CUSTOMER]: message</li>
-                  <li>Example: [BOT]: Hello! [CUSTOMER]: Hi there [BOT]: How can I help?</li>
-                  <li>First row should be header: &quot;transcript&quot;</li>
-                </ul>
+              <div className="glass-card-subtle p-4 space-y-3">
+                <div>
+                  <p className="text-sm text-[var(--color-slate-300)] mb-2 font-medium">
+                    CSV Format:
+                  </p>
+                  <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
+                    <li>One row = one complete call (multi-line transcripts in ONE cell)</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">setup user 00:00:00 Message</code> for bot</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05 Message</code> for customer</li>
+                    <li>First row should be header: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Transcript</code></li>
+                  </ul>
+                </div>
+                <div className="border-t border-[var(--color-navy-700)] pt-3">
+                  <p className="text-sm text-[var(--color-slate-300)] mb-2 font-medium">
+                    Text Files Format:
+                  </p>
+                  <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
+                    <li>One .txt file = one complete call transcript</li>
+                    <li>You can upload multiple .txt files at once</li>
+                    <li>Each file uses the same format as CSV cells (setup user / phone number)</li>
+                    <li>Multi-line content is supported within each file</li>
+                  </ul>
+                </div>
               </div>
 
               {transcripts.length > 0 && (

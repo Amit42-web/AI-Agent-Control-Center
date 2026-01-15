@@ -24,14 +24,19 @@ export function ReferenceScript() {
     setReferenceScript(defaultReferenceScript);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!templateName.trim()) {
       alert('Please enter a template name');
       return;
     }
-    saveTemplate(templateName.trim(), referenceScript);
-    setTemplateName('');
-    setShowSaveDialog(false);
+    try {
+      await saveTemplate(templateName.trim(), referenceScript);
+      setTemplateName('');
+      setShowSaveDialog(false);
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('Failed to save template. Please try again.');
+    }
   };
 
   const handleLoad = (templateId: string) => {
