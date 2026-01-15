@@ -87,6 +87,8 @@ export interface AppState {
   transcripts: Transcript[];
   referenceScript: string;
   referenceEnabled: boolean;
+  knowledgeBase: string;
+  knowledgeBaseEnabled: boolean;
   checks: CheckConfig[];
 
   // OpenAI configuration
@@ -106,6 +108,8 @@ export interface AppState {
   setTranscripts: (transcripts: Transcript[]) => void;
   setReferenceScript: (script: string) => void;
   setReferenceEnabled: (enabled: boolean) => void;
+  setKnowledgeBase: (kb: string) => void;
+  setKnowledgeBaseEnabled: (enabled: boolean) => void;
   setOpenAIConfig: (config: Partial<OpenAIConfig>) => void;
   toggleCheck: (checkId: CheckType) => void;
   updateCheckInstructions: (checkId: CheckType, instructions: string) => void;

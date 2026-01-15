@@ -6,6 +6,7 @@ import { Header } from '@/components/ui/Header';
 import { Footer } from '@/components/ui/Footer';
 import { TranscriptInput } from '@/components/wizard/TranscriptInput';
 import { ReferenceScript } from '@/components/wizard/ReferenceScript';
+import { KnowledgeBase } from '@/components/wizard/KnowledgeBase';
 import { ChecksConfig } from '@/components/wizard/ChecksConfig';
 import { OpenAIConfig } from '@/components/wizard/OpenAIConfig';
 import { RunButton } from '@/components/wizard/RunButton';
@@ -35,6 +36,7 @@ function RunWizardPage() {
       <OpenAIConfig />
       <TranscriptInput />
       <ReferenceScript />
+      <KnowledgeBase />
       <ChecksConfig />
       <RunButton />
     </motion.div>
@@ -73,7 +75,7 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes } = useAppStore();
+  const { goToStep, generateFixes, isRunning } = useAppStore();
 
   const handleGenerateFixes = () => {
     generateFixes();
@@ -104,9 +106,19 @@ function ResultsPage() {
           <button
             className="btn-primary flex items-center gap-2"
             onClick={handleGenerateFixes}
+            disabled={isRunning}
           >
-            Next: Generate Fixes
-            <ArrowRight className="w-4 h-4" />
+            {isRunning ? (
+              <>
+                <Sparkles className="w-4 h-4 animate-pulse" />
+                Generating Fixes...
+              </>
+            ) : (
+              <>
+                Next: Generate Fixes
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

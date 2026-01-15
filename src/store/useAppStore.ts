@@ -21,6 +21,8 @@ const initialState = {
   transcripts: [demoTranscript],
   referenceScript: defaultReferenceScript,
   referenceEnabled: true,
+  knowledgeBase: '',
+  knowledgeBaseEnabled: false,
   checks: defaultChecks,
   openaiConfig: {
     apiKey: '',
@@ -51,6 +53,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ checks });
     }
   },
+
+  setKnowledgeBase: (kb: string) => set({ knowledgeBase: kb }),
+
+  setKnowledgeBaseEnabled: (enabled: boolean) => set({ knowledgeBaseEnabled: enabled }),
 
   setOpenAIConfig: (config) => {
     const currentConfig = get().openaiConfig;
@@ -103,10 +109,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysis: async () => {
-    const { transcripts, checks, referenceEnabled, referenceScript, openaiConfig } = get();
+    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig } = get();
+
+    // Check for environment variable API key first
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || openaiConfig.apiKey;
 
     // Validate OpenAI configuration
-    if (!openaiConfig.apiKey.trim()) {
+    if (!apiKey.trim()) {
       alert('Please configure your OpenAI API key before running analysis.');
       return;
     }
@@ -125,11 +134,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         try {
           const issues = await analyzeTranscript(
-            openaiConfig.apiKey,
+            apiKey,
             openaiConfig.model,
             transcript,
             checks,
-            referenceEnabled ? referenceScript : null
+            referenceEnabled ? referenceScript : null,
+            knowledgeBaseEnabled ? knowledgeBase : null
           );
           allIssues.push(...issues);
         } catch (error) {
@@ -192,11 +202,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   generateFixes: async () => {
-    const { results, referenceEnabled, referenceScript, transcripts, openaiConfig } = get();
+    const { results, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, transcripts, openaiConfig } = get();
     if (!results) return;
 
+    // Check for environment variable API key first
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || openaiConfig.apiKey;
+
     // Validate OpenAI configuration
-    if (!openaiConfig.apiKey.trim()) {
+    if (!apiKey.trim()) {
       alert('Please configure your OpenAI API key before generating fixes.');
       return;
     }
@@ -205,11 +218,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       const fixes = await generateFixSuggestions(
-        openaiConfig.apiKey,
+        apiKey,
         openaiConfig.model,
         results.issues,
         transcripts,
-        referenceEnabled ? referenceScript : null
+        referenceEnabled ? referenceScript : null,
+        knowledgeBaseEnabled ? knowledgeBase : null
       );
 
       set({ fixes, currentStep: 'fixes', isRunning: false });

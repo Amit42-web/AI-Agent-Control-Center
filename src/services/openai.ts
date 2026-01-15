@@ -37,7 +37,8 @@ export async function analyzeTranscript(
   model: string,
   transcript: Transcript,
   checks: CheckConfig[],
-  referenceScript: string | null
+  referenceScript: string | null,
+  knowledgeBase: string | null = null
 ): Promise<DetectedIssue[]> {
   const enabledChecks = checks.filter((c) => c.enabled);
 
@@ -61,6 +62,7 @@ Analyze the following transcript and identify issues based on these enabled chec
 ${checksDescription}
 
 ${referenceScript ? `Reference Script/Flow:\n${referenceScript}\n` : ''}
+${knowledgeBase ? `Knowledge Base:\n${knowledgeBase}\n` : ''}
 
 For each issue found, provide a JSON object with:
 - type: one of [flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue]
@@ -120,7 +122,8 @@ export async function generateFixSuggestions(
   model: string,
   issues: DetectedIssue[],
   transcripts: Transcript[],
-  referenceScript: string | null
+  referenceScript: string | null,
+  knowledgeBase: string | null = null
 ): Promise<{ scriptFixes: Fix[]; generalFixes: Fix[] }> {
   if (issues.length === 0) {
     return { scriptFixes: [], generalFixes: [] };
@@ -135,25 +138,27 @@ export async function generateFixSuggestions(
     issuesByType[issue.type].push(issue);
   });
 
-  const systemPrompt = `You are an expert AI voice bot developer and prompt engineer. Your task is to generate actionable fix suggestions for detected issues in voice bot call transcripts.
+  const systemPrompt = `You are an expert AI voice bot prompt engineer. Your task is to generate PROMPT-ONLY fix suggestions for detected issues in voice bot call transcripts.
 
-Based on the issues found, generate specific, actionable fixes. Consider:
-1. Script/Flow fixes - Changes to the reference script or conversation flow
-2. Prompt/Instruction fixes - Improvements to the bot's system prompts or instructions
+CRITICAL CONSTRAINTS:
+- ONLY suggest changes to bot prompts/instructions
+- DO NOT suggest code changes, UI changes, or system architecture changes
+- Focus exclusively on what can be added to the bot's system prompt or reference script
+- All fixes must be implementable by modifying prompts alone
 
-For each fix suggestion, provide a JSON object with:
-- issueType: the type of issue this fix addresses
-- problem: concise description of the problem
-- suggestion: specific, actionable fix suggestion
-- placementHint: where in the script/prompt this should be applied
-- exampleResponse: an example of how the bot should respond after the fix
-- relatedIssueIds: array of issue IDs this fix addresses
+For each fix, provide a JSON object with:
+- issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
+- problem: brief description of the problem identified
+- suggestion: SPECIFIC prompt text that can be added to the bot's system prompt
+- placementHint: where to add this in the reference script or knowledge base (e.g., "Add to greeting section", "Add to troubleshooting guidelines", "Add to knowledge base")
+- exampleResponse: example of how bot should respond after adding this prompt
+- relatedIssueIds: array of issue IDs this addresses
 
-Separate fixes into:
-- scriptFixes: Changes to the conversation flow or reference script
-- generalFixes: Changes to bot prompts, instructions, or behavior
+Categorize fixes:
+- scriptFixes: Prompt additions/modifications for reference script (flow-related)
+- generalFixes: Prompt additions for system instructions (behavior-related)
 
-Return a JSON object with "scriptFixes" and "generalFixes" arrays.`;
+Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
 
   const issuesSummary = issues
     .map(
@@ -164,7 +169,9 @@ Return a JSON object with "scriptFixes" and "generalFixes" arrays.`;
 
   const userPrompt = `Issues detected:\n\n${issuesSummary}\n\n${
     referenceScript ? `Current Reference Script:\n${referenceScript}\n\n` : ''
-  }Generate fix suggestions for these issues.`;
+  }${
+    knowledgeBase ? `Current Knowledge Base:\n${knowledgeBase}\n\n` : ''
+  }Generate PROMPT-ONLY fix suggestions. Each suggestion must be a specific prompt instruction that can be added to the bot's system prompt, reference script, or knowledge base.`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
