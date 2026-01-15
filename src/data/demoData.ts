@@ -378,43 +378,124 @@ export const demoGeneralFixes: Fix[] = [
 // CSV format demo data - ONE COLUMN ONLY with complete call transcripts
 // Header: Transcript
 // Each row = one complete call transcript in a single cell
-// Format: "setup user" = bot's part, phone number = customer's part
+// Format: Speaker and timestamp on one line, message text on next line(s)
 export const demoCSVContent = `Transcript
-"setup user 00:00:00 Hello! Welcome to TechSupport. How can I assist you today?
-919820203664 00:00:05 Hi, I need help with my internet connection. It keeps dropping.
-setup user 00:00:10 I understand you're having connectivity issues. Let me help you troubleshoot that.
-919820203664 00:00:15 Yes please, it's been happening for two days now.
-setup user 00:00:20 Please restart your router by unplugging it for 30 seconds.
-919820203664 00:00:25 I already tried that three times.
-setup user 00:00:30 I see. Have you tried restarting your router?
-919820203664 00:00:35 Yes, I just told you I did that already."
-"setup user 00:00:00 Hello! Welcome to TechSupport. How can I assist you today?
-918765432109 00:00:05 I want to cancel my subscription.
-setup user 00:00:10 I'm sorry to hear that. Your subscription has been cancelled.
-918765432109 00:00:15 Wait, don't you need to verify my identity first?
-setup user 00:00:20 You're right, I apologize. Can I have your account number?
-918765432109 00:00:25 Mera account number 98765432 hai.
-setup user 00:00:30 Thank you. I've located your account. Are you sure you want to cancel?"
-"setup user 00:00:00 Hello! Welcome to TechSupport. How can I assist you today?
-917654321098 00:00:05 My bill seems too high this month.
-setup user 00:00:10 I'd be happy to help review your bill. Let me pull up your account.
-917654321098 00:00:15 Sure, take your time.
-setup user 00:00:20 I'd be happy to help review your bill. Let me pull up your account.
-917654321098 00:00:25 You just said that...
-setup user 00:00:30 I apologize. I'd be happy to help review your bill.
-917654321098 00:00:35 This bot is broken."
-"setup user 00:00:00 Hello! Welcome to TechSupport. How can I assist you today?
-916543210987 00:00:05 I need to update my address.
-setup user 00:00:10 Of course! I can help you with that. What is your new address?
-916543210987 00:00:15 123 Main Street, Apt 4B, New York, NY 10001
-setup user 00:00:20 Thank you. I've updated your address to 123 Main Street, Apt 4B, New York, NY 10001.
-916543210987 00:00:25 Great, thanks!
-setup user 00:00:30 You're welcome! Is there anything else I can help you with?
-916543210987 00:00:35 No, that's all. Thanks!"
-"setup user 00:00:00 Hello! Welcome to TechSupport. How can I assist you today?
-915432109876 00:00:05 My payment didn't go through.
-setup user 00:00:10 I'm sorry to hear about the payment issue. Let me check that for you.
-setup user 00:00:15 Hello! Welcome to TechSupport. How can I assist you today?
-915432109876 00:00:20 Uhh what? We were just talking about my payment.
-setup user 00:00:25 I apologize for the confusion. Could you tell me what you need help with?
-915432109876 00:00:30 Never mind, this is useless."`;
+"outbound Call to 919820203664
+
+ setup user  00:00:00
+ Hello! Welcome to TechSupport. How can I assist you today?
+
+ 919820203664  00:00:05
+ Hi, I need help with my internet connection. It keeps dropping.
+
+ setup user  00:00:10
+ I understand you're having connectivity issues. Let me help you troubleshoot that.
+
+ 919820203664  00:00:15
+ Yes please, it's been happening for two days now.
+
+ setup user  00:00:20
+ Please restart your router by unplugging it for 30 seconds.
+
+ 919820203664  00:00:25
+ I already tried that three times.
+
+ setup user  00:00:30
+ I see. Have you tried restarting your router?
+
+ 919820203664  00:00:35
+ Yes, I just told you I did that already."
+"outbound Call to 918765432109
+
+ setup user  00:00:00
+ Hello! Welcome to TechSupport. How can I assist you today?
+
+ 918765432109  00:00:05
+ I want to cancel my subscription.
+
+ setup user  00:00:10
+ I'm sorry to hear that. Your subscription has been cancelled.
+
+ 918765432109  00:00:15
+ Wait, don't you need to verify my identity first?
+
+ setup user  00:00:20
+ You're right, I apologize. Can I have your account number?
+
+ 918765432109  00:00:25
+ Mera account number 98765432 hai.
+
+ setup user  00:00:30
+ Thank you. I've located your account. Are you sure you want to cancel?"
+"outbound Call to 917654321098
+
+ setup user  00:00:00
+ Hello! Welcome to TechSupport. How can I assist you today?
+
+ 917654321098  00:00:05
+ My bill seems too high this month.
+
+ setup user  00:00:10
+ I'd be happy to help review your bill. Let me pull up your account.
+
+ 917654321098  00:00:15
+ Sure, take your time.
+
+ setup user  00:00:20
+ I'd be happy to help review your bill. Let me pull up your account.
+
+ 917654321098  00:00:25
+ You just said that...
+
+ setup user  00:00:30
+ I apologize. I'd be happy to help review your bill.
+
+ 917654321098  00:00:35
+ This bot is broken."
+"outbound Call to 916543210987
+
+ setup user  00:00:00
+ Hello! Welcome to TechSupport. How can I assist you today?
+
+ 916543210987  00:00:05
+ I need to update my address.
+
+ setup user  00:00:10
+ Of course! I can help you with that. What is your new address?
+
+ 916543210987  00:00:15
+ 123 Main Street, Apt 4B, New York, NY 10001
+
+ setup user  00:00:20
+ Thank you. I've updated your address to 123 Main Street, Apt 4B, New York, NY 10001.
+
+ 916543210987  00:00:25
+ Great, thanks!
+
+ setup user  00:00:30
+ You're welcome! Is there anything else I can help you with?
+
+ 916543210987  00:00:35
+ No, that's all. Thanks!"
+"outbound Call to 915432109876
+
+ setup user  00:00:00
+ Hello! Welcome to TechSupport. How can I assist you today?
+
+ 915432109876  00:00:05
+ My payment didn't go through.
+
+ setup user  00:00:10
+ I'm sorry to hear about the payment issue. Let me check that for you.
+
+ setup user  00:00:15
+ Hello! Welcome to TechSupport. How can I assist you today?
+
+ 915432109876  00:00:20
+ Uhh what? We were just talking about my payment.
+
+ setup user  00:00:25
+ I apologize for the confusion. Could you tell me what you need help with?
+
+ 915432109876  00:00:30
+ Never mind, this is useless."`;
