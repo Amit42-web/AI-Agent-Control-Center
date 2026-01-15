@@ -26,15 +26,14 @@ export function CallViewer() {
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
   const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  if (!selectedCallId || !results) return null;
-
-  const transcript = transcripts.find((t) => t.id === selectedCallId);
-  const callIssues = results.issues.filter((i) => i.callId === selectedCallId);
-
-  if (!transcript || !transcript.lines || !Array.isArray(transcript.lines)) return null;
+  // Early returns AFTER all hooks have been called
+  const isVisible = selectedCallId && results;
+  const transcript = isVisible ? transcripts.find((t) => t.id === selectedCallId) : null;
+  const callIssues = isVisible && results ? results.issues.filter((i) => i.callId === selectedCallId) : [];
+  const hasValidTranscript = transcript && transcript.lines && Array.isArray(transcript.lines);
 
   // Get line numbers for the currently hovered issue
-  const hoveredIssue = hoveredIssueId
+  const hoveredIssue = hoveredIssueId && callIssues.length > 0
     ? callIssues.find((i) => i.id === hoveredIssueId)
     : null;
   const hoveredLines = hoveredIssue && hoveredIssue.lineNumbers && Array.isArray(hoveredIssue.lineNumbers)
@@ -43,7 +42,7 @@ export function CallViewer() {
 
   // Auto-scroll to relevant line when hovering over an issue
   useEffect(() => {
-    if (!hoveredIssueId || !results) return;
+    if (!hoveredIssueId || !results || !selectedCallId) return;
 
     // Find the hovered issue from results
     const issue = results.issues.find((i) => i.id === hoveredIssueId && i.callId === selectedCallId);
@@ -67,6 +66,9 @@ export function CallViewer() {
       }
     }
   }, [hoveredIssueId, results, selectedCallId]);
+
+  // Return null AFTER all hooks
+  if (!isVisible || !hasValidTranscript) return null;
 
   return (
     <AnimatePresence>
