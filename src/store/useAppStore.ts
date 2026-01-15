@@ -26,7 +26,7 @@ const initialState = {
   checks: defaultChecks,
   openaiConfig: {
     apiKey: '',
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1-mini',
   },
   isRunning: false,
   runProgress: 0,
@@ -111,12 +111,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   runAnalysis: async () => {
     const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig } = get();
 
-    // Check for environment variable API key first
-    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || openaiConfig.apiKey;
+    // Get API key from environment variable only
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
 
     // Validate OpenAI configuration
     if (!apiKey.trim()) {
-      alert('Please configure your OpenAI API key before running analysis.');
+      alert('OpenAI API key is not configured. Please contact your administrator.');
       return;
     }
 
@@ -205,12 +205,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { results, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, transcripts, openaiConfig } = get();
     if (!results) return;
 
-    // Check for environment variable API key first
-    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || openaiConfig.apiKey;
+    // Get API key from environment variable only
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
 
     // Validate OpenAI configuration
     if (!apiKey.trim()) {
-      alert('Please configure your OpenAI API key before generating fixes.');
+      alert('OpenAI API key is not configured. Please contact your administrator.');
       return;
     }
 

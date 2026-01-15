@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Lightbulb, MessageSquare } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -24,6 +24,7 @@ const severityClasses: Record<Severity, string> = {
 export function CallViewer() {
   const { selectedCallId, setSelectedCallId, results, transcripts } = useAppStore();
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
+  const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   if (!selectedCallId || !results) return null;
 
@@ -39,6 +40,22 @@ export function CallViewer() {
   const hoveredLines = hoveredIssue
     ? new Set(hoveredIssue.lineNumbers)
     : null;
+
+  // Auto-scroll to relevant line when hovering over an issue
+  useEffect(() => {
+    if (hoveredLines && hoveredLines.size > 0) {
+      // Get the first line number from the hovered issue
+      const firstLineNumber = Math.min(...Array.from(hoveredLines));
+      const lineElement = lineRefs.current.get(firstLineNumber);
+
+      if (lineElement) {
+        lineElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    }
+  }, [hoveredLines]);
 
   return (
     <AnimatePresence>
@@ -89,12 +106,20 @@ export function CallViewer() {
                 <div className="space-y-1">
                   {transcript.lines.map((line, index) => {
                     // Determine highlighting state based on hover
-                    const isRelevant = hoveredLines ? hoveredLines.has(index + 1) : true;
-                    const isDimmed = hoveredLines && !hoveredLines.has(index + 1);
+                    const lineNumber = index + 1;
+                    const isRelevant = hoveredLines ? hoveredLines.has(lineNumber) : true;
+                    const isDimmed = hoveredLines && !hoveredLines.has(lineNumber);
 
                     return (
                       <div
                         key={index}
+                        ref={(el) => {
+                          if (el) {
+                            lineRefs.current.set(lineNumber, el);
+                          } else {
+                            lineRefs.current.delete(lineNumber);
+                          }
+                        }}
                         className={`transcript-line ${isRelevant ? 'highlighted' : ''}`}
                         style={{
                           opacity: isDimmed ? 0.3 : 1,
