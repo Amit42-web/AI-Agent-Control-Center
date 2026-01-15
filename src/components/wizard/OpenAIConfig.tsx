@@ -8,6 +8,8 @@ import { useAppStore } from '@/store/useAppStore';
 const OPENAI_MODELS = [
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Recommended)', description: 'Fast and cost-effective' },
   { value: 'gpt-4o', label: 'GPT-4o', description: 'More capable, higher cost' },
+  { value: 'o1', label: 'O1', description: 'Advanced reasoning model' },
+  { value: 'o1-mini', label: 'O1 Mini', description: 'Fast reasoning model' },
   { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', description: 'Previous generation' },
   { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', description: 'Fastest, lowest cost' },
 ];
@@ -17,7 +19,9 @@ export function OpenAIConfig() {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
 
-  const isConfigured = openaiConfig.apiKey.trim().length > 0;
+  // Check for environment variable API key
+  const envApiKey = typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_OPENAI_API_KEY || '' : '';
+  const isConfigured = (openaiConfig.apiKey.trim().length > 0) || (envApiKey.length > 0);
 
   return (
     <motion.div
@@ -61,13 +65,23 @@ export function OpenAIConfig() {
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
         >
-          {!isConfigured && (
+          {envApiKey ? (
+            <div className="glass-card-subtle p-3 flex items-start gap-3 border border-green-500/20">
+              <AlertCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="text-green-400 font-medium mb-1">API Key Configured</p>
+                <p className="text-[var(--color-slate-400)]">
+                  Using API key from environment variable (NEXT_PUBLIC_OPENAI_API_KEY)
+                </p>
+              </div>
+            </div>
+          ) : !isConfigured && (
             <div className="glass-card-subtle p-3 flex items-start gap-3 border border-amber-500/20">
               <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="text-sm">
                 <p className="text-amber-400 font-medium mb-1">API Key Required</p>
                 <p className="text-[var(--color-slate-400)]">
-                  Please enter your OpenAI API key to enable real-time analysis. Get your API key
+                  Please enter your OpenAI API key below or set NEXT_PUBLIC_OPENAI_API_KEY environment variable. Get your API key
                   from{' '}
                   <a
                     href="https://platform.openai.com/api-keys"
@@ -83,25 +97,27 @@ export function OpenAIConfig() {
             </div>
           )}
 
-          {/* API Key Input */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-[var(--color-slate-300)]">OpenAI API Key</label>
-              <button
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="text-xs text-[var(--color-slate-400)] hover:text-white transition-colors"
-              >
-                {showApiKey ? 'Hide' : 'Show'}
-              </button>
+          {/* API Key Input - Only show if not configured via environment */}
+          {!envApiKey && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-[var(--color-slate-300)]">OpenAI API Key</label>
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="text-xs text-[var(--color-slate-400)] hover:text-white transition-colors"
+                >
+                  {showApiKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                className="input-field font-mono text-sm"
+                value={openaiConfig.apiKey}
+                onChange={(e) => setOpenAIConfig({ apiKey: e.target.value })}
+                placeholder="sk-..."
+              />
             </div>
-            <input
-              type={showApiKey ? 'text' : 'password'}
-              className="input-field font-mono text-sm"
-              value={openaiConfig.apiKey}
-              onChange={(e) => setOpenAIConfig({ apiKey: e.target.value })}
-              placeholder="sk-..."
-            />
-          </div>
+          )}
 
           {/* Model Selection */}
           <div className="space-y-2">

@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { Header } from '@/components/ui/Header';
@@ -16,15 +15,8 @@ import { IssueTable } from '@/components/results/IssueTable';
 import { CallViewer } from '@/components/results/CallViewer';
 import { FixesPanel } from '@/components/fixes/FixesPanel';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
-import { demoBatchTranscripts } from '@/data/demoData';
 
 function RunWizardPage() {
-  const { setTranscripts } = useAppStore();
-
-  // Load demo batch data by default
-  useEffect(() => {
-    setTranscripts(demoBatchTranscripts);
-  }, [setTranscripts]);
 
   return (
     <motion.div
