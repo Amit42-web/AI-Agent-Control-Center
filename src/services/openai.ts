@@ -184,14 +184,16 @@ CRITICAL CONSTRAINTS:
 For each fix, provide a JSON object with:
 - issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
 - problem: brief description of the problem identified
-- suggestion: SPECIFIC prompt text that can be added to the bot's system prompt
-- placementHint: where to add this in the reference script or knowledge base (e.g., "Add to greeting section", "Add to troubleshooting guidelines", "Add to knowledge base")
-- exampleResponse: example of how bot should respond after adding this prompt
+- suggestion: SPECIFIC prompt text that can be added to the bot's system prompt (avoid using quotes or special characters)
+- placementHint: where to add this in the reference script or knowledge base
+- exampleResponse: example of how bot should respond after adding this prompt (avoid using quotes or special characters)
 - relatedIssueIds: array of issue IDs this addresses
 
 Categorize fixes:
 - scriptFixes: Prompt additions/modifications for reference script (flow-related)
 - generalFixes: Prompt additions for system instructions (behavior-related)
+
+IMPORTANT: Return ONLY valid JSON without any markdown, comments, or extra text. Use single quotes inside string values if needed. Ensure all strings are properly escaped.
 
 Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
 
@@ -238,45 +240,70 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
       fixesData = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('Attempted to parse:', jsonStr);
+      console.error('Attempted to parse:', jsonStr.substring(0, 500)); // Log first 500 chars
 
-      // Try one more time with a more lenient approach
+      // Try multiple cleanup strategies
       try {
-        // Remove any trailing commas before closing brackets/braces
-        const cleaned = jsonStr
-          .replace(/,(\s*[}\]])/g, '$1')
-          .replace(/\n/g, ' ')
-          .replace(/\r/g, '');
+        // Strategy 1: Fix common issues
+        let cleaned = jsonStr
+          .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
+          .replace(/\n/g, ' ')             // Remove newlines
+          .replace(/\r/g, '')              // Remove carriage returns
+          .replace(/\t/g, ' ');            // Replace tabs with spaces
+
         fixesData = JSON.parse(cleaned);
       } catch (secondError) {
-        throw new Error(`Failed to parse fix suggestions: ${parseError instanceof Error ? parseError.message : 'Invalid JSON'}`);
+        try {
+          // Strategy 2: More aggressive - fix escaped quotes
+          let cleaned = jsonStr
+            .replace(/\\'/g, "'")           // Fix escaped single quotes
+            .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
+            .replace(/[\n\r\t]/g, ' ')      // Remove all whitespace chars
+            .replace(/\s+/g, ' ');          // Collapse multiple spaces
+
+          fixesData = JSON.parse(cleaned);
+        } catch (thirdError) {
+          // Last resort: try to extract just the arrays
+          console.error('All parsing strategies failed');
+          console.error('Original error:', parseError);
+          console.error('Second error:', secondError);
+          console.error('Third error:', thirdError);
+
+          throw new Error(`Failed to parse fix suggestions. The AI response was not in valid JSON format. Please try again.`);
+        }
       }
     }
 
-    // Add IDs to fixes
-    const scriptFixes = (fixesData.scriptFixes || []).map((fix: {
-      issueType: string;
-      problem: string;
-      suggestion: string;
-      placementHint: string;
-      exampleResponse: string;
-      relatedIssueIds: string[];
-    }, idx: number) => ({
-      ...fix,
-      id: `script-fix-${idx}`,
-    }));
+    // Validate structure
+    if (!fixesData || typeof fixesData !== 'object') {
+      console.error('Parsed data is not an object:', fixesData);
+      return { scriptFixes: [], generalFixes: [] };
+    }
 
-    const generalFixes = (fixesData.generalFixes || []).map((fix: {
-      issueType: string;
-      problem: string;
-      suggestion: string;
-      placementHint: string;
-      exampleResponse: string;
-      relatedIssueIds: string[];
-    }, idx: number) => ({
-      ...fix,
-      id: `general-fix-${idx}`,
-    }));
+    // Add IDs to fixes with validation
+    const scriptFixes = Array.isArray(fixesData.scriptFixes)
+      ? fixesData.scriptFixes.map((fix: any, idx: number) => ({
+          id: `script-fix-${idx}`,
+          issueType: fix.issueType || 'quality_issue',
+          problem: fix.problem || 'Issue detected',
+          suggestion: fix.suggestion || '',
+          placementHint: fix.placementHint || 'Add to system prompt',
+          exampleResponse: fix.exampleResponse || '',
+          relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
+        }))
+      : [];
+
+    const generalFixes = Array.isArray(fixesData.generalFixes)
+      ? fixesData.generalFixes.map((fix: any, idx: number) => ({
+          id: `general-fix-${idx}`,
+          issueType: fix.issueType || 'quality_issue',
+          problem: fix.problem || 'Issue detected',
+          suggestion: fix.suggestion || '',
+          placementHint: fix.placementHint || 'Add to system prompt',
+          exampleResponse: fix.exampleResponse || '',
+          relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
+        }))
+      : [];
 
     return { scriptFixes, generalFixes };
   } catch (error) {
