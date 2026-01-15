@@ -31,32 +31,42 @@ export function CallViewer() {
   const transcript = transcripts.find((t) => t.id === selectedCallId);
   const callIssues = results.issues.filter((i) => i.callId === selectedCallId);
 
-  if (!transcript) return null;
+  if (!transcript || !transcript.lines || !Array.isArray(transcript.lines)) return null;
 
   // Get line numbers for the currently hovered issue
   const hoveredIssue = hoveredIssueId
     ? callIssues.find((i) => i.id === hoveredIssueId)
     : null;
-  const hoveredLines = hoveredIssue
+  const hoveredLines = hoveredIssue && hoveredIssue.lineNumbers && Array.isArray(hoveredIssue.lineNumbers)
     ? new Set(hoveredIssue.lineNumbers)
     : null;
 
   // Auto-scroll to relevant line when hovering over an issue
   useEffect(() => {
-    if (hoveredIssueId && hoveredLines && hoveredLines.size > 0) {
-      // Get the first line number from the hovered issue
-      const firstLineNumber = Math.min(...Array.from(hoveredLines));
-      const lineElement = lineRefs.current.get(firstLineNumber);
+    if (!hoveredIssueId || !results) return;
 
-      if (lineElement) {
+    // Find the hovered issue from results
+    const issue = results.issues.find((i) => i.id === hoveredIssueId && i.callId === selectedCallId);
+    if (!issue || !issue.lineNumbers || !Array.isArray(issue.lineNumbers) || issue.lineNumbers.length === 0) {
+      return;
+    }
+
+    // Get the first line number
+    const firstLineNumber = Math.min(...issue.lineNumbers);
+    if (!Number.isFinite(firstLineNumber)) return;
+
+    const lineElement = lineRefs.current.get(firstLineNumber);
+    if (lineElement) {
+      try {
         lineElement.scrollIntoView({
           behavior: 'smooth',
           block: 'center',
         });
+      } catch (error) {
+        console.error('Error scrolling to line:', error);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoveredIssueId]); // hoveredLines is derived from hoveredIssueId, no need to include it
+  }, [hoveredIssueId, results, selectedCallId]);
 
   return (
     <AnimatePresence>
@@ -170,10 +180,10 @@ export function CallViewer() {
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4 text-amber-400" />
                         <span className="text-sm font-medium text-white">
-                          {issueTypeLabels[issue.type]}
+                          {issueTypeLabels[issue.type] || issue.type}
                         </span>
                       </div>
-                      <span className={`badge ${severityClasses[issue.severity]}`}>
+                      <span className={`badge ${severityClasses[issue.severity] || 'badge-medium'}`}>
                         {issue.severity}
                       </span>
                     </div>
