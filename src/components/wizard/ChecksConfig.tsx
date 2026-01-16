@@ -11,6 +11,9 @@ import {
   Lock,
   Save,
   Star,
+  Edit2,
+  Check,
+  X,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { CheckType } from '@/types';
@@ -207,12 +210,33 @@ export function ChecksConfig() {
     referenceEnabled,
     toggleCheck,
     updateCheckInstructions,
+    updateCheckName,
     resetCheckInstructions,
   } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedCheck, setExpandedCheck] = useState<CheckType | null>(null);
+  const [editingCheckId, setEditingCheckId] = useState<CheckType | null>(null);
+  const [editedName, setEditedName] = useState('');
 
   const enabledCount = checks.filter((c) => c.enabled).length;
+
+  const startEditingName = (checkId: CheckType, currentName: string) => {
+    setEditingCheckId(checkId);
+    setEditedName(currentName);
+  };
+
+  const saveEditedName = (checkId: CheckType) => {
+    if (editedName.trim()) {
+      updateCheckName(checkId, editedName.trim());
+    }
+    setEditingCheckId(null);
+    setEditedName('');
+  };
+
+  const cancelEditingName = () => {
+    setEditingCheckId(null);
+    setEditedName('');
+  };
 
   return (
     <motion.div
@@ -265,14 +289,51 @@ export function ChecksConfig() {
                 layout
               >
                 {/* Check Header */}
-                <div className="flex items-center justify-between p-4">
+                <div className="flex items-center justify-between p-4 group">
                   <div className="flex items-center gap-3 flex-1">
                     <span className="text-xl">{checkIcons[check.id]}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-white text-sm">
-                          {check.name}
-                        </h4>
+                        {editingCheckId === check.id ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <input
+                              type="text"
+                              value={editedName}
+                              onChange={(e) => setEditedName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEditedName(check.id);
+                                if (e.key === 'Escape') cancelEditingName();
+                              }}
+                              className="flex-1 px-2 py-1 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => saveEditedName(check.id)}
+                              className="p-1 hover:bg-[var(--color-navy-700)] rounded"
+                            >
+                              <Check className="w-4 h-4 text-green-400" />
+                            </button>
+                            <button
+                              onClick={cancelEditingName}
+                              className="p-1 hover:bg-[var(--color-navy-700)] rounded"
+                            >
+                              <X className="w-4 h-4 text-red-400" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <h4 className="font-medium text-white text-sm">
+                              {check.name}
+                            </h4>
+                            <button
+                              onClick={() => startEditingName(check.id, check.name)}
+                              className="p-1 hover:bg-[var(--color-navy-700)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Edit check name"
+                            >
+                              <Edit2 className="w-3 h-3 text-[var(--color-slate-400)]" />
+                            </button>
+                          </>
+                        )}
                         {isLocked && (
                           <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 rounded text-xs text-amber-400">
                             <Lock className="w-3 h-3" />

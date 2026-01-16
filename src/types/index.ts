@@ -113,6 +113,7 @@ export interface AppState {
   setOpenAIConfig: (config: Partial<OpenAIConfig>) => void;
   toggleCheck: (checkId: CheckType) => void;
   updateCheckInstructions: (checkId: CheckType, instructions: string) => void;
+  updateCheckName: (checkId: CheckType, name: string) => void;
   resetCheckInstructions: (checkId: CheckType) => void;
   resetAllToDefaults: () => void;
   runAnalysis: () => Promise<void>;

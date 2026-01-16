@@ -88,6 +88,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  updateCheckName: (checkId: CheckType, name: string) => {
+    const { checks } = get();
+    set({
+      checks: checks.map((check) =>
+        check.id === checkId ? { ...check, name } : check
+      ),
+    });
+  },
+
   resetCheckInstructions: (checkId: CheckType) => {
     const { checks } = get();
     set({
