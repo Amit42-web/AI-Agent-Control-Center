@@ -23,8 +23,8 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
   };
 
   const copyAll = () => {
-    const fullText = `${fix.suggestion}\n\nExample: ${fix.exampleResponse}`;
-    copyToClipboard(fullText, 'all');
+    // Only copy suggestion, not the example
+    copyToClipboard(fix.suggestion, 'all');
   };
 
   return (

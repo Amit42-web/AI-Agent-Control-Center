@@ -142,28 +142,20 @@ function FixesPage() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-2">Fix Suggestions</h2>
-          <p className="text-[var(--color-slate-400)]">
-            Actionable fixes based on the detected issues in your calls.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            className="btn-secondary flex items-center gap-2"
-            onClick={() => goToStep('results')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Results
-          </button>
-          <button
-            className="btn-secondary flex items-center gap-2"
-            onClick={() => goToStep('input')}
-          >
-            Start New Run
-          </button>
-        </div>
+      <div className="flex items-center gap-3">
+        <button
+          className="btn-secondary flex items-center gap-2"
+          onClick={() => goToStep('results')}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Results
+        </button>
+        <button
+          className="btn-secondary flex items-center gap-2"
+          onClick={() => goToStep('input')}
+        >
+          Start New Run
+        </button>
       </div>
 
       <FixesPanel />

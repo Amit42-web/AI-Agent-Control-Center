@@ -50,17 +50,58 @@ export function FixesPanel() {
     const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
 
     let script = referenceScript || '';
-    let additions = '\n\n# Selected Improvements:\n\n';
+    const scriptLines = script.split('\n');
 
-    selectedFixes.forEach((fix, index) => {
-      additions += `## ${index + 1}. ${fix.problem}\n\n`;
-      additions += `${fix.suggestion}\n\n`;
-      additions += `Example: ${fix.exampleResponse}\n\n`;
-      additions += `Placement: ${fix.placementHint}\n\n`;
-      additions += '---\n\n';
+    // Process each fix and insert it intelligently
+    selectedFixes.forEach((fix, fixIndex) => {
+      const suggestion = fix.suggestion;
+      const placementHint = fix.placementHint.toLowerCase();
+
+      // Find the best insertion point based on placement hint
+      let insertIndex = -1;
+
+      // Try to find a section that matches the placement hint
+      for (let i = 0; i < scriptLines.length; i++) {
+        const line = scriptLines[i].toLowerCase();
+
+        // Check if this line contains keywords from placement hint
+        if (placementHint.includes('beginning') || placementHint.includes('start')) {
+          insertIndex = Math.min(3, scriptLines.length); // After intro/header
+          break;
+        } else if (placementHint.includes('end') || placementHint.includes('closing')) {
+          insertIndex = scriptLines.length;
+          break;
+        } else if (placementHint.includes('greeting') && line.includes('greet')) {
+          insertIndex = i + 1;
+          break;
+        } else if (placementHint.includes('introduction') && line.includes('intro')) {
+          insertIndex = i + 1;
+          break;
+        } else if (placementHint.includes('verification') && (line.includes('verif') || line.includes('confirm'))) {
+          insertIndex = i + 1;
+          break;
+        } else if (placementHint.includes('question') && line.includes('?')) {
+          insertIndex = i + 1;
+          break;
+        } else if (placementHint.includes('response') && line.includes('response')) {
+          insertIndex = i + 1;
+          break;
+        }
+      }
+
+      // If no specific location found, add to end
+      if (insertIndex === -1) {
+        insertIndex = scriptLines.length;
+      }
+
+      // Create the addition with highlighting markers
+      const addition = `\n>>>>>> START OF NEW ADDITION ${fixIndex + 1} <<<<<<\n${suggestion}\n>>>>>> END OF NEW ADDITION ${fixIndex + 1} <<<<<<\n`;
+
+      // Insert at the determined position
+      scriptLines.splice(insertIndex, 0, addition);
     });
 
-    setFinalScript(script + additions);
+    setFinalScript(scriptLines.join('\n'));
     setShowFinalScript(true);
   };
 
