@@ -85,6 +85,30 @@ export interface OpenAIConfig {
   model: string;
 }
 
+export interface SavedAnalysis {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedAnalysisWithState extends SavedAnalysis {
+  state: AnalysisState;
+}
+
+export interface AnalysisState {
+  transcripts: Transcript[];
+  referenceScript: string;
+  referenceEnabled: boolean;
+  knowledgeBase: string;
+  knowledgeBaseEnabled: boolean;
+  checks: CheckConfig[];
+  openaiConfig: OpenAIConfig;
+  results: AnalysisResult | null;
+  fixes: FixSuggestions | null;
+  selectedCallId: string | null;
+}
+
 export interface AppState {
   // Input state
   transcripts: Transcript[];
@@ -100,7 +124,11 @@ export interface AppState {
   // Run state
   isRunning: boolean;
   runProgress: number;
-  currentStep: 'input' | 'running' | 'results' | 'fixes';
+  currentStep: 'analyses' | 'input' | 'running' | 'results' | 'fixes';
+
+  // Analysis management
+  currentAnalysisId: string | null;
+  currentAnalysisName: string | null;
 
   // Results state
   results: AnalysisResult | null;
@@ -124,5 +152,12 @@ export interface AppState {
   runAnalysis: () => Promise<void>;
   generateFixes: () => void;
   setSelectedCallId: (id: string | null) => void;
-  goToStep: (step: 'input' | 'running' | 'results' | 'fixes') => void;
+  goToStep: (step: 'analyses' | 'input' | 'running' | 'results' | 'fixes') => void;
+
+  // Analysis management
+  saveAnalysis: (name: string) => Promise<void>;
+  loadAnalysis: (id: string) => Promise<void>;
+  createNewAnalysis: (name: string) => void;
+  getAnalysisState: () => AnalysisState;
+  restoreAnalysisState: (state: AnalysisState) => void;
 }
