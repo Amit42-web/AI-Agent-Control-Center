@@ -106,25 +106,117 @@ export function AnalysisManager() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Animated background */}
+    <div className="min-h-screen relative overflow-hidden bg-[var(--color-navy-900)]">
+      {/* Space-themed animated background */}
       <div className="fixed inset-0 pointer-events-none">
+        {/* Stars */}
+        {[...Array(100)].map((_, i) => (
+          <motion.div
+            key={`star-${i}`}
+            className="absolute w-1 h-1 bg-white rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              opacity: [0.2, 1, 0.2],
+              scale: [0.5, 1, 0.5],
+            }}
+            transition={{
+              duration: 2 + Math.random() * 3,
+              repeat: Infinity,
+              delay: Math.random() * 5,
+            }}
+          />
+        ))}
+
+        {/* Comets */}
+        {[...Array(3)].map((_, i) => (
+          <motion.div
+            key={`comet-${i}`}
+            className="absolute"
+            initial={{
+              x: -100,
+              y: Math.random() * 100,
+            }}
+            animate={{
+              x: ['0%', '120%'],
+              y: [
+                `${Math.random() * 100}%`,
+                `${Math.random() * 100}%`,
+              ],
+            }}
+            transition={{
+              duration: 15 + Math.random() * 10,
+              repeat: Infinity,
+              delay: i * 8,
+              ease: 'linear',
+            }}
+          >
+            <div className="relative">
+              <div className="w-2 h-2 bg-blue-400 rounded-full shadow-[0_0_10px_2px_rgba(96,165,250,0.8)]" />
+              <motion.div
+                className="absolute top-0 left-0 w-32 h-px bg-gradient-to-r from-blue-400 to-transparent"
+                style={{ transformOrigin: 'left center' }}
+              />
+            </div>
+          </motion.div>
+        ))}
+
+        {/* Planets/Nebula effects */}
         <motion.div
-          className="absolute top-20 left-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
+          className="absolute top-20 left-10 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl"
           animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
+            scale: [1, 1.3, 1],
+            opacity: [0.2, 0.4, 0.2],
+            x: [0, 30, 0],
+            y: [0, -20, 0],
           }}
-          transition={{ duration: 8, repeat: Infinity }}
+          transition={{ duration: 20, repeat: Infinity }}
         />
         <motion.div
-          className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"
+          className="absolute top-1/3 right-20 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
-            opacity: [0.3, 0.5, 0.3],
+            opacity: [0.2, 0.4, 0.2],
+            x: [0, -30, 0],
+            y: [0, 20, 0],
           }}
-          transition={{ duration: 10, repeat: Infinity, delay: 1 }}
+          transition={{ duration: 25, repeat: Infinity }}
         />
+        <motion.div
+          className="absolute bottom-20 left-1/3 w-72 h-72 bg-pink-500/5 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.4, 1],
+            opacity: [0.15, 0.35, 0.15],
+            x: [0, 20, 0],
+            y: [0, -30, 0],
+          }}
+          transition={{ duration: 30, repeat: Infinity }}
+        />
+
+        {/* Meteor shower */}
+        {[...Array(5)].map((_, i) => (
+          <motion.div
+            key={`meteor-${i}`}
+            className="absolute w-px h-20 bg-gradient-to-b from-white to-transparent opacity-70"
+            initial={{
+              x: `${Math.random() * 100}%`,
+              y: -100,
+              rotate: 45,
+            }}
+            animate={{
+              x: `${Math.random() * 100}%`,
+              y: '120vh',
+            }}
+            transition={{
+              duration: 2 + Math.random() * 2,
+              repeat: Infinity,
+              delay: i * 4 + Math.random() * 10,
+              ease: 'linear',
+            }}
+          />
+        ))}
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-12 max-w-6xl">
@@ -135,19 +227,9 @@ export function AnalysisManager() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <motion.div
-            className="inline-block mb-4"
-            animate={{ rotate: [0, 360] }}
-            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-          >
-            <Sparkles className="w-12 h-12 text-blue-400 mx-auto" />
-          </motion.div>
-          <h1 className="text-5xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            VoiceBot QA Analysis
+          <h1 className="text-6xl font-bold text-white mb-2 tracking-tight">
+            AI Agent Control Line
           </h1>
-          <p className="text-xl text-[var(--color-slate-400)]">
-            Create, manage, and resume your call quality analyses
-          </p>
         </motion.div>
 
         {/* Search and Create Section */}

@@ -7,11 +7,18 @@ import { useAppStore } from '@/store/useAppStore';
 import { FixCard } from './FixCard';
 import { determineFixPlacements } from '@/services/openai';
 
+interface ScriptSection {
+  text: string;
+  isNew: boolean;
+  reasoning?: string;
+}
+
 export function FixesPanel() {
   const { fixes, referenceEnabled, referenceScript, openaiConfig } = useAppStore();
   const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
   const [showFinalScript, setShowFinalScript] = useState(false);
   const [finalScript, setFinalScript] = useState('');
+  const [scriptSections, setScriptSections] = useState<ScriptSection[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
   if (!fixes) return null;
@@ -77,37 +84,58 @@ export function FixesPanel() {
         selectedFixes
       );
 
-      // Create a map of fixId -> placement info
-      const placementMap = new Map(
-        placements.map(p => [p.fixId, p])
-      );
-
       const scriptLines = referenceScript.split('\n');
 
-      // Sort placements by line number in descending order to insert from bottom to top
-      // This prevents line number shifts during insertion
-      const sortedPlacements = placements.sort((a, b) => b.lineNumber - a.lineNumber);
+      // Build sections array with metadata
+      const sections: ScriptSection[] = [];
 
-      // Insert each fix at its determined position
+      // Sort placements by line number ascending
+      const sortedPlacements = [...placements].sort((a, b) => a.lineNumber - b.lineNumber);
+
+      let currentLineIndex = 0;
+
+      // Process each placement
       sortedPlacements.forEach(placement => {
         const fix = selectedFixes.find(f => f.id === placement.fixId);
         if (!fix) return;
 
-        const fixIndex = selectedFixes.indexOf(fix);
-        const addition = [
-          '',
-          `>>>>>> START OF NEW ADDITION ${fixIndex + 1} <<<<<<`,
-          `[Placement: ${placement.reasoning}]`,
-          fix.suggestion,
-          `>>>>>> END OF NEW ADDITION ${fixIndex + 1} <<<<<<`,
-          ''
-        ].join('\n');
+        // Add original lines before this insertion
+        if (currentLineIndex < placement.lineNumber) {
+          const originalLines = scriptLines.slice(currentLineIndex, placement.lineNumber).join('\n');
+          if (originalLines.trim()) {
+            sections.push({
+              text: originalLines,
+              isNew: false,
+            });
+          }
+        }
 
-        // Insert after the specified line number
-        scriptLines.splice(placement.lineNumber, 0, addition);
+        // Add the new suggestion (clean, no markers)
+        sections.push({
+          text: fix.suggestion,
+          isNew: true,
+          reasoning: placement.reasoning,
+        });
+
+        currentLineIndex = placement.lineNumber;
       });
 
-      setFinalScript(scriptLines.join('\n'));
+      // Add remaining original lines
+      if (currentLineIndex < scriptLines.length) {
+        const remainingLines = scriptLines.slice(currentLineIndex).join('\n');
+        if (remainingLines.trim()) {
+          sections.push({
+            text: remainingLines,
+            isNew: false,
+          });
+        }
+      }
+
+      // Generate clean final script (for copying)
+      const cleanScript = sections.map(s => s.text).join('\n');
+
+      setScriptSections(sections);
+      setFinalScript(cleanScript);
       setShowFinalScript(true);
     } catch (error) {
       console.error('Error generating final script:', error);
@@ -265,19 +293,25 @@ export function FixesPanel() {
 
       {/* Final Script Modal */}
       {showFinalScript && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <motion.div
-            className="glass-card max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+            className="glass-card max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
             <div className="p-4 border-b border-[var(--color-navy-700)] flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Final Updated Script</h3>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Final Updated Script</h3>
+                <p className="text-xs text-[var(--color-slate-400)] mt-1">
+                  New additions are highlighted in green. Copy button copies clean text without highlights.
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   className="btn-primary flex items-center gap-2 text-sm"
                   onClick={() => {
                     navigator.clipboard.writeText(finalScript);
+                    alert('Script copied to clipboard!');
                   }}
                 >
                   <Download className="w-4 h-4" />
@@ -291,10 +325,35 @@ export function FixesPanel() {
                 </button>
               </div>
             </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap font-mono bg-[var(--color-navy-900)] p-4 rounded-lg border border-[var(--color-navy-700)]">
-                {finalScript}
-              </pre>
+            <div className="p-4 overflow-y-auto flex-1 bg-[var(--color-navy-900)]">
+              <div className="space-y-0">
+                {scriptSections.map((section, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: section.isNew ? 10 : 0 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`relative ${
+                      section.isNew
+                        ? 'bg-green-500/10 border-l-4 border-green-500 pl-4 py-3 my-2'
+                        : ''
+                    }`}
+                  >
+                    {section.isNew && section.reasoning && (
+                      <div className="absolute -top-6 left-0 text-xs text-green-400 italic">
+                        → {section.reasoning}
+                      </div>
+                    )}
+                    <pre className={`text-sm whitespace-pre-wrap font-mono ${
+                      section.isNew
+                        ? 'text-green-100'
+                        : 'text-[var(--color-slate-200)]'
+                    }`}>
+{section.text}
+                    </pre>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </motion.div>
         </div>
