@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import {
   AppState,
   CheckType,
+  CheckConfig,
   Transcript,
   AnalysisResult,
   IssueType,
