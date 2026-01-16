@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Sparkles, Download, FileText } from 'lucide-react';
+import { BookOpen, Sparkles, Download, FileText, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { FixCard } from './FixCard';
+import { determineFixPlacements } from '@/services/openai';
 
 export function FixesPanel() {
-  const { fixes, referenceEnabled, referenceScript } = useAppStore();
+  const { fixes, referenceEnabled, referenceScript, openaiConfig } = useAppStore();
   const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
   const [showFinalScript, setShowFinalScript] = useState(false);
   const [finalScript, setFinalScript] = useState('');
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
   if (!fixes) return null;
 
@@ -46,63 +48,73 @@ export function FixesPanel() {
     setSelectedFixIds(newSelected);
   };
 
-  const generateFinalScript = () => {
-    const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
+  const generateFinalScript = async () => {
+    setIsGeneratingScript(true);
 
-    let script = referenceScript || '';
-    const scriptLines = script.split('\n');
+    try {
+      const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
 
-    // Process each fix and insert it intelligently
-    selectedFixes.forEach((fix, fixIndex) => {
-      const suggestion = fix.suggestion;
-      const placementHint = fix.placementHint.toLowerCase();
-
-      // Find the best insertion point based on placement hint
-      let insertIndex = -1;
-
-      // Try to find a section that matches the placement hint
-      for (let i = 0; i < scriptLines.length; i++) {
-        const line = scriptLines[i].toLowerCase();
-
-        // Check if this line contains keywords from placement hint
-        if (placementHint.includes('beginning') || placementHint.includes('start')) {
-          insertIndex = Math.min(3, scriptLines.length); // After intro/header
-          break;
-        } else if (placementHint.includes('end') || placementHint.includes('closing')) {
-          insertIndex = scriptLines.length;
-          break;
-        } else if (placementHint.includes('greeting') && line.includes('greet')) {
-          insertIndex = i + 1;
-          break;
-        } else if (placementHint.includes('introduction') && line.includes('intro')) {
-          insertIndex = i + 1;
-          break;
-        } else if (placementHint.includes('verification') && (line.includes('verif') || line.includes('confirm'))) {
-          insertIndex = i + 1;
-          break;
-        } else if (placementHint.includes('question') && line.includes('?')) {
-          insertIndex = i + 1;
-          break;
-        } else if (placementHint.includes('response') && line.includes('response')) {
-          insertIndex = i + 1;
-          break;
-        }
+      if (!referenceScript) {
+        alert('No reference script available');
+        setIsGeneratingScript(false);
+        return;
       }
 
-      // If no specific location found, add to end
-      if (insertIndex === -1) {
-        insertIndex = scriptLines.length;
+      // Get API key from environment
+      const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+
+      if (!apiKey.trim()) {
+        alert('OpenAI API key is not configured. Please set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in your environment variables.');
+        setIsGeneratingScript(false);
+        return;
       }
 
-      // Create the addition with highlighting markers
-      const addition = `\n>>>>>> START OF NEW ADDITION ${fixIndex + 1} <<<<<<\n${suggestion}\n>>>>>> END OF NEW ADDITION ${fixIndex + 1} <<<<<<\n`;
+      // Use LLM to determine optimal placements
+      const placements = await determineFixPlacements(
+        apiKey,
+        openaiConfig.model,
+        referenceScript,
+        selectedFixes
+      );
 
-      // Insert at the determined position
-      scriptLines.splice(insertIndex, 0, addition);
-    });
+      // Create a map of fixId -> placement info
+      const placementMap = new Map(
+        placements.map(p => [p.fixId, p])
+      );
 
-    setFinalScript(scriptLines.join('\n'));
-    setShowFinalScript(true);
+      const scriptLines = referenceScript.split('\n');
+
+      // Sort placements by line number in descending order to insert from bottom to top
+      // This prevents line number shifts during insertion
+      const sortedPlacements = placements.sort((a, b) => b.lineNumber - a.lineNumber);
+
+      // Insert each fix at its determined position
+      sortedPlacements.forEach(placement => {
+        const fix = selectedFixes.find(f => f.id === placement.fixId);
+        if (!fix) return;
+
+        const fixIndex = selectedFixes.indexOf(fix);
+        const addition = [
+          '',
+          `>>>>>> START OF NEW ADDITION ${fixIndex + 1} <<<<<<`,
+          `[Placement: ${placement.reasoning}]`,
+          fix.suggestion,
+          `>>>>>> END OF NEW ADDITION ${fixIndex + 1} <<<<<<`,
+          ''
+        ].join('\n');
+
+        // Insert after the specified line number
+        scriptLines.splice(placement.lineNumber, 0, addition);
+      });
+
+      setFinalScript(scriptLines.join('\n'));
+      setShowFinalScript(true);
+    } catch (error) {
+      console.error('Error generating final script:', error);
+      alert(`Failed to generate script: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingScript(false);
+    }
   };
 
   return (
@@ -124,9 +136,19 @@ export function FixesPanel() {
             <button
               className="btn-primary flex items-center gap-2"
               onClick={generateFinalScript}
+              disabled={isGeneratingScript}
             >
-              <FileText className="w-4 h-4" />
-              Generate Final Script ({selectedFixIds.size})
+              {isGeneratingScript ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing placement...
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  Generate Final Script ({selectedFixIds.size})
+                </>
+              )}
             </button>
           )}
           <button className="btn-secondary flex items-center gap-2" onClick={exportFixes}>

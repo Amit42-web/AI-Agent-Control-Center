@@ -163,6 +163,118 @@ Return ONLY a JSON array of issues. If no issues are found, return an empty arra
   }
 }
 
+export async function determineFixPlacements(
+  apiKey: string,
+  model: string,
+  script: string,
+  fixes: Fix[]
+): Promise<{ fixId: string; lineNumber: number; reasoning: string }[]> {
+  if (fixes.length === 0) {
+    return [];
+  }
+
+  const scriptLines = script.split('\n');
+  const numberedScript = scriptLines.map((line, idx) => `${idx + 1}: ${line}`).join('\n');
+
+  const fixesSummary = fixes
+    .map((fix, idx) =>
+      `Fix ${idx + 1} (ID: ${fix.id}):\n` +
+      `Problem: ${fix.problem}\n` +
+      `Suggestion: ${fix.suggestion}\n` +
+      `Placement Hint: ${fix.placementHint}`
+    )
+    .join('\n\n---\n\n');
+
+  const systemPrompt = `You are an expert at analyzing scripts and determining optimal placement for improvements.
+
+Given a script with line numbers and a list of fixes, determine the BEST line number where each fix should be inserted.
+
+Consider:
+- The semantic meaning and context of each line
+- The fix's placement hint (e.g., "after greeting", "before verification")
+- The natural flow of the conversation
+- Logical grouping of related content
+
+Return ONLY a JSON array with this structure:
+[
+  {
+    "fixId": "the fix ID",
+    "lineNumber": the line number (1-indexed) where this fix should be inserted AFTER,
+    "reasoning": "brief explanation of why this is the best placement"
+  }
+]
+
+IMPORTANT:
+- Return ONLY valid JSON, no markdown, no extra text
+- lineNumber should be where to insert AFTER (e.g., lineNumber: 5 means insert after line 5)
+- If a fix should go at the very beginning, use lineNumber: 0
+- If a fix should go at the very end, use lineNumber: ${scriptLines.length}`;
+
+  const userPrompt = `Script with line numbers:\n\n${numberedScript}\n\n---\n\nFixes to place:\n\n${fixesSummary}\n\nDetermine the optimal line number for each fix.`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    let jsonStr = response.trim();
+
+    // Remove markdown code blocks if present
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    // Find the first [ and last ]
+    const startIdx = jsonStr.indexOf('[');
+    const endIdx = jsonStr.lastIndexOf(']');
+
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+      console.error('No valid JSON array found in placement response:', response);
+      // Fallback: place all at end
+      return fixes.map(fix => ({
+        fixId: fix.id,
+        lineNumber: scriptLines.length,
+        reasoning: 'Fallback: placed at end'
+      }));
+    }
+
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+
+    let placements;
+    try {
+      placements = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('JSON parse error for placements:', parseError);
+      // Fallback: place all at end
+      return fixes.map(fix => ({
+        fixId: fix.id,
+        lineNumber: scriptLines.length,
+        reasoning: 'Fallback: placed at end due to parse error'
+      }));
+    }
+
+    if (!Array.isArray(placements)) {
+      console.error('Placements result is not an array:', placements);
+      return fixes.map(fix => ({
+        fixId: fix.id,
+        lineNumber: scriptLines.length,
+        reasoning: 'Fallback: placed at end'
+      }));
+    }
+
+    return placements;
+  } catch (error) {
+    console.error('Error determining fix placements:', error);
+    // Fallback: place all at end
+    return fixes.map(fix => ({
+      fixId: fix.id,
+      lineNumber: script.split('\n').length,
+      reasoning: 'Fallback: placed at end due to error'
+    }));
+  }
+}
+
 export async function generateFixSuggestions(
   apiKey: string,
   model: string,
