@@ -16,7 +16,7 @@ export type IssueType =
   | 'quality_issue';
 
 export interface TranscriptLine {
-  speaker: 'bot' | 'customer';
+  speaker: 'agent' | 'customer';
   text: string;
   timestamp?: string;
   language?: string;

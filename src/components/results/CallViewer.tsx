@@ -86,7 +86,7 @@ export function CallViewer() {
                       </span>
                       <span
                         className={`speaker-badge ${
-                          line.speaker === 'bot' ? 'speaker-bot' : 'speaker-customer'
+                          line.speaker === 'agent' ? 'speaker-agent' : 'speaker-customer'
                         }`}
                       >
                         {line.speaker}

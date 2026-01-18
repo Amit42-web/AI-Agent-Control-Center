@@ -20,13 +20,27 @@ export function TranscriptInput() {
   const handleTextChange = (text: string) => {
     const lines = text.split('\n').filter((l) => l.trim());
     const parsedLines = lines.map((line) => {
-      const match = line.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
-      if (match) {
+      // Try format: [BOT/AGENT/CUSTOMER]: text
+      const bracketMatch = line.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
+      if (bracketMatch) {
+        const speaker = bracketMatch[1].toLowerCase();
         return {
-          speaker: match[1].toLowerCase() as 'bot' | 'customer',
-          text: match[2].trim(),
+          speaker: (speaker === 'bot' || speaker === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer',
+          text: bracketMatch[2].trim(),
         };
       }
+
+      // Try format: timestamp SPEAKER text (e.g., "00:00:00 BOT text")
+      const timestampMatch = line.match(/^(\d{2}:\d{2}:\d{2})\s+(BOT|AGENT|CUSTOMER|bot|agent|customer)\s+(.+)$/i);
+      if (timestampMatch) {
+        const speaker = timestampMatch[2].toLowerCase();
+        return {
+          speaker: (speaker === 'bot' || speaker === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer',
+          text: timestampMatch[3].trim(),
+          timestamp: timestampMatch[1],
+        };
+      }
+
       return { speaker: 'customer' as const, text: line.trim() };
     });
 
@@ -118,12 +132,28 @@ export function TranscriptInput() {
             continue;
           }
 
-          let speaker: 'bot' | 'customer' | null = null;
+          let speaker: 'agent' | 'customer' | null = null;
           let timestamp: string | undefined = undefined;
 
-          // Check if line starts with "setup user" (bot)
+          // Check format: timestamp SPEAKER text (e.g., "00:00:00 BOT text" or "00:00:00 AGENT text")
+          const timestampSpeakerMatch = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(BOT|AGENT|CUSTOMER|bot|agent|customer)\s+(.+)$/i);
+          if (timestampSpeakerMatch) {
+            const speakerStr = timestampSpeakerMatch[2].toLowerCase();
+            speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
+            timestamp = timestampSpeakerMatch[1];
+            parsedLines.push({
+              speaker,
+              text: timestampSpeakerMatch[3].trim(),
+              timestamp,
+            });
+            console.log(`Parsed ${speaker} at ${timestamp}:`, timestampSpeakerMatch[3].substring(0, 50));
+            i++;
+            continue;
+          }
+
+          // Check if line starts with "setup user" (bot/agent)
           if (trimmedLine.toLowerCase().startsWith('setup user')) {
-            speaker = 'bot';
+            speaker = 'agent';
             // Extract timestamp: "setup user  00:00:01"
             const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
             if (match) {
@@ -139,12 +169,13 @@ export function TranscriptInput() {
               timestamp = match[2];
             }
           }
-          // Fallback: old [BOT]/[CUSTOMER] format on same line as text
-          else if (trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i)) {
-            const m = trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+          // Fallback: old [BOT/AGENT]/[CUSTOMER] format on same line as text
+          else if (trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i)) {
+            const m = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
             if (m) {
+              const speakerStr = m[1].toLowerCase();
               parsedLines.push({
-                speaker: m[1].toLowerCase() as 'bot' | 'customer',
+                speaker: (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer',
                 text: m[2].trim(),
               });
               i++;
@@ -261,12 +292,28 @@ export function TranscriptInput() {
             continue;
           }
 
-          let speaker: 'bot' | 'customer' | null = null;
+          let speaker: 'agent' | 'customer' | null = null;
           let timestamp: string | undefined = undefined;
 
-          // Check if line starts with "setup user" (bot)
+          // Check format: timestamp SPEAKER text (e.g., "00:00:00 BOT text" or "00:00:00 AGENT text")
+          const timestampSpeakerMatch = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(BOT|AGENT|CUSTOMER|bot|agent|customer)\s+(.+)$/i);
+          if (timestampSpeakerMatch) {
+            const speakerStr = timestampSpeakerMatch[2].toLowerCase();
+            speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
+            timestamp = timestampSpeakerMatch[1];
+            parsedLines.push({
+              speaker,
+              text: timestampSpeakerMatch[3].trim(),
+              timestamp,
+            });
+            console.log(`Parsed ${speaker} at ${timestamp}:`, timestampSpeakerMatch[3].substring(0, 50));
+            i++;
+            continue;
+          }
+
+          // Check if line starts with "setup user" (bot/agent)
           if (trimmedLine.toLowerCase().startsWith('setup user')) {
-            speaker = 'bot';
+            speaker = 'agent';
             const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
             if (match) {
               timestamp = match[1];
@@ -280,12 +327,13 @@ export function TranscriptInput() {
               timestamp = match[2];
             }
           }
-          // Fallback: old [BOT]/[CUSTOMER] format on same line as text
-          else if (trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i)) {
-            const m = trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+          // Fallback: old [BOT/AGENT]/[CUSTOMER] format on same line as text
+          else if (trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i)) {
+            const m = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
             if (m) {
+              const speakerStr = m[1].toLowerCase();
               parsedLines.push({
-                speaker: m[1].toLowerCase() as 'bot' | 'customer',
+                speaker: (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer',
                 text: m[2].trim(),
               });
               i++;
@@ -456,13 +504,13 @@ export function TranscriptInput() {
           {inputMode === 'single' ? (
             <div className="space-y-2">
               <label className="text-sm text-[var(--color-slate-300)]">
-                Paste transcript (format: [BOT]: message or [CUSTOMER]: message)
+                Paste transcript (format: [AGENT]: message or [CUSTOMER]: message)
               </label>
               <textarea
                 className="textarea-field"
                 value={transcriptText}
                 onChange={(e) => handleTextChange(e.target.value)}
-                placeholder="[BOT]: Hello, how can I help you?&#10;[CUSTOMER]: I need help with my account..."
+                placeholder="[AGENT]: Hello, how can I help you?&#10;[CUSTOMER]: I need help with my account..."
                 rows={12}
               />
             </div>
@@ -508,7 +556,8 @@ export function TranscriptInput() {
                   </p>
                   <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
                     <li>One row = one complete call (multi-line transcripts in ONE cell)</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">setup user 00:00:00 Message</code> for bot</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">setup user 00:00:00 Message</code> for agent</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">00:00:00 AGENT Message</code> for agent (alternate)</li>
                     <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05 Message</code> for customer</li>
                     <li>First row should be header: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Transcript</code></li>
                   </ul>

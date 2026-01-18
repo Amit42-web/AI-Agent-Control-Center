@@ -5,42 +5,42 @@ export const demoTranscript: Transcript = {
   id: 'demo-001',
   lines: [
     // Normal start
-    { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
+    { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
     { speaker: 'customer', text: 'Hi, I need help with my internet connection. It keeps dropping.', timestamp: '00:05' },
-    { speaker: 'bot', text: 'I understand you\'re having connectivity issues. Let me help you troubleshoot that.', timestamp: '00:10' },
+    { speaker: 'agent', text: 'I understand you\'re having connectivity issues. Let me help you troubleshoot that.', timestamp: '00:10' },
     { speaker: 'customer', text: 'Yes please, it\'s been happening for two days now.', timestamp: '00:15' },
 
     // Flow deviation - Bot skips verification step, jumps directly to solution
-    { speaker: 'bot', text: 'Please restart your router by unplugging it for 30 seconds.', timestamp: '00:20' },
+    { speaker: 'agent', text: 'Please restart your router by unplugging it for 30 seconds.', timestamp: '00:20' },
     { speaker: 'customer', text: 'I already tried that three times.', timestamp: '00:25' },
 
     // Repetition loop starts
-    { speaker: 'bot', text: 'I see. Have you tried restarting your router?', timestamp: '00:30' },
+    { speaker: 'agent', text: 'I see. Have you tried restarting your router?', timestamp: '00:30' },
     { speaker: 'customer', text: 'Yes, I just told you I did that already.', timestamp: '00:35' },
-    { speaker: 'bot', text: 'I understand. Let me suggest restarting your router by unplugging it for 30 seconds.', timestamp: '00:40' },
+    { speaker: 'agent', text: 'I understand. Let me suggest restarting your router by unplugging it for 30 seconds.', timestamp: '00:40' },
     { speaker: 'customer', text: 'Are you even listening? I said I already restarted it multiple times!', timestamp: '00:45' },
-    { speaker: 'bot', text: 'I apologize for the confusion. Have you tried power cycling your router?', timestamp: '00:50' },
+    { speaker: 'agent', text: 'I apologize for the confusion. Have you tried power cycling your router?', timestamp: '00:50' },
 
     // Customer switches to Hindi - Language mismatch
     { speaker: 'customer', text: 'Yeh kya ho raha hai? Mujhe Hindi mein baat karni hai.', timestamp: '00:55', language: 'hi' },
-    { speaker: 'bot', text: 'I understand you\'re frustrated. Let me check your account details.', timestamp: '01:00' },
+    { speaker: 'agent', text: 'I understand you\'re frustrated. Let me check your account details.', timestamp: '01:00' },
     { speaker: 'customer', text: 'Main Hindi mein baat kar raha hoon, aap English mein kyun jawab de rahe ho?', timestamp: '01:05', language: 'hi' },
-    { speaker: 'bot', text: 'Could you please provide your account number so I can look into this further?', timestamp: '01:10' },
+    { speaker: 'agent', text: 'Could you please provide your account number so I can look into this further?', timestamp: '01:10' },
 
     // Mid-call restart/reset
     { speaker: 'customer', text: 'Fine, my account number is 12345678.', timestamp: '01:15' },
-    { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '01:20' },
+    { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '01:20' },
     { speaker: 'customer', text: 'What? We were already talking! Why are you greeting me again?', timestamp: '01:25' },
-    { speaker: 'bot', text: 'I apologize for any confusion. How may I help you today?', timestamp: '01:30' },
+    { speaker: 'agent', text: 'I apologize for any confusion. How may I help you today?', timestamp: '01:30' },
 
     // Attempt to recover
     { speaker: 'customer', text: 'This is ridiculous. I want to speak to a human.', timestamp: '01:35' },
-    { speaker: 'bot', text: 'I understand your frustration. Let me transfer you to a human agent. Please hold.', timestamp: '01:40' },
+    { speaker: 'agent', text: 'I understand your frustration. Let me transfer you to a human agent. Please hold.', timestamp: '01:40' },
   ],
   metadata: {
     duration: '01:45',
     date: '2024-01-15',
-    agentId: 'BOT-001',
+    agentId: 'AGENT-001',
   },
 };
 
@@ -50,61 +50,61 @@ export const demoBatchTranscripts: Transcript[] = [
   {
     id: 'demo-002',
     lines: [
-      { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
+      { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
       { speaker: 'customer', text: 'I want to cancel my subscription.', timestamp: '00:05' },
       // Flow deviation - Doesn't follow cancellation protocol
-      { speaker: 'bot', text: 'I\'m sorry to hear that. Your subscription has been cancelled.', timestamp: '00:10' },
+      { speaker: 'agent', text: 'I\'m sorry to hear that. Your subscription has been cancelled.', timestamp: '00:10' },
       { speaker: 'customer', text: 'Wait, don\'t you need to verify my identity first?', timestamp: '00:15' },
-      { speaker: 'bot', text: 'You\'re right, I apologize. Can I have your account number?', timestamp: '00:20' },
+      { speaker: 'agent', text: 'You\'re right, I apologize. Can I have your account number?', timestamp: '00:20' },
       // Language switch
       { speaker: 'customer', text: 'Mera account number 98765432 hai.', timestamp: '00:25', language: 'hi' },
-      { speaker: 'bot', text: 'Thank you. I\'ve located your account. Are you sure you want to cancel?', timestamp: '00:30' },
+      { speaker: 'agent', text: 'Thank you. I\'ve located your account. Are you sure you want to cancel?', timestamp: '00:30' },
     ],
-    metadata: { duration: '00:35', date: '2024-01-15', agentId: 'BOT-002' },
+    metadata: { duration: '00:35', date: '2024-01-15', agentId: 'AGENT-002' },
   },
   {
     id: 'demo-003',
     lines: [
-      { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
+      { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
       { speaker: 'customer', text: 'My bill seems too high this month.', timestamp: '00:05' },
-      { speaker: 'bot', text: 'I\'d be happy to help review your bill. Let me pull up your account.', timestamp: '00:10' },
+      { speaker: 'agent', text: 'I\'d be happy to help review your bill. Let me pull up your account.', timestamp: '00:10' },
       { speaker: 'customer', text: 'Sure, take your time.', timestamp: '00:15' },
       // Repetition
-      { speaker: 'bot', text: 'I\'d be happy to help review your bill. Let me pull up your account.', timestamp: '00:20' },
+      { speaker: 'agent', text: 'I\'d be happy to help review your bill. Let me pull up your account.', timestamp: '00:20' },
       { speaker: 'customer', text: 'You just said that...', timestamp: '00:25' },
-      { speaker: 'bot', text: 'I apologize. I\'d be happy to help review your bill.', timestamp: '00:30' },
+      { speaker: 'agent', text: 'I apologize. I\'d be happy to help review your bill.', timestamp: '00:30' },
       { speaker: 'customer', text: 'This bot is broken.', timestamp: '00:35' },
     ],
-    metadata: { duration: '00:40', date: '2024-01-15', agentId: 'BOT-001' },
+    metadata: { duration: '00:40', date: '2024-01-15', agentId: 'AGENT-001' },
   },
   {
     id: 'demo-004',
     lines: [
-      { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
+      { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
       { speaker: 'customer', text: 'I need to update my address.', timestamp: '00:05' },
-      { speaker: 'bot', text: 'Of course! I can help you with that. What is your new address?', timestamp: '00:10' },
+      { speaker: 'agent', text: 'Of course! I can help you with that. What is your new address?', timestamp: '00:10' },
       { speaker: 'customer', text: '123 Main Street, Apt 4B, New York, NY 10001', timestamp: '00:15' },
-      { speaker: 'bot', text: 'Thank you. I\'ve updated your address to 123 Main Street, Apt 4B, New York, NY 10001.', timestamp: '00:20' },
+      { speaker: 'agent', text: 'Thank you. I\'ve updated your address to 123 Main Street, Apt 4B, New York, NY 10001.', timestamp: '00:20' },
       { speaker: 'customer', text: 'Great, thanks!', timestamp: '00:25' },
-      { speaker: 'bot', text: 'You\'re welcome! Is there anything else I can help you with?', timestamp: '00:30' },
+      { speaker: 'agent', text: 'You\'re welcome! Is there anything else I can help you with?', timestamp: '00:30' },
       { speaker: 'customer', text: 'No, that\'s all. Thanks!', timestamp: '00:35' },
-      { speaker: 'bot', text: 'Thank you for contacting TechSupport. Have a great day!', timestamp: '00:40' },
+      { speaker: 'agent', text: 'Thank you for contacting TechSupport. Have a great day!', timestamp: '00:40' },
     ],
-    metadata: { duration: '00:45', date: '2024-01-15', agentId: 'BOT-003' },
+    metadata: { duration: '00:45', date: '2024-01-15', agentId: 'AGENT-003' },
   },
   {
     id: 'demo-005',
     lines: [
-      { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
+      { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:00' },
       { speaker: 'customer', text: 'My payment didn\'t go through.', timestamp: '00:05' },
-      { speaker: 'bot', text: 'I\'m sorry to hear about the payment issue. Let me check that for you.', timestamp: '00:10' },
+      { speaker: 'agent', text: 'I\'m sorry to hear about the payment issue. Let me check that for you.', timestamp: '00:10' },
       // Mid-call restart
-      { speaker: 'bot', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:15' },
+      { speaker: 'agent', text: 'Hello! Welcome to TechSupport. How can I assist you today?', timestamp: '00:15' },
       { speaker: 'customer', text: 'Uhh what? We were just talking about my payment.', timestamp: '00:20' },
-      { speaker: 'bot', text: 'I apologize for the confusion. Could you tell me what you need help with?', timestamp: '00:25' },
+      { speaker: 'agent', text: 'I apologize for the confusion. Could you tell me what you need help with?', timestamp: '00:25' },
       { speaker: 'customer', text: 'Never mind, this is useless.', timestamp: '00:30' },
     ],
-    metadata: { duration: '00:35', date: '2024-01-15', agentId: 'BOT-002' },
+    metadata: { duration: '00:35', date: '2024-01-15', agentId: 'AGENT-002' },
   },
 ];
 
