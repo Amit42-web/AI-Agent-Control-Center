@@ -75,11 +75,22 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes, isRunning } = useAppStore();
+  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig } = useAppStore();
 
   const handleGenerateFixes = () => {
     generateFixes();
   };
+
+  const OPENAI_MODELS = [
+    { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini (Recommended)', description: 'Fast and cost-effective' },
+    { value: 'gpt-5.2', label: 'GPT-5.2', description: 'Most advanced model' },
+    { value: 'gpt-5', label: 'GPT-5', description: 'Advanced capabilities' },
+    { value: 'gpt-5-mini', label: 'GPT-5 Mini', description: 'Balanced performance' },
+    { value: 'gpt-4.1', label: 'GPT-4.1', description: 'Previous generation flagship' },
+    { value: 'gpt-5-nano', label: 'GPT-5 Nano', description: 'Ultra-fast responses' },
+    { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano', description: 'Lightweight model' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Legacy model' },
+  ];
 
   return (
     <motion.div
@@ -120,6 +131,26 @@ function ResultsPage() {
               </>
             )}
           </button>
+        </div>
+      </div>
+
+      {/* Model Selection */}
+      <div className="glass-card p-4">
+        <div className="flex items-center gap-4">
+          <label className="text-sm text-[var(--color-slate-300)] font-medium whitespace-nowrap">
+            AI Model for Fix Generation:
+          </label>
+          <select
+            className="input-field flex-1 max-w-md"
+            value={openaiConfig.model}
+            onChange={(e) => setOpenAIConfig({ model: e.target.value })}
+          >
+            {OPENAI_MODELS.map((model) => (
+              <option key={model.value} value={model.value}>
+                {model.label} - {model.description}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

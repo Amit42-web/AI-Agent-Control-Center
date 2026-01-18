@@ -20,13 +20,38 @@ export function TranscriptInput() {
   const handleTextChange = (text: string) => {
     const lines = text.split('\n').filter((l) => l.trim());
     const parsedLines = lines.map((line) => {
-      const match = line.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+      // Format 1: [BOT]: text or [CUSTOMER]: text
+      let match = line.match(/^\[?(BOT|CUSTOMER|AGENT|bot|customer|agent)\]?:?\s*(.+)$/i);
       if (match) {
+        const speaker = match[1].toLowerCase();
         return {
-          speaker: match[1].toLowerCase() as 'bot' | 'customer',
+          speaker: (speaker === 'agent' ? 'bot' : speaker) as 'bot' | 'customer',
           text: match[2].trim(),
         };
       }
+
+      // Format 2: BOT 00:00:00 text or CUSTOMER 00:00:00 text (with timestamp)
+      match = line.match(/^(BOT|CUSTOMER|AGENT|bot|customer|agent|setup user|\d+)\s+(\d{1,2}:\d{2}:\d{2}|\d{2}:\d{2}:\d{2})\s+(.+)$/i);
+      if (match) {
+        const speakerLabel = match[1].toLowerCase();
+        const timestamp = match[2];
+        const text = match[3].trim();
+
+        // Determine if it's bot or customer
+        let speaker: 'bot' | 'customer';
+        if (speakerLabel.includes('bot') || speakerLabel.includes('agent') || speakerLabel === 'setup user') {
+          speaker = 'bot';
+        } else {
+          speaker = 'customer';
+        }
+
+        return {
+          speaker,
+          text,
+          timestamp,
+        };
+      }
+
       return { speaker: 'customer' as const, text: line.trim() };
     });
 
@@ -54,15 +79,40 @@ export function TranscriptInput() {
         const transcript = line.trim();
 
         // Parse the transcript into conversation lines
-        const conversationLines = transcript.split(/(?=\[(?:BOT|CUSTOMER)\]:)/i).filter((l) => l.trim());
+        const conversationLines = transcript.split(/(?=\[(?:BOT|CUSTOMER|AGENT)\]:)/i).filter((l) => l.trim());
         const parsedLines = conversationLines.map((convLine) => {
-          const match = convLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
+          // Format 1: [BOT]: text or [CUSTOMER]: text
+          let match = convLine.match(/^\[?(BOT|CUSTOMER|AGENT|bot|customer|agent)\]?:?\s*(.+)$/i);
           if (match) {
+            const speaker = match[1].toLowerCase();
             return {
-              speaker: match[1].toLowerCase() as 'bot' | 'customer',
+              speaker: (speaker === 'agent' ? 'bot' : speaker) as 'bot' | 'customer',
               text: match[2].trim(),
             };
           }
+
+          // Format 2: BOT 00:00:00 text or CUSTOMER 00:00:00 text (with timestamp)
+          match = convLine.match(/^(BOT|CUSTOMER|AGENT|bot|customer|agent|setup user|\d+)\s+(\d{1,2}:\d{2}:\d{2}|\d{2}:\d{2}:\d{2})\s+(.+)$/i);
+          if (match) {
+            const speakerLabel = match[1].toLowerCase();
+            const timestamp = match[2];
+            const text = match[3].trim();
+
+            // Determine if it's bot or customer
+            let speaker: 'bot' | 'customer';
+            if (speakerLabel.includes('bot') || speakerLabel.includes('agent') || speakerLabel === 'setup user') {
+              speaker = 'bot';
+            } else {
+              speaker = 'customer';
+            }
+
+            return {
+              speaker,
+              text,
+              timestamp,
+            };
+          }
+
           return { speaker: 'customer' as const, text: convLine.trim() };
         });
 
@@ -175,13 +225,13 @@ export function TranscriptInput() {
           {inputMode === 'single' ? (
             <div className="space-y-2">
               <label className="text-sm text-[var(--color-slate-300)]">
-                Paste transcript (format: [BOT]: message or [CUSTOMER]: message)
+                Paste transcript (format: [BOT]: message or BOT 00:00:00 message)
               </label>
               <textarea
                 className="textarea-field"
                 value={transcriptText}
                 onChange={(e) => handleTextChange(e.target.value)}
-                placeholder="[BOT]: Hello, how can I help you?&#10;[CUSTOMER]: I need help with my account..."
+                placeholder="[BOT]: Hello, how can I help you?&#10;[CUSTOMER]: I need help with my account...&#10;&#10;Or with timestamps:&#10;BOT 00:00:00 Hello, how can I help you?&#10;CUSTOMER 00:00:05 I need help with my account..."
                 rows={12}
               />
             </div>
@@ -213,8 +263,9 @@ export function TranscriptInput() {
                 </p>
                 <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
                   <li>Each row contains one complete call transcript</li>
-                  <li>Format each message as: [BOT]: message or [CUSTOMER]: message</li>
+                  <li>Format: [BOT]: message or BOT 00:00:00 message (with timestamps)</li>
                   <li>Example: [BOT]: Hello! [CUSTOMER]: Hi there [BOT]: How can I help?</li>
+                  <li>Or: BOT 00:00:00 Hello! CUSTOMER 00:00:05 Hi there</li>
                   <li>First row should be header: &quot;transcript&quot;</li>
                 </ul>
               </div>

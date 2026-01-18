@@ -134,7 +134,7 @@ export function CallViewer() {
                             line.speaker === 'bot' ? 'speaker-bot' : 'speaker-customer'
                           }`}
                         >
-                          {line.speaker}
+                          {line.speaker === 'bot' ? 'agent' : line.speaker}
                         </span>
                         <span className="text-sm text-[var(--color-slate-200)] flex-1">
                           {line.text}
