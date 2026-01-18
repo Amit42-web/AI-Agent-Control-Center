@@ -1,5 +1,25 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Prerequisites
+
+Before running this application, you need to configure your OpenAI API key:
+
+### For Vercel Deployment
+See [VERCEL_SETUP.md](./VERCEL_SETUP.md) for detailed instructions on setting up environment variables in Vercel.
+
+**Quick Steps:**
+1. Go to your Vercel project → Settings → Environment Variables
+2. Add: `NEXT_PUBLIC_OPENAI_API_KEY` = `your-openai-api-key`
+3. Redeploy your application
+
+### For Local Development
+Create a `.env.local` file in the root directory:
+```bash
+NEXT_PUBLIC_OPENAI_API_KEY=sk-proj-your-api-key-here
+```
+
+Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys).
+
 ## Getting Started
 
 First, run the development server:
