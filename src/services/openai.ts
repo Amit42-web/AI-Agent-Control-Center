@@ -315,7 +315,21 @@ CRITICAL CONSTRAINTS:
 - DO NOT suggest code changes, UI changes, or system architecture changes
 - Focus exclusively on what can be added to the bot's system prompt or reference script
 - All fixes must be implementable by modifying prompts alone
-- MAINTAIN the exact language, format, and style of the original script (do NOT translate to Devanagari or any other script)
+
+⚠️ CRITICAL: SCRIPT/ALPHABET PRESERVATION (READ THIS CAREFULLY):
+- Analyze the reference script to identify what SCRIPT/ALPHABET it uses
+- If the reference script is written in LATIN/ROMAN alphabet (English letters like A-Z), your suggestion MUST also use LATIN/ROMAN alphabet
+- If the reference script is written in Devanagari alphabet (Hindi script like अ आ), your suggestion MUST also use Devanagari alphabet
+- DO NOT translate between scripts/alphabets
+- DO NOT change from Latin to Devanagari or vice versa
+- Match the EXACT writing system of the reference script
+
+LANGUAGE AND FORMAT PRESERVATION:
+- Preserve the exact formatting style (bullet points, dashes, numbered lists, etc.)
+- If script uses "State S0", "State S1" format, continue that pattern
+- If script uses English paragraph style, continue that style
+- If script mixes English with occasional Hindi terms in Roman script, do the same
+- Maintain the same level of formality and tone
 
 For each fix, provide a JSON object with these SEPARATE fields:
 - issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
@@ -324,45 +338,31 @@ For each fix, provide a JSON object with these SEPARATE fields:
   * "add": Insert new content (most common)
   * "remove": Delete existing problematic content
   * "replace": Replace existing content with improved version
-- suggestion: The actual prompt text/instruction (for "add" or "replace" actions) - MAINTAIN ORIGINAL FORMAT
+- suggestion: The actual prompt text/instruction (for "add" or "replace" actions) - MUST USE SAME SCRIPT/ALPHABET AS REFERENCE
 - targetContent: (ONLY for "remove" or "replace") The exact text from the script to remove/replace
-- placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2" or "Remove from State S3")
-- exampleResponse: example of how bot should respond (avoid using quotes or special characters)
+- placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2")
+- exampleResponse: example of how bot should respond (can be in native language/script as this is what bot says)
 - relatedIssueIds: array of issue IDs this addresses
-
-LANGUAGE AND FORMAT PRESERVATION:
-- If the original script uses English with occasional Hindi terms, keep that exact style
-- If it uses bullet points, keep bullet points
-- If it uses specific formatting (dashes, numbers, etc.), maintain that
-- DO NOT convert English to Devanagari or change the writing system
-- DO NOT translate or change the format unless specifically needed for the fix
 
 CRITICAL SEPARATION:
 - "suggestion" field = WHAT to add/replace (the actual prompt/instruction text ONLY)
 - "placementHint" field = WHERE to make the change (location description ONLY)
 - DO NOT mix these two! Keep them completely separate.
 
-Example of CORRECT format preservation:
+Example for LATIN/ROMAN script reference (DO THIS):
+Reference script format: "State S0 - Availability & Readiness Check / Confirm customer availability"
 {
   "action": "add",
-  "suggestion": "Always verify customer identity with full name confirmation before proceeding\nExample: 'Am I speaking with [customer name]?'\nIf unclear, restate: 'This is Sunita from Animal app, am I speaking with [customer name]?'",
-  "placementHint": "Within State S1 - Greeting & Identity Confirmation, after greeting and before availability check"
+  "suggestion": "In State S0 - Availability & Readiness Check, use a clear, complete sentence to check availability and mention call duration.\nExamples:\nIf customer says they're free:\n'Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.'\nIf customer seems busy:\n'Main samajhti hun aap thode busy hongi, kya aap mujhe 2 minute de sakti hain ya main baad mein call karun?'",
+  "exampleResponse": "Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.",
+  "placementHint": "Add to State S0 - Availability & Readiness Check, after 'Confirm customer availability'"
 }
 
-Example with REMOVE action:
+Example for LATIN/ROMAN script reference (DO NOT DO THIS - WRONG):
 {
-  "action": "remove",
-  "targetContent": "If busy, explain the call will take only two minutes",
-  "suggestion": "",
-  "placementHint": "Remove from State S0 - this creates pressure and should be removed"
-}
-
-Example with REPLACE action:
-{
-  "action": "replace",
-  "targetContent": "Confirm customer availability",
-  "suggestion": "Check customer availability and get explicit consent to continue\nExample: 'Do you have 2-3 minutes to discuss your listing?'\nIf not available: 'No problem! When would be a better time for me to call you back?'",
-  "placementHint": "Replace in State S0 - Availability & Readiness Check"
+  "action": "add",
+  "suggestion": "अगर ग्राहक ने कॉल उठाया हो तो कहें:\nनमस्ते, क्या अभी आप बात करने के लिए free हैं?",
+  "placementHint": "Add to State S0"
 }
 
 Categorize fixes:
@@ -381,10 +381,12 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
     .join('\n\n---\n\n');
 
   const userPrompt = `Issues detected:\n\n${issuesSummary}\n\n${
-    referenceScript ? `Current Reference Script:\n${referenceScript}\n\n` : ''
+    referenceScript ? `Current Reference Script (ANALYZE THE SCRIPT/ALPHABET USED):\n${referenceScript}\n\n` : ''
   }${
     knowledgeBase ? `Current Knowledge Base:\n${knowledgeBase}\n\n` : ''
-  }Generate PROMPT-ONLY fix suggestions. Each suggestion must be a specific prompt instruction that can be added to the bot's system prompt, reference script, or knowledge base.`;
+  }Generate PROMPT-ONLY fix suggestions. Each suggestion must be a specific prompt instruction that can be added to the bot's system prompt, reference script, or knowledge base.
+
+⚠️ CRITICAL REMINDER: Look at the Reference Script above. Notice what SCRIPT/ALPHABET it uses (Latin/Roman letters like "State S0" or Devanagari script like "अवस्था"). Your "suggestion" field MUST use the SAME script/alphabet. DO NOT translate or convert between scripts.`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
