@@ -154,17 +154,17 @@ export function TranscriptInput() {
           // Check if line starts with "setup user" (bot/agent)
           if (trimmedLine.toLowerCase().startsWith('setup user')) {
             speaker = 'agent';
-            // Extract timestamp: "setup user  00:00:01"
+            // Extract timestamp: "setup user  00:00:01" or "Setup User   00:00:01"
             const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
             if (match) {
               timestamp = match[1];
             }
           }
-          // Check if line starts with phone number (customer)
-          else if (/^\d{10,}/.test(trimmedLine)) {
+          // Check if line starts with phone number (customer) - with optional + prefix
+          else if (/^\+?\d{10,}/.test(trimmedLine)) {
             speaker = 'customer';
-            // Extract timestamp: "919525823316  00:00:13"
-            const match = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})/);
+            // Extract timestamp: "+919525823316  00:00:13" or "919525823316  00:00:13"
+            const match = trimmedLine.match(/^\+?(\d+)\s+(\d{2}:\d{2}:\d{2})/);
             if (match) {
               timestamp = match[2];
             }
@@ -202,8 +202,8 @@ export function TranscriptInput() {
                 continue;
               }
 
-              // Stop if this is a new speaker line
-              if (nextLine.toLowerCase().startsWith('setup user') || /^\d{10,}/.test(nextLine)) {
+              // Stop if this is a new speaker line (with optional + prefix for phone numbers)
+              if (nextLine.toLowerCase().startsWith('setup user') || /^\+?\d{10,}/.test(nextLine)) {
                 break;
               }
 
@@ -319,10 +319,10 @@ export function TranscriptInput() {
               timestamp = match[1];
             }
           }
-          // Check if line starts with phone number (customer)
-          else if (/^\d{10,}/.test(trimmedLine)) {
+          // Check if line starts with phone number (customer) - with optional + prefix
+          else if (/^\+?\d{10,}/.test(trimmedLine)) {
             speaker = 'customer';
-            const match = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})/);
+            const match = trimmedLine.match(/^\+?(\d+)\s+(\d{2}:\d{2}:\d{2})/);
             if (match) {
               timestamp = match[2];
             }
@@ -356,8 +356,8 @@ export function TranscriptInput() {
                 continue;
               }
 
-              // Stop if this is a new speaker line
-              if (nextLine.toLowerCase().startsWith('setup user') || /^\d{10,}/.test(nextLine)) {
+              // Stop if this is a new speaker line (with optional + prefix for phone numbers)
+              if (nextLine.toLowerCase().startsWith('setup user') || /^\+?\d{10,}/.test(nextLine)) {
                 break;
               }
 
