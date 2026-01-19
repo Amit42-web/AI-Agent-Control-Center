@@ -338,30 +338,44 @@ For each fix, provide a JSON object with these SEPARATE fields:
   * "add": Insert new content (most common)
   * "remove": Delete existing problematic content
   * "replace": Replace existing content with improved version
-- suggestion: The actual prompt text/instruction (for "add" or "replace" actions) - MUST USE SAME SCRIPT/ALPHABET AS REFERENCE
+- suggestion: ONLY the instruction/guidance text - DO NOT include location phrases like "In State X" or "Add to..." - MUST USE SAME SCRIPT/ALPHABET AS REFERENCE
 - targetContent: (ONLY for "remove" or "replace") The exact text from the script to remove/replace
 - placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2")
-- exampleResponse: example of how bot should respond (can be in native language/script as this is what bot says)
+- exampleResponse: (OPTIONAL - only if needed) example of how bot should respond (can be in native language/script)
 - relatedIssueIds: array of issue IDs this addresses
+
+🚨 CRITICAL - SUGGESTION FIELD RULES:
+- "suggestion" = The actual instruction/guidance ONLY
+- DO NOT start with "In State X" or "Add to..." or any location phrases
+- DO NOT include where to add it - that goes in "placementHint"
+- Start directly with the instruction: "First clearly check availability..." NOT "In State S0, first clearly check..."
+- Examples in suggestion field are OPTIONAL - only include if truly helpful to show bot's response format
 
 CRITICAL SEPARATION:
 - "suggestion" field = WHAT to add/replace (the actual prompt/instruction text ONLY)
 - "placementHint" field = WHERE to make the change (location description ONLY)
 - DO NOT mix these two! Keep them completely separate.
 
-Example for LATIN/ROMAN script reference (DO THIS):
+Example for LATIN/ROMAN script reference (CORRECT - DO THIS):
 Reference script format: "State S0 - Availability & Readiness Check / Confirm customer availability"
 {
   "action": "add",
-  "suggestion": "In State S0 - Availability & Readiness Check, use a clear, complete sentence to check availability and mention call duration.\nExamples:\nIf customer says they're free:\n'Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.'\nIf customer seems busy:\n'Main samajhti hun aap thode busy hongi, kya aap mujhe 2 minute de sakti hain ya main baad mein call karun?'",
+  "suggestion": "First clearly check availability in one complete sentence before any introduction. Do not start with your name or company here.\nIf customer says they are free: 'Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.'\nIf customer sounds unsure or busy: 'Main samajhti hun aap thode busy hongi, kya aap mujhe 2 minute de sakti hain ya main baad mein call karun?'",
   "exampleResponse": "Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.",
-  "placementHint": "Add to State S0 - Availability & Readiness Check, after 'Confirm customer availability'"
+  "placementHint": "Add to State S0 - Availability & Readiness Check, as explicit wording guidance before moving to State S1"
 }
 
-Example for LATIN/ROMAN script reference (DO NOT DO THIS - WRONG):
+WRONG Example 1 (DO NOT DO THIS - includes location in suggestion):
 {
   "action": "add",
-  "suggestion": "अगर ग्राहक ने कॉल उठाया हो तो कहें:\nनमस्ते, क्या अभी आप बात करने के लिए free हैं?",
+  "suggestion": "In State S0 - Availability & Readiness Check, use a clear sentence...",  ← WRONG - has "In State S0"
+  "placementHint": "Add to State S0"
+}
+
+WRONG Example 2 (DO NOT DO THIS - uses Devanagari when reference is Latin):
+{
+  "action": "add",
+  "suggestion": "अगर ग्राहक ने कॉल उठाया हो तो कहें:\nनमस्ते, क्या अभी आप बात करने के लिए free हैं?",  ← WRONG - uses Devanagari
   "placementHint": "Add to State S0"
 }
 

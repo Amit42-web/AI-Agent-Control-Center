@@ -246,11 +246,11 @@ function ResultsPage() {
             Review detected issues and analytics from your voice bot calls.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-end gap-3">
           <div className="flex flex-col">
-            <label className="text-xs text-[var(--color-slate-400)] mb-1">AI Model for Fixes</label>
+            <label className="text-xs text-[var(--color-slate-400)] mb-1.5">AI Model for Fixes</label>
             <select
-              className="input-field text-sm py-2 px-3"
+              className="input-field text-sm py-2 px-3 min-w-[200px]"
               value={openaiConfig.model}
               onChange={(e) => setOpenAIConfig({ model: e.target.value })}
             >

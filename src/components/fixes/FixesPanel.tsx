@@ -10,6 +10,8 @@ import { determineFixPlacements } from '@/services/openai';
 interface ScriptSection {
   text: string;
   isNew: boolean;
+  isRemoved?: boolean;
+  isReplaced?: boolean;
   reasoning?: string;
 }
 
@@ -87,12 +89,28 @@ export function FixesPanel() {
       // Apply removals and replacements to script text first
       let modifiedScript = referenceScript;
 
+      // Track removed and replaced content for display
+      const removedSections: { text: string; fix: any }[] = [];
+      const replacedSections: { oldText: string; newText: string; fix: any }[] = [];
+
       // Apply removals
       removeFixes.forEach(fix => {
         if (fix.targetContent) {
           // Remove all occurrences of the target content
           const lines = modifiedScript.split('\n');
-          const filteredLines = lines.filter(line => !line.includes(fix.targetContent!));
+          const removedLines: string[] = [];
+          const filteredLines = lines.filter(line => {
+            if (line.includes(fix.targetContent!)) {
+              removedLines.push(line);
+              return false;
+            }
+            return true;
+          });
+
+          if (removedLines.length > 0) {
+            removedSections.push({ text: removedLines.join('\n'), fix });
+          }
+
           modifiedScript = filteredLines.join('\n');
           console.log(`Removed lines containing: ${fix.targetContent.substring(0, 50)}...`);
         }
@@ -101,8 +119,15 @@ export function FixesPanel() {
       // Apply replacements
       replaceFixes.forEach(fix => {
         if (fix.targetContent && fix.suggestion) {
-          modifiedScript = modifiedScript.replace(fix.targetContent, fix.suggestion);
-          console.log(`Replaced: ${fix.targetContent.substring(0, 50)}... with ${fix.suggestion.substring(0, 50)}...`);
+          if (modifiedScript.includes(fix.targetContent)) {
+            replacedSections.push({
+              oldText: fix.targetContent,
+              newText: fix.suggestion,
+              fix
+            });
+            modifiedScript = modifiedScript.replace(fix.targetContent, fix.suggestion);
+            console.log(`Replaced: ${fix.targetContent.substring(0, 50)}... with ${fix.suggestion.substring(0, 50)}...`);
+          }
         }
       });
 
@@ -158,8 +183,37 @@ export function FixesPanel() {
         }
       }
 
-      // Generate clean final script (for copying)
-      const cleanScript = sections.map(s => s.text).join('\n');
+      // Add removed sections at the top with strikethrough indicator
+      if (removedSections.length > 0) {
+        removedSections.forEach(removed => {
+          sections.unshift({
+            text: removed.text,
+            isNew: false,
+            isRemoved: true,
+            reasoning: `Removed: ${removed.fix.problem}`
+          });
+        });
+      }
+
+      // Add replaced sections indicator
+      if (replacedSections.length > 0) {
+        replacedSections.forEach(replaced => {
+          // Find the section with the new text and mark it as replaced
+          const sectionIndex = sections.findIndex(s => s.text.includes(replaced.newText));
+          if (sectionIndex !== -1) {
+            // Insert the old text before the new text
+            sections.splice(sectionIndex, 0, {
+              text: replaced.oldText,
+              isNew: false,
+              isReplaced: true,
+              reasoning: `Replaced: ${replaced.fix.problem}`
+            });
+          }
+        });
+      }
+
+      // Generate clean final script (for copying) - exclude removed sections
+      const cleanScript = sections.filter(s => !s.isRemoved && !s.isReplaced).map(s => s.text).join('\n');
 
       setScriptSections(sections);
       setFinalScript(cleanScript);
@@ -357,16 +411,29 @@ export function FixesPanel() {
                 {scriptSections.map((section, index) => (
                   <motion.div
                     key={index}
-                    initial={{ opacity: 0, x: section.isNew ? 10 : 0 }}
+                    initial={{ opacity: 0, x: section.isNew ? 10 : section.isRemoved || section.isReplaced ? -10 : 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                     className={`${
                       section.isNew
-                        ? 'border-l-4 border-green-500 pl-4 py-2'
+                        ? 'border-l-4 border-green-500 pl-4 py-2 bg-green-500/5'
+                        : section.isRemoved
+                        ? 'border-l-4 border-red-500 pl-4 py-2 bg-red-500/5 line-through opacity-60'
+                        : section.isReplaced
+                        ? 'border-l-4 border-yellow-500 pl-4 py-2 bg-yellow-500/5 line-through opacity-60'
                         : ''
                     }`}
                   >
-                    <pre className="text-sm whitespace-pre-wrap font-mono text-[var(--color-slate-200)]">
+                    {(section.isRemoved || section.isReplaced) && (
+                      <div className="text-xs mb-1 font-semibold">
+                        <span className={section.isRemoved ? 'text-red-400' : 'text-yellow-400'}>
+                          {section.isRemoved ? '🗑️ REMOVED' : '✏️ REPLACED'}: {section.reasoning}
+                        </span>
+                      </div>
+                    )}
+                    <pre className={`text-sm whitespace-pre-wrap font-mono ${
+                      section.isRemoved || section.isReplaced ? 'text-[var(--color-slate-400)]' : 'text-[var(--color-slate-200)]'
+                    }`}>
 {section.text}
                     </pre>
                   </motion.div>
