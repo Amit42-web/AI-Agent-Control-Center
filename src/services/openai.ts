@@ -316,13 +316,30 @@ CRITICAL CONSTRAINTS:
 - Focus exclusively on what can be added to the bot's system prompt or reference script
 - All fixes must be implementable by modifying prompts alone
 
-For each fix, provide a JSON object with:
+For each fix, provide a JSON object with these SEPARATE fields:
 - issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
 - problem: brief description of the problem identified
-- suggestion: SPECIFIC prompt text that can be added to the bot's system prompt (avoid using quotes or special characters)
-- placementHint: where to add this in the reference script or knowledge base
+- suggestion: ONLY the actual prompt text/instruction to add (DO NOT include placement information here)
+- placementHint: ONLY where to add it (e.g., "Add to State S1 - Greeting & Identity Confirmation" or "Within Pillar 3, under...")
 - exampleResponse: example of how bot should respond after adding this prompt (avoid using quotes or special characters)
 - relatedIssueIds: array of issue IDs this addresses
+
+CRITICAL SEPARATION:
+- "suggestion" field = WHAT to add (the actual prompt/instruction text ONLY)
+- "placementHint" field = WHERE to add it (location description ONLY)
+- DO NOT mix these two! Keep them completely separate.
+
+Example of CORRECT separation:
+{
+  "suggestion": "After greeting and introducing yourself, always clearly and fully confirm identity in one natural sentence before continuing. For example, say: क्या मैं [ग्राहक का नाम] से बात कर रही हूँ? Do not leave the sentence incomplete like क्या यह आपने.... If the customer responds positively, then proceed to the next state. If the customer seems confused, briefly restate: मैं सुनीता बोल रही हूँ ऐनिमॉल ऐप से, क्या आप हैं [ग्राहक का नाम] हैं?",
+  "placementHint": "Within Pillar 3, under the description of State S1 - Greeting & Identity Confirmation, after Introduce yourself as Sunita from ऐनिमॉल and before Confirm the correct person"
+}
+
+Example of INCORRECT mixing (DO NOT DO THIS):
+{
+  "suggestion": "Add to State S1 - Greeting & Identity Confirmation: After greeting and introducing yourself...",
+  "placementHint": "Within Pillar 3..."
+}
 
 Categorize fixes:
 - scriptFixes: Prompt additions/modifications for reference script (flow-related)
