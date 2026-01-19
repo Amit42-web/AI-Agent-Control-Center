@@ -44,6 +44,18 @@ export interface DetectedIssue {
   suggestedFix?: string;
 }
 
+export interface AggregatedIssue {
+  id: string;
+  type: IssueType;
+  pattern: string; // Common pattern extracted from explanations
+  severity: Severity; // Highest severity from instances
+  avgConfidence: number;
+  occurrences: number; // Number of calls affected
+  affectedCallIds: string[];
+  instances: DetectedIssue[]; // All individual instances
+  evidenceSnippets: string[]; // Sample evidence from different calls
+}
+
 export interface CheckConfig {
   id: CheckType;
   name: string;
