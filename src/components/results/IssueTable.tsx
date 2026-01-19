@@ -232,6 +232,29 @@ export function IssueTable() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                 >
+                  {/* All Patterns/Findings */}
+                  {(() => {
+                    const uniquePatterns = Array.from(new Set(issue.instances.map(i => i.explanation)));
+                    if (uniquePatterns.length > 1) {
+                      return (
+                        <div className="bg-[var(--color-navy-900)] rounded-lg p-3">
+                          <p className="text-xs text-[var(--color-slate-400)] mb-2">All Findings ({uniquePatterns.length}):</p>
+                          <div className="space-y-2">
+                            {uniquePatterns.map((pattern, idx) => (
+                              <div key={idx} className="flex items-start gap-2">
+                                <span className="text-blue-400 font-semibold text-xs mt-0.5">{idx + 1}.</span>
+                                <p className="text-xs text-[var(--color-slate-300)] flex-1">
+                                  {pattern}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   <div className="bg-[var(--color-navy-900)] rounded-lg p-3">
                     <p className="text-xs text-[var(--color-slate-400)] mb-2">Affected Calls:</p>
                     <div className="flex flex-wrap gap-2">
