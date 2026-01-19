@@ -55,7 +55,16 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
             {index + 1}
           </div>
           <div>
-            <h4 className="font-medium text-white text-sm">{fix.problem}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="font-medium text-white text-sm">{fix.problem}</h4>
+              <span className={`text-xs px-2 py-0.5 rounded ${
+                fix.action === 'remove' ? 'bg-red-500/20 text-red-400' :
+                fix.action === 'replace' ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-green-500/20 text-green-400'
+              }`}>
+                {fix.action === 'remove' ? 'Remove' : fix.action === 'replace' ? 'Replace' : 'Add'}
+              </span>
+            </div>
             <p className="text-xs text-[var(--color-slate-400)] mt-0.5">
               {fix.relatedIssueIds.length} related issue{fix.relatedIssueIds.length !== 1 ? 's' : ''}
             </p>
@@ -99,33 +108,52 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
             </button>
           </div>
 
-          {/* Suggestion */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Suggested Fix
-              </span>
+          {/* Target Content (for remove/replace) */}
+          {fix.action && (fix.action === 'remove' || fix.action === 'replace') && fix.targetContent && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-red-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  {fix.action === 'remove' ? 'Content to Remove' : 'Content to Replace'}
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 bg-red-500/10 border border-red-500/30">
+                <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono line-through">
+                  {fix.targetContent}
+                </pre>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 relative group bg-[var(--color-navy-900)] border border-[var(--color-navy-700)]">
-              <pre className="text-sm text-[var(--color-slate-200)] pr-8 whitespace-pre-wrap font-mono">
-                {fix.suggestion}
-              </pre>
-              <button
-                className="absolute top-2 right-2 p-1.5 hover:bg-[var(--color-navy-600)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyToClipboard(fix.suggestion, 'suggestion');
-                }}
-              >
-                {copiedField === 'suggestion' ? (
-                  <Check className="w-4 h-4 text-green-400" />
-                ) : (
-                  <Copy className="w-4 h-4 text-[var(--color-slate-400)]" />
-                )}
-              </button>
+          )}
+
+          {/* Suggestion (for add/replace) */}
+          {fix.action !== 'remove' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  {fix.action === 'replace' ? 'Replacement Content' : 'Suggested Fix'}
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 relative group bg-[var(--color-navy-900)] border border-[var(--color-navy-700)]">
+                <pre className="text-sm text-[var(--color-slate-200)] pr-8 whitespace-pre-wrap font-mono">
+                  {fix.suggestion}
+                </pre>
+                <button
+                  className="absolute top-2 right-2 p-1.5 hover:bg-[var(--color-navy-600)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(fix.suggestion, 'suggestion');
+                  }}
+                >
+                  {copiedField === 'suggestion' ? (
+                    <Check className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-[var(--color-slate-400)]" />
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Placement Hint */}
           <div className="space-y-2">

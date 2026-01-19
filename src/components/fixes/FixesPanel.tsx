@@ -76,32 +76,59 @@ export function FixesPanel() {
         return;
       }
 
-      // Use LLM to determine optimal placements
-      const placements = await determineFixPlacements(
-        apiKey,
-        openaiConfig.model,
-        referenceScript,
-        selectedFixes
-      );
-
-      const scriptLines = referenceScript.split('\n');
-
       // Build sections array with metadata
       const sections: ScriptSection[] = [];
 
+      // Group fixes by action type
+      const addFixes = selectedFixes.filter(f => !f.action || f.action === 'add');
+      const removeFixes = selectedFixes.filter(f => f.action === 'remove');
+      const replaceFixes = selectedFixes.filter(f => f.action === 'replace');
+
+      // Apply removals and replacements to script text first
+      let modifiedScript = referenceScript;
+
+      // Apply removals
+      removeFixes.forEach(fix => {
+        if (fix.targetContent) {
+          // Remove all occurrences of the target content
+          const lines = modifiedScript.split('\n');
+          const filteredLines = lines.filter(line => !line.includes(fix.targetContent!));
+          modifiedScript = filteredLines.join('\n');
+          console.log(`Removed lines containing: ${fix.targetContent.substring(0, 50)}...`);
+        }
+      });
+
+      // Apply replacements
+      replaceFixes.forEach(fix => {
+        if (fix.targetContent && fix.suggestion) {
+          modifiedScript = modifiedScript.replace(fix.targetContent, fix.suggestion);
+          console.log(`Replaced: ${fix.targetContent.substring(0, 50)}... with ${fix.suggestion.substring(0, 50)}...`);
+        }
+      });
+
+      // Now handle additions with placement logic
+      const addPlacements = await determineFixPlacements(
+        apiKey,
+        openaiConfig.model,
+        modifiedScript,
+        addFixes
+      );
+
+      const scriptLinesAfterModifications = modifiedScript.split('\n');
+
       // Sort placements by line number ascending
-      const sortedPlacements = [...placements].sort((a, b) => a.lineNumber - b.lineNumber);
+      const sortedPlacements = [...addPlacements].sort((a, b) => a.lineNumber - b.lineNumber);
 
       let currentLineIndex = 0;
 
-      // Process each placement
+      // Process each insertion placement
       sortedPlacements.forEach(placement => {
-        const fix = selectedFixes.find(f => f.id === placement.fixId);
+        const fix = addFixes.find(f => f.id === placement.fixId);
         if (!fix) return;
 
         // Add original lines before this insertion
         if (currentLineIndex < placement.lineNumber) {
-          const originalLines = scriptLines.slice(currentLineIndex, placement.lineNumber).join('\n');
+          const originalLines = scriptLinesAfterModifications.slice(currentLineIndex, placement.lineNumber).join('\n');
           if (originalLines.trim()) {
             sections.push({
               text: originalLines,
@@ -121,8 +148,8 @@ export function FixesPanel() {
       });
 
       // Add remaining original lines
-      if (currentLineIndex < scriptLines.length) {
-        const remainingLines = scriptLines.slice(currentLineIndex).join('\n');
+      if (currentLineIndex < scriptLinesAfterModifications.length) {
+        const remainingLines = scriptLinesAfterModifications.slice(currentLineIndex).join('\n');
         if (remainingLines.trim()) {
           sections.push({
             text: remainingLines,

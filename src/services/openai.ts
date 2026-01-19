@@ -315,30 +315,54 @@ CRITICAL CONSTRAINTS:
 - DO NOT suggest code changes, UI changes, or system architecture changes
 - Focus exclusively on what can be added to the bot's system prompt or reference script
 - All fixes must be implementable by modifying prompts alone
+- MAINTAIN the exact language, format, and style of the original script (do NOT translate to Devanagari or any other script)
 
 For each fix, provide a JSON object with these SEPARATE fields:
 - issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
 - problem: brief description of the problem identified
-- suggestion: ONLY the actual prompt text/instruction to add (DO NOT include placement information here)
-- placementHint: ONLY where to add it (e.g., "Add to State S1 - Greeting & Identity Confirmation" or "Within Pillar 3, under...")
-- exampleResponse: example of how bot should respond after adding this prompt (avoid using quotes or special characters)
+- action: one of ["add", "remove", "replace"] - what type of change to make
+  * "add": Insert new content (most common)
+  * "remove": Delete existing problematic content
+  * "replace": Replace existing content with improved version
+- suggestion: The actual prompt text/instruction (for "add" or "replace" actions) - MAINTAIN ORIGINAL FORMAT
+- targetContent: (ONLY for "remove" or "replace") The exact text from the script to remove/replace
+- placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2" or "Remove from State S3")
+- exampleResponse: example of how bot should respond (avoid using quotes or special characters)
 - relatedIssueIds: array of issue IDs this addresses
 
+LANGUAGE AND FORMAT PRESERVATION:
+- If the original script uses English with occasional Hindi terms, keep that exact style
+- If it uses bullet points, keep bullet points
+- If it uses specific formatting (dashes, numbers, etc.), maintain that
+- DO NOT convert English to Devanagari or change the writing system
+- DO NOT translate or change the format unless specifically needed for the fix
+
 CRITICAL SEPARATION:
-- "suggestion" field = WHAT to add (the actual prompt/instruction text ONLY)
-- "placementHint" field = WHERE to add it (location description ONLY)
+- "suggestion" field = WHAT to add/replace (the actual prompt/instruction text ONLY)
+- "placementHint" field = WHERE to make the change (location description ONLY)
 - DO NOT mix these two! Keep them completely separate.
 
-Example of CORRECT separation:
+Example of CORRECT format preservation:
 {
-  "suggestion": "After greeting and introducing yourself, always clearly and fully confirm identity in one natural sentence before continuing. For example, say: क्या मैं [ग्राहक का नाम] से बात कर रही हूँ? Do not leave the sentence incomplete like क्या यह आपने.... If the customer responds positively, then proceed to the next state. If the customer seems confused, briefly restate: मैं सुनीता बोल रही हूँ ऐनिमॉल ऐप से, क्या आप हैं [ग्राहक का नाम] हैं?",
-  "placementHint": "Within Pillar 3, under the description of State S1 - Greeting & Identity Confirmation, after Introduce yourself as Sunita from ऐनिमॉल and before Confirm the correct person"
+  "action": "add",
+  "suggestion": "Always verify customer identity with full name confirmation before proceeding\nExample: 'Am I speaking with [customer name]?'\nIf unclear, restate: 'This is Sunita from Animal app, am I speaking with [customer name]?'",
+  "placementHint": "Within State S1 - Greeting & Identity Confirmation, after greeting and before availability check"
 }
 
-Example of INCORRECT mixing (DO NOT DO THIS):
+Example with REMOVE action:
 {
-  "suggestion": "Add to State S1 - Greeting & Identity Confirmation: After greeting and introducing yourself...",
-  "placementHint": "Within Pillar 3..."
+  "action": "remove",
+  "targetContent": "If busy, explain the call will take only two minutes",
+  "suggestion": "",
+  "placementHint": "Remove from State S0 - this creates pressure and should be removed"
+}
+
+Example with REPLACE action:
+{
+  "action": "replace",
+  "targetContent": "Confirm customer availability",
+  "suggestion": "Check customer availability and get explicit consent to continue\nExample: 'Do you have 2-3 minutes to discuss your listing?'\nIf not available: 'No problem! When would be a better time for me to call you back?'",
+  "placementHint": "Replace in State S0 - Availability & Readiness Check"
 }
 
 Categorize fixes:
@@ -442,6 +466,8 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
           placementHint: fix.placementHint || 'Add to system prompt',
           exampleResponse: fix.exampleResponse || '',
           relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
+          action: fix.action || 'add',
+          targetContent: fix.targetContent || undefined,
         }))
       : [];
 
@@ -454,6 +480,8 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
           placementHint: fix.placementHint || 'Add to system prompt',
           exampleResponse: fix.exampleResponse || '',
           relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
+          action: fix.action || 'add',
+          targetContent: fix.targetContent || undefined,
         }))
       : [];
 
