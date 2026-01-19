@@ -338,11 +338,18 @@ For each fix, provide a JSON object with these SEPARATE fields:
   * "add": Insert new content (most common)
   * "remove": Delete existing problematic content
   * "replace": Replace existing content with improved version
-- suggestion: ONLY the instruction/guidance text - DO NOT include location phrases like "In State X" or "Add to..." - MUST USE SAME SCRIPT/ALPHABET AS REFERENCE
+- suggestion: MUST BE IN ENGLISH - This is instruction/guidance for developers - DO NOT write in Hindi/Hinglish - MUST USE SAME SCRIPT/ALPHABET AS REFERENCE (English/Latin characters)
 - targetContent: (ONLY for "remove" or "replace") The exact text from the script to remove/replace
 - placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2")
-- exampleResponse: (OPTIONAL - only if needed) example of how bot should respond (can be in native language/script)
+- exampleResponse: (OPTIONAL) What the bot should actually say to customers (this CAN be in native language/Hinglish)
 - relatedIssueIds: array of issue IDs this addresses
+
+🎯 LANGUAGE RULES FOR SUGGESTION FIELD:
+- suggestion field = INSTRUCTIONS for developers in ENGLISH
+- Write like you're instructing a developer: "Always check availability in one complete sentence..."
+- DO NOT write in romanized Hindi/Hinglish like "Availability check ko hamesha..."
+- Keep it professional, clear, and in English
+- exampleResponse field = What bot SAYS to customers (can be Hindi/Hinglish/native language)
 
 🚨 CRITICAL - SUGGESTION FIELD RULES:
 - "suggestion" = The actual instruction/guidance ONLY
@@ -360,9 +367,9 @@ Example for LATIN/ROMAN script reference (CORRECT - DO THIS):
 Reference script format: "State S0 - Availability & Readiness Check / Confirm customer availability"
 {
   "action": "add",
-  "suggestion": "First clearly check availability in one complete sentence before any introduction. Do not start with your name or company here.\nIf customer says they are free: 'Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.'\nIf customer sounds unsure or busy: 'Main samajhti hun aap thode busy hongi, kya aap mujhe 2 minute de sakti hain ya main baad mein call karun?'",
-  "exampleResponse": "Namaste, kya abhi aap baat karne ke liye free hain? Yeh call sirf 2 minute ka hai.",
-  "placementHint": "Add to State S0 - Availability & Readiness Check, as explicit wording guidance before moving to State S1"
+  "suggestion": "Always check availability in one complete, clear sentence. Do not fragment the question or pause mid-sentence. Ask in a single flow without breaking into pieces. The question should feel natural and complete.",
+  "exampleResponse": "Namaste, kya abhi aap baat karna aapke liye theek rahega? Yeh call sirf 2 minute ka hai.",
+  "placementHint": "Add under State S0 - Availability & Readiness Check as explicit phrasing guidance for the first question"
 }
 
 WRONG Example 1 (DO NOT DO THIS - includes location in suggestion):
@@ -372,10 +379,17 @@ WRONG Example 1 (DO NOT DO THIS - includes location in suggestion):
   "placementHint": "Add to State S0"
 }
 
-WRONG Example 2 (DO NOT DO THIS - uses Devanagari when reference is Latin):
+WRONG Example 2 (DO NOT DO THIS - suggestion in Hindi/Hinglish):
 {
   "action": "add",
-  "suggestion": "अगर ग्राहक ने कॉल उठाया हो तो कहें:\nनमस्ते, क्या अभी आप बात करने के लिए free हैं?",  ← WRONG - uses Devanagari
+  "suggestion": "Availability check ko hamesha ek hi poori saaf sentence mein bolo, beech mein ruk kar tukde-tukde mein mat bolo.",  ← WRONG - uses Hinglish
+  "placementHint": "Add to State S0"
+}
+
+WRONG Example 3 (DO NOT DO THIS - uses Devanagari script):
+{
+  "action": "add",
+  "suggestion": "अगर ग्राहक ने कॉल उठाया हो तो कहें: नमस्ते",  ← WRONG - uses Devanagari script
   "placementHint": "Add to State S0"
 }
 
@@ -400,7 +414,12 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
     knowledgeBase ? `Current Knowledge Base:\n${knowledgeBase}\n\n` : ''
   }Generate PROMPT-ONLY fix suggestions. Each suggestion must be a specific prompt instruction that can be added to the bot's system prompt, reference script, or knowledge base.
 
-⚠️ CRITICAL REMINDER: Look at the Reference Script above. Notice what SCRIPT/ALPHABET it uses (Latin/Roman letters like "State S0" or Devanagari script like "अवस्था"). Your "suggestion" field MUST use the SAME script/alphabet. DO NOT translate or convert between scripts.`;
+⚠️ CRITICAL REMINDERS:
+1. LANGUAGE: Write "suggestion" field in ENGLISH only (instructions for developers). Write "exampleResponse" field in the native language the bot speaks to customers.
+2. FORMAT: Match the reference script's formatting style (State S0, bullet points, etc.)
+3. LOCATION: DO NOT include location/placement info in "suggestion" - that goes in "placementHint"
+
+Think: "suggestion" = Developer instructions in English | "exampleResponse" = What bot says to customers`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
