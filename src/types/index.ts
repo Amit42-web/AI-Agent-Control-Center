@@ -13,7 +13,8 @@ export type IssueType =
   | 'repetition_loop'
   | 'language_mismatch'
   | 'mid_call_restart'
-  | 'quality_issue';
+  | 'quality_issue'
+  | string; // Allow custom issue types from custom checks
 
 export interface TranscriptLine {
   speaker: 'agent' | 'customer';
@@ -42,6 +43,9 @@ export interface DetectedIssue {
   lineNumbers: number[];
   explanation: string;
   suggestedFix?: string;
+  isCustomCheck?: boolean; // Flag if this came from a custom/open-ended audit
+  sourceCheckId?: string; // ID of the custom check that generated this
+  sourceCheckName?: string; // Name of the custom check for display
 }
 
 export interface AggregatedIssue {

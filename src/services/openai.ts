@@ -75,6 +75,10 @@ export async function analyzeTranscript(
     ...enabledChecks.filter(c => c.custom).map(c => c.id)
   ];
 
+  // Separate custom checks from standard checks
+  const customChecks = enabledChecks.filter(c => c.custom);
+  const standardChecks = enabledChecks.filter(c => !c.custom);
+
   const systemPrompt = `You are an expert AI voice bot quality analyst. Your task is to analyze call transcripts and detect issues based on specific checks.
 
 Analyze the following transcript and identify issues based on these enabled checks:
@@ -83,15 +87,31 @@ ${checksDescription}
 ${referenceScript ? `Reference Script/Flow:\n${referenceScript}\n` : ''}
 ${knowledgeBase ? `Knowledge Base:\n${knowledgeBase}\n` : ''}
 
+🎯 ISSUE CATEGORIZATION (IMPORTANT):
+
+For STANDARD checks (flow_compliance, repetition, language_alignment, restart_reset, general_quality):
+- Use the standard issue types: flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue
+
+For CUSTOM/OPEN-ENDED checks:
+- CATEGORIZE the finding into one of the standard types above if it clearly fits (e.g., if custom check finds a flow problem, use "flow_deviation")
+- OR create a NEW specific category name that describes the issue type (e.g., "tone_issue", "empathy_gap", "politeness_violation")
+- NEW category names should be: lowercase, underscore-separated, descriptive, specific (NOT generic)
+- Examples of good custom types: "tone_issue", "empathy_gap", "profanity_detected", "pricing_promise", "unauthorized_commitment"
+- Examples of bad custom types: "problem", "issue", "error" (too generic)
+
+🔍 DEDUPLICATION GUIDANCE:
+- If you find multiple similar issues from the SAME check in the SAME call, only report the MOST SIGNIFICANT one
+- Look for: same root cause, same conversation segment, or very similar explanations
+- Keep separate if they are genuinely different issues or occur in different parts of the conversation
+
 For each issue found, provide a JSON object with:
-- type: Use the check ID for the issue type. Valid types are: [${validIssueTypes.join(', ')}]
-  * For standard checks, use: flow_deviation (for flow_compliance check), repetition_loop (for repetition check), language_mismatch (for language_alignment check), mid_call_restart (for restart_reset check), or quality_issue (for general_quality check)
-  * For custom checks, use the exact check ID provided above
+- type: Issue type following the categorization rules above
 - severity: one of [low, medium, high, critical]
 - confidence: number between 0-100
 - evidenceSnippet: the exact text from the transcript that demonstrates the issue
 - lineNumbers: array of line numbers where the issue occurs
 - explanation: detailed explanation of why this is an issue
+- sourceCheckId: the ID of the check that found this issue (use the check ID from above)
 
 Return ONLY a JSON array of issues. If no issues are found, return an empty array [].`;
 
@@ -158,17 +178,27 @@ Return ONLY a JSON array of issues. If no issues are found, return an empty arra
       lineNumbers: number[];
       explanation: string;
       suggestedFix?: string;
-    }, idx: number) => ({
-      id: `${transcript.id}-issue-${idx}`,
-      callId: transcript.id,
-      type: issue.type as IssueType,
-      severity: issue.severity as Severity,
-      confidence: issue.confidence,
-      evidenceSnippet: issue.evidenceSnippet,
-      lineNumbers: issue.lineNumbers,
-      explanation: issue.explanation,
-      suggestedFix: issue.suggestedFix,
-    }));
+      sourceCheckId?: string;
+    }, idx: number) => {
+      // Find the source check to get its name and determine if custom
+      const sourceCheck = enabledChecks.find(c => c.id === issue.sourceCheckId);
+      const isCustomCheck = sourceCheck?.custom || false;
+
+      return {
+        id: `${transcript.id}-issue-${idx}`,
+        callId: transcript.id,
+        type: issue.type as IssueType,
+        severity: issue.severity as Severity,
+        confidence: issue.confidence,
+        evidenceSnippet: issue.evidenceSnippet,
+        lineNumbers: issue.lineNumbers,
+        explanation: issue.explanation,
+        suggestedFix: issue.suggestedFix,
+        isCustomCheck,
+        sourceCheckId: issue.sourceCheckId,
+        sourceCheckName: sourceCheck?.name,
+      };
+    });
   } catch (error) {
     console.error('Error analyzing transcript:', error);
     throw error;
