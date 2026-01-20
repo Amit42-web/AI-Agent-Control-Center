@@ -14,12 +14,29 @@ const severityClasses: Record<Severity, string> = {
 };
 
 export function ScenarioTable() {
-  const { scenarioResults, setSelectedCallId } = useAppStore();
+  const { scenarioResults, transcripts, setSelectedCallId } = useAppStore();
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedScenarios, setExpandedScenarios] = useState<Set<string>>(new Set());
 
   if (!scenarioResults) return null;
+
+  // Helper to get transcript lines for a scenario
+  const getTranscriptLines = (callId: string, lineNumbers: number[]) => {
+    const transcript = transcripts.find(t => t.id === callId);
+    if (!transcript || !lineNumbers || lineNumbers.length === 0) return [];
+
+    return lineNumbers.map(lineNum => {
+      const line = transcript.lines[lineNum - 1]; // lineNumbers are 1-indexed
+      if (!line) return null;
+      return {
+        lineNumber: lineNum,
+        speaker: line.speaker,
+        text: line.text,
+        timestamp: line.timestamp
+      };
+    }).filter(Boolean);
+  };
 
   const filteredScenarios = scenarioResults.scenarios.filter((scenario) => {
     if (severityFilter !== 'all' && scenario.severity !== severityFilter) return false;
@@ -166,14 +183,38 @@ export function ScenarioTable() {
                       </p>
                     </div>
 
-                    {/* Evidence */}
+                    {/* Evidence - Actual Transcript */}
                     <div className="bg-[var(--color-navy-900)] rounded-lg p-3 border-l-2 border-blue-500">
-                      <p className="text-xs font-semibold text-blue-400 mb-1">
-                        Evidence (Lines {scenario.lineNumbers.join(', ')}):
+                      <p className="text-xs font-semibold text-blue-400 mb-2">
+                        Transcript Evidence (Lines {scenario.lineNumbers.join(', ')}):
                       </p>
-                      <p className="text-sm text-[var(--color-slate-300)] font-mono">
-                        {scenario.evidenceSnippet}
-                      </p>
+                      <div className="space-y-2">
+                        {getTranscriptLines(scenario.callId, scenario.lineNumbers).map((line: any, idx: number) => (
+                          <div key={idx} className="text-sm">
+                            <div className="flex items-start gap-2">
+                              <span className="text-[var(--color-slate-500)] font-mono text-xs flex-shrink-0">
+                                [{line.lineNumber}]
+                                {line.timestamp && (
+                                  <span className="ml-1 text-[var(--color-slate-600)]">
+                                    {line.timestamp}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[var(--color-slate-300)]">
+                                <span className={`font-semibold ${line.speaker === 'agent' ? 'text-blue-300' : 'text-green-300'}`}>
+                                  {line.speaker.toUpperCase()}:
+                                </span>{' '}
+                                {line.text}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {scenario.lineNumbers.length === 0 && (
+                          <p className="text-xs text-[var(--color-slate-500)] italic">
+                            No specific lines identified for this scenario
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}

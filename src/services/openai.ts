@@ -567,20 +567,11 @@ For each scenario, provide a JSON object with:
 - impact: How this affected the customer experience or call outcome
 - severity: one of [low, medium, high, critical] - based on impact to customer
 - confidence: number between 0-100 - how confident you are this is a genuine issue
-- lineNumbers: array of line numbers where this scenario occurs
-- evidenceSnippet: relevant excerpt from the transcript (IMPORTANT: Keep under 150 chars, use ONLY ASCII characters, replace any Hindi/Devanagari text with "[Hindi text]" placeholder)
+- lineNumbers: array of line numbers where this scenario occurs (e.g., [19, 20, 21, 22] for lines 19-22)
+
+IMPORTANT: Do NOT include evidence snippets or transcript excerpts. Just provide the line numbers - the UI will display the actual transcript lines.
 
 Think like a call center trainer reviewing calls with agents. Be constructive, specific, and focus on actionable improvements.
-
-CRITICAL JSON FORMATTING REQUIREMENTS:
-- ALL string values MUST be properly escaped with backslashes
-- Evidence snippets: Use ONLY ASCII characters (a-z, A-Z, 0-9, basic punctuation)
-- If transcript contains Hindi/Devanagari/Unicode: Replace with "[Hindi text]" or "[Customer speaking in Hindi]"
-- Replace ALL newlines (\n) in evidence snippets with single spaces
-- Do NOT include actual Hindi/Devanagari characters in JSON output
-- Double-check JSON is valid before returning
-- Example good evidence: "CUSTOMER: [Hindi text] AGENT: I understand, let me help"
-- Example bad evidence: "CUSTOMER: लेकिन AGENT: थोड़ी देर..."
 
 Return ONLY a valid JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
 
@@ -698,8 +689,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
                       impact: 'Impact assessment limited',
                       severity: severityMatch ? severityMatch[1] : 'medium',
                       confidence: confidenceMatch ? parseInt(confidenceMatch[1]) : 70,
-                      lineNumbers: lineNumbersMatch ? lineNumbersMatch[1].split(',').map(n => parseInt(n.trim())) : [],
-                      evidenceSnippet: 'Evidence snippet unavailable due to encoding issues'
+                      lineNumbers: lineNumbersMatch ? lineNumbersMatch[1].split(',').map(n => parseInt(n.trim())) : []
                     });
                   }
                 }
@@ -738,7 +728,6 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
       severity: string;
       confidence: number;
       lineNumbers: number[];
-      evidenceSnippet: string;
     }, idx: number) => ({
       id: `${transcript.id}-scenario-${idx}`,
       callId: transcript.id,
@@ -748,8 +737,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
       impact: scenario.impact,
       severity: scenario.severity as Severity,
       confidence: scenario.confidence,
-      lineNumbers: scenario.lineNumbers,
-      evidenceSnippet: scenario.evidenceSnippet,
+      lineNumbers: scenario.lineNumbers || [],
     }));
   } catch (error) {
     console.error('Error analyzing transcript scenarios:', error);

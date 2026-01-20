@@ -113,7 +113,7 @@ export interface Scenario {
   severity: Severity;
   confidence: number;
   lineNumbers: number[];
-  evidenceSnippet: string;
+  // evidenceSnippet removed - we'll show actual transcript lines in UI instead
 }
 
 export interface EnhancedFix {
