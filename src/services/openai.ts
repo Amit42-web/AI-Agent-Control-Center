@@ -577,10 +577,16 @@ Return ONLY a JSON array of scenarios. If no concerning scenarios are found, ret
   const userPrompt = `Transcript to analyze:\n${transcriptText}`;
 
   try {
+    console.log(`[SCENARIO ANALYSIS] Starting for ${transcript.id}`);
+    console.log(`[SCENARIO ANALYSIS] Audit prompt length: ${auditPrompt.length} chars`);
+    console.log(`[SCENARIO ANALYSIS] Transcript lines: ${transcript.lines.length}`);
+
     const response = await callOpenAI(apiKey, model, [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ]);
+
+    console.log(`[SCENARIO ANALYSIS] Received response (first 500 chars):`, response.substring(0, 500));
 
     // Try to extract JSON array
     let jsonStr = response.trim();
@@ -595,18 +601,21 @@ Return ONLY a JSON array of scenarios. If no concerning scenarios are found, ret
     const endIdx = jsonStr.lastIndexOf(']');
 
     if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
-      console.error('No valid JSON array found in response:', response);
+      console.error(`[SCENARIO ANALYSIS] No valid JSON array found for ${transcript.id}`);
+      console.error('[SCENARIO ANALYSIS] Full response:', response);
+      console.warn('[SCENARIO ANALYSIS] Possible reasons: 1) API key invalid/missing, 2) AI found no issues, 3) Unexpected response format');
       return [];
     }
 
     jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+    console.log(`[SCENARIO ANALYSIS] Extracted JSON length: ${jsonStr.length} chars`);
 
     let scenarios;
     try {
       scenarios = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Attempted to parse:', jsonStr);
+      console.error(`[SCENARIO ANALYSIS] JSON parse error for ${transcript.id}:`, parseError);
+      console.error('[SCENARIO ANALYSIS] Attempted to parse:', jsonStr.substring(0, 1000));
 
       // Try one more time with cleanup
       try {
