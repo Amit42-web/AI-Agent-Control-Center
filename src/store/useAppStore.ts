@@ -354,7 +354,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           knowledgeBaseEnabled ? knowledgeBase : null
         );
 
-        set({ fixes, currentStep: 'fixes', isRunning: false });
+        // Ensure fixes have the proper structure
+        const validatedFixes = {
+          scriptFixes: Array.isArray(fixes?.scriptFixes) ? fixes.scriptFixes : [],
+          generalFixes: Array.isArray(fixes?.generalFixes) ? fixes.generalFixes : []
+        };
+
+        set({ fixes: validatedFixes, currentStep: 'fixes', isRunning: false });
       } else if (flowType === 'open-ended' && scenarioResults) {
         // Open-ended flow: Generate enhanced fixes
         const enhancedFixesArray = await generateEnhancedFixSuggestions(
@@ -366,8 +372,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           knowledgeBaseEnabled ? knowledgeBase : null
         );
 
+        // Ensure enhancedFixes have the proper structure
+        const validatedEnhancedFixes = {
+          fixes: Array.isArray(enhancedFixesArray) ? enhancedFixesArray : []
+        };
+
         set({
-          enhancedFixes: { fixes: enhancedFixesArray },
+          enhancedFixes: validatedEnhancedFixes,
           currentStep: 'fixes',
           isRunning: false
         });
@@ -375,7 +386,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Error generating fixes:', error);
       set({ isRunning: false });
-      alert(`Failed to generate fixes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`Failed to generate fixes: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or check the console for details.`);
     }
   },
 

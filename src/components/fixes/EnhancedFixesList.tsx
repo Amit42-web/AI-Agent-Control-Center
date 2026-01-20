@@ -44,7 +44,8 @@ export function EnhancedFixesList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFixes, setExpandedFixes] = useState<Set<string>>(new Set());
 
-  if (!enhancedFixes || enhancedFixes.fixes.length === 0) {
+  // Proper null/undefined checks
+  if (!enhancedFixes || !enhancedFixes.fixes || enhancedFixes.fixes.length === 0) {
     return (
       <div className="glass-card p-8 text-center">
         <p className="text-[var(--color-slate-400)]">No fixes available yet.</p>

@@ -23,12 +23,19 @@ export function FixesPanel() {
   const [scriptSections, setScriptSections] = useState<ScriptSection[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
-  if (!fixes) return null;
+  // Proper null/undefined checks with fallbacks
+  if (!fixes || !fixes.scriptFixes || !fixes.generalFixes) {
+    return (
+      <div className="glass-card p-8 text-center">
+        <p className="text-[var(--color-slate-400)]">No fixes available yet.</p>
+      </div>
+    );
+  }
 
   const exportFixes = () => {
     const content = {
-      scriptFixes: fixes.scriptFixes,
-      generalFixes: fixes.generalFixes,
+      scriptFixes: fixes.scriptFixes || [],
+      generalFixes: fixes.generalFixes || [],
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(content, null, 2)], {
@@ -42,10 +49,10 @@ export function FixesPanel() {
     URL.revokeObjectURL(url);
   };
 
-  const hasScriptFixes = fixes.scriptFixes.length > 0;
-  const hasGeneralFixes = fixes.generalFixes.length > 0;
-  const totalFixes = fixes.scriptFixes.length + fixes.generalFixes.length;
-  const allFixes = [...fixes.scriptFixes, ...fixes.generalFixes];
+  const hasScriptFixes = (fixes.scriptFixes || []).length > 0;
+  const hasGeneralFixes = (fixes.generalFixes || []).length > 0;
+  const totalFixes = (fixes.scriptFixes || []).length + (fixes.generalFixes || []).length;
+  const allFixes = [...(fixes.scriptFixes || []), ...(fixes.generalFixes || [])];
 
   const toggleFixSelection = (fixId: string) => {
     const newSelected = new Set(selectedFixIds);
