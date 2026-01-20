@@ -532,17 +532,10 @@ export async function analyzeTranscriptScenarios(
   apiKey: string,
   model: string,
   transcript: Transcript,
-  checks: CheckConfig[],
+  auditPrompt: string,
   referenceScript: string | null,
   knowledgeBase: string | null = null
 ): Promise<Scenario[]> {
-  const enabledChecks = checks.filter((c) => c.enabled);
-
-  if (enabledChecks.length === 0) {
-    console.log('No enabled checks, skipping scenario analysis');
-    return [];
-  }
-
   // Validate transcript has lines
   if (!transcript.lines || transcript.lines.length === 0) {
     console.warn('Transcript has no lines:', transcript.id);
@@ -556,27 +549,17 @@ export async function analyzeTranscriptScenarios(
 
   console.log(`Analyzing transcript ${transcript.id} for scenarios with ${transcript.lines.length} lines`);
 
-  // Build checks description
-  const checksDescription = enabledChecks
-    .map((check) => `- ${check.name}: ${check.instructions}`)
-    .join('\n');
-
   const systemPrompt = `You are an expert call center quality analyst conducting holistic, open-ended audits of agent performance.
 
-Your task is to identify SCENARIOS where the agent underperformed or could improve. Think beyond simple rule violations - look for:
-- Missed opportunities to build rapport or show empathy
-- Poor handling of customer emotions or objections
-- Incomplete problem resolution or information gathering
-- Lack of personalization or active listening
-- Process inefficiencies or awkward conversation flow
-- Any situation where customer experience was suboptimal
+Your task is to identify SCENARIOS where the agent underperformed or could improve.
 
-Focus areas based on enabled checks:
-${checksDescription}
+## Audit Instructions:
+${auditPrompt}
 
-${referenceScript ? `Reference Script/Flow:\n${referenceScript}\n` : ''}
-${knowledgeBase ? `Knowledge Base:\n${knowledgeBase}\n` : ''}
+${referenceScript ? `\n## Reference Script/Flow:\n${referenceScript}\n` : ''}
+${knowledgeBase ? `\n## Knowledge Base:\n${knowledgeBase}\n` : ''}
 
+## Output Format:
 For each scenario, provide a JSON object with:
 - title: Concise title describing the scenario (e.g., "Empathy Gap During Customer Frustration", "Incomplete Information Gathering")
 - context: Where/when this occurred (e.g., "Lines 45-67, customer expressed frustration about delayed order")

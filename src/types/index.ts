@@ -170,6 +170,7 @@ export interface AnalysisState {
   knowledgeBase: string;
   knowledgeBaseEnabled: boolean;
   checks: CheckConfig[];
+  auditPrompt: string; // For open-ended flow
   openaiConfig: OpenAIConfig;
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
@@ -189,6 +190,9 @@ export interface AppState {
   knowledgeBase: string;
   knowledgeBaseEnabled: boolean;
   checks: CheckConfig[];
+
+  // Open-ended flow audit prompt
+  auditPrompt: string;
 
   // OpenAI configuration
   openaiConfig: OpenAIConfig;
@@ -219,6 +223,7 @@ export interface AppState {
   setReferenceEnabled: (enabled: boolean) => void;
   setKnowledgeBase: (kb: string) => void;
   setKnowledgeBaseEnabled: (enabled: boolean) => void;
+  setAuditPrompt: (prompt: string) => void;
   setOpenAIConfig: (config: Partial<OpenAIConfig>) => void;
   toggleCheck: (checkId: CheckType) => void;
   updateCheckInstructions: (checkId: CheckType, instructions: string) => void;

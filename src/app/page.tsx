@@ -9,6 +9,7 @@ import { TranscriptInput } from '@/components/wizard/TranscriptInput';
 import { ReferenceScript } from '@/components/wizard/ReferenceScript';
 import { KnowledgeBase } from '@/components/wizard/KnowledgeBase';
 import { ChecksConfig } from '@/components/wizard/ChecksConfig';
+import { AuditPromptConfig } from '@/components/wizard/AuditPromptConfig';
 import { OpenAIConfig } from '@/components/wizard/OpenAIConfig';
 import { RunButton } from '@/components/wizard/RunButton';
 import { KPICards } from '@/components/results/KPICards';
@@ -23,6 +24,8 @@ import { AggregateResults } from '@/components/results/AggregateResults';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 
 function RunWizardPage() {
+  const { flowType } = useAppStore();
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -49,7 +52,9 @@ function RunWizardPage() {
       <motion.div className="mb-8" variants={itemVariants}>
         <h2 className="text-2xl font-bold text-white mb-2">Run Analysis</h2>
         <p className="text-[var(--color-slate-400)]">
-          Configure your transcript input, reference script, and checks to analyze voice bot calls.
+          {flowType === 'objective'
+            ? 'Configure your transcript input, reference script, and checks to analyze voice bot calls.'
+            : 'Configure your transcript input and comprehensive audit instructions for holistic evaluation.'}
         </p>
       </motion.div>
 
@@ -57,7 +62,11 @@ function RunWizardPage() {
       <motion.div variants={itemVariants}><TranscriptInput /></motion.div>
       <motion.div variants={itemVariants}><ReferenceScript /></motion.div>
       <motion.div variants={itemVariants}><KnowledgeBase /></motion.div>
-      <motion.div variants={itemVariants}><ChecksConfig /></motion.div>
+      {flowType === 'objective' ? (
+        <motion.div variants={itemVariants}><ChecksConfig /></motion.div>
+      ) : (
+        <motion.div variants={itemVariants}><AuditPromptConfig /></motion.div>
+      )}
       <motion.div variants={itemVariants}><RunButton /></motion.div>
     </motion.div>
   );

@@ -17,6 +17,7 @@ import {
   demoTranscript,
   defaultReferenceScript,
 } from '@/data/demoData';
+import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
 import {
   analyzeTranscript,
   generateFixSuggestions,
@@ -34,6 +35,7 @@ const initialState = {
   knowledgeBase: '',
   knowledgeBaseEnabled: false,
   checks: defaultChecks,
+  auditPrompt: defaultAuditPrompt,
   openaiConfig: {
     apiKey: '',
     model: 'gpt-4.1-mini',
@@ -73,6 +75,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setKnowledgeBase: (kb: string) => set({ knowledgeBase: kb }),
 
   setKnowledgeBaseEnabled: (enabled: boolean) => set({ knowledgeBaseEnabled: enabled }),
+
+  setAuditPrompt: (prompt: string) => set({ auditPrompt: prompt }),
 
   setOpenAIConfig: (config) => {
     const currentConfig = get().openaiConfig;
@@ -147,7 +151,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysis: async () => {
-    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig, flowType } = get();
+    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig, flowType, auditPrompt } = get();
 
     // Get API key from environment variable - check both possible names
     const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
@@ -260,7 +264,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               apiKey,
               openaiConfig.model,
               transcript,
-              checks,
+              auditPrompt,
               referenceEnabled ? referenceScript : null,
               knowledgeBaseEnabled ? knowledgeBase : null
             );
@@ -387,6 +391,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       knowledgeBase: state.knowledgeBase,
       knowledgeBaseEnabled: state.knowledgeBaseEnabled,
       checks: state.checks,
+      auditPrompt: state.auditPrompt,
       openaiConfig: state.openaiConfig,
       results: state.results,
       fixes: state.fixes,
@@ -405,6 +410,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       knowledgeBase: analysisState.knowledgeBase,
       knowledgeBaseEnabled: analysisState.knowledgeBaseEnabled,
       checks: analysisState.checks,
+      auditPrompt: analysisState.auditPrompt || defaultAuditPrompt,
       openaiConfig: analysisState.openaiConfig,
       results: analysisState.results,
       fixes: analysisState.fixes,
