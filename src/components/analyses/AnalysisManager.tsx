@@ -12,9 +12,11 @@ import {
   ArrowRight,
   Search,
   Filter,
+  Target,
+  Brain,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { SavedAnalysis } from '@/types';
+import { SavedAnalysis, FlowType } from '@/types';
 
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
@@ -24,6 +26,7 @@ export function AnalysisManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [showNewAnalysisModal, setShowNewAnalysisModal] = useState(false);
   const [newAnalysisName, setNewAnalysisName] = useState('');
+  const [selectedFlowType, setSelectedFlowType] = useState<FlowType>('objective');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -51,9 +54,10 @@ export function AnalysisManager() {
       alert('Please enter an analysis name');
       return;
     }
-    createNewAnalysis(newAnalysisName.trim());
+    createNewAnalysis(newAnalysisName.trim(), selectedFlowType);
     setShowNewAnalysisModal(false);
     setNewAnalysisName('');
+    setSelectedFlowType('objective');
   };
 
   const handleLoadAnalysis = async (id: string) => {
@@ -481,29 +485,123 @@ export function AnalysisManager() {
               onClick={() => setShowNewAnalysisModal(false)}
             />
             <motion.div
-              className="glass-card max-w-md w-full p-6 relative z-10"
+              className="glass-card max-w-2xl w-full p-6 relative z-10"
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
             >
-              <h2 className="text-2xl font-bold text-white mb-4">
+              <h2 className="text-2xl font-bold text-white mb-2">
                 Create New Analysis
               </h2>
               <p className="text-[var(--color-slate-400)] mb-6">
-                Give your analysis a descriptive name to easily identify it later.
+                Choose your analysis type and give it a descriptive name.
               </p>
-              <input
-                type="text"
-                placeholder="e.g., Q4 Customer Support Analysis"
-                value={newAnalysisName}
-                onChange={(e) => setNewAnalysisName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateNew();
-                  if (e.key === 'Escape') setShowNewAnalysisModal(false);
-                }}
-                className="w-full px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-white placeholder-[var(--color-slate-500)] focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
-                autoFocus
-              />
+
+              {/* Flow Type Selector */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-white mb-3">
+                  Analysis Type
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Objective Flow */}
+                  <motion.button
+                    type="button"
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      selectedFlowType === 'objective'
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-[var(--color-navy-700)] bg-[var(--color-navy-800)] hover:border-blue-500/50'
+                    }`}
+                    onClick={() => setSelectedFlowType('objective')}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        selectedFlowType === 'objective'
+                          ? 'bg-blue-500/20'
+                          : 'bg-[var(--color-navy-700)]'
+                      }`}>
+                        <Target className={`w-5 h-5 ${
+                          selectedFlowType === 'objective'
+                            ? 'text-blue-400'
+                            : 'text-[var(--color-slate-400)]'
+                        }`} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className={`font-semibold mb-1 ${
+                          selectedFlowType === 'objective'
+                            ? 'text-blue-400'
+                            : 'text-white'
+                        }`}>
+                          Objective Analysis
+                        </h3>
+                        <p className="text-xs text-[var(--color-slate-400)] leading-relaxed">
+                          Find specific issues and problems like flow deviations, repetitions, and language mismatches
+                        </p>
+                      </div>
+                    </div>
+                  </motion.button>
+
+                  {/* Open-Ended Flow */}
+                  <motion.button
+                    type="button"
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      selectedFlowType === 'open-ended'
+                        ? 'border-purple-500 bg-purple-500/10'
+                        : 'border-[var(--color-navy-700)] bg-[var(--color-navy-800)] hover:border-purple-500/50'
+                    }`}
+                    onClick={() => setSelectedFlowType('open-ended')}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        selectedFlowType === 'open-ended'
+                          ? 'bg-purple-500/20'
+                          : 'bg-[var(--color-navy-700)]'
+                      }`}>
+                        <Brain className={`w-5 h-5 ${
+                          selectedFlowType === 'open-ended'
+                            ? 'text-purple-400'
+                            : 'text-[var(--color-slate-400)]'
+                        }`} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className={`font-semibold mb-1 ${
+                          selectedFlowType === 'open-ended'
+                            ? 'text-purple-400'
+                            : 'text-white'
+                        }`}>
+                          Open-Ended Audit
+                        </h3>
+                        <p className="text-xs text-[var(--color-slate-400)] leading-relaxed">
+                          Holistic evaluation with scenarios, root causes, and actionable implementation solutions
+                        </p>
+                      </div>
+                    </div>
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Name Input */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-white mb-2">
+                  Analysis Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Q4 Customer Support Analysis"
+                  value={newAnalysisName}
+                  onChange={(e) => setNewAnalysisName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateNew();
+                    if (e.key === 'Escape') setShowNewAnalysisModal(false);
+                  }}
+                  className="w-full px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-white placeholder-[var(--color-slate-500)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+
               <div className="flex items-center gap-3">
                 <motion.button
                   className="flex-1 btn-primary"
@@ -515,7 +613,11 @@ export function AnalysisManager() {
                 </motion.button>
                 <motion.button
                   className="flex-1 btn-secondary"
-                  onClick={() => setShowNewAnalysisModal(false)}
+                  onClick={() => {
+                    setShowNewAnalysisModal(false);
+                    setNewAnalysisName('');
+                    setSelectedFlowType('objective');
+                  }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >

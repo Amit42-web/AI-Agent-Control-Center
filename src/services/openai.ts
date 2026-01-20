@@ -1,4 +1,4 @@
-import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix } from '@/types';
+import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType } from '@/types';
 
 export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -523,6 +523,293 @@ Think: "suggestion" = Developer instructions in English | "exampleResponse" = Wh
     return { scriptFixes, generalFixes };
   } catch (error) {
     console.error('Error generating fix suggestions:', error);
+    throw error;
+  }
+}
+
+// Open-ended flow: Scenario-based analysis
+export async function analyzeTranscriptScenarios(
+  apiKey: string,
+  model: string,
+  transcript: Transcript,
+  checks: CheckConfig[],
+  referenceScript: string | null,
+  knowledgeBase: string | null = null
+): Promise<Scenario[]> {
+  const enabledChecks = checks.filter((c) => c.enabled);
+
+  if (enabledChecks.length === 0) {
+    console.log('No enabled checks, skipping scenario analysis');
+    return [];
+  }
+
+  // Validate transcript has lines
+  if (!transcript.lines || transcript.lines.length === 0) {
+    console.warn('Transcript has no lines:', transcript.id);
+    return [];
+  }
+
+  // Build transcript text
+  const transcriptText = transcript.lines
+    .map((line, idx) => `[${idx + 1}] ${line.speaker.toUpperCase()}: ${line.text}`)
+    .join('\n');
+
+  console.log(`Analyzing transcript ${transcript.id} for scenarios with ${transcript.lines.length} lines`);
+
+  // Build checks description
+  const checksDescription = enabledChecks
+    .map((check) => `- ${check.name}: ${check.instructions}`)
+    .join('\n');
+
+  const systemPrompt = `You are an expert call center quality analyst conducting holistic, open-ended audits of agent performance.
+
+Your task is to identify SCENARIOS where the agent underperformed or could improve. Think beyond simple rule violations - look for:
+- Missed opportunities to build rapport or show empathy
+- Poor handling of customer emotions or objections
+- Incomplete problem resolution or information gathering
+- Lack of personalization or active listening
+- Process inefficiencies or awkward conversation flow
+- Any situation where customer experience was suboptimal
+
+Focus areas based on enabled checks:
+${checksDescription}
+
+${referenceScript ? `Reference Script/Flow:\n${referenceScript}\n` : ''}
+${knowledgeBase ? `Knowledge Base:\n${knowledgeBase}\n` : ''}
+
+For each scenario, provide a JSON object with:
+- title: Concise title describing the scenario (e.g., "Empathy Gap During Customer Frustration", "Incomplete Information Gathering")
+- context: Where/when this occurred (e.g., "Lines 45-67, customer expressed frustration about delayed order")
+- whatHappened: What the agent did or didn't do (be specific and objective)
+- impact: How this affected the customer experience or call outcome
+- severity: one of [low, medium, high, critical] - based on impact to customer
+- confidence: number between 0-100 - how confident you are this is a genuine issue
+- lineNumbers: array of line numbers where this scenario occurs
+- evidenceSnippet: relevant excerpt from the transcript
+
+Think like a call center trainer reviewing calls with agents. Be constructive, specific, and focus on actionable improvements.
+
+Return ONLY a JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
+
+  const userPrompt = `Transcript to analyze:\n${transcriptText}`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    // Try to extract JSON array
+    let jsonStr = response.trim();
+
+    // If wrapped in markdown code blocks, remove them
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    // Find the first [ and last ]
+    const startIdx = jsonStr.indexOf('[');
+    const endIdx = jsonStr.lastIndexOf(']');
+
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+      console.error('No valid JSON array found in response:', response);
+      return [];
+    }
+
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+
+    let scenarios;
+    try {
+      scenarios = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Attempted to parse:', jsonStr);
+
+      // Try one more time with cleanup
+      try {
+        const cleaned = jsonStr
+          .replace(/,(\s*[}\]])/g, '$1')
+          .replace(/\n/g, ' ')
+          .replace(/\r/g, '');
+        scenarios = JSON.parse(cleaned);
+      } catch (secondError) {
+        console.error('Failed to parse scenarios after cleanup:', secondError);
+        return [];
+      }
+    }
+
+    if (!Array.isArray(scenarios)) {
+      console.error('Parsed result is not an array:', scenarios);
+      return [];
+    }
+
+    console.log(`Found ${scenarios.length} scenarios in transcript ${transcript.id}`);
+
+    // Convert to Scenario format with IDs
+    return scenarios.map((scenario: {
+      title: string;
+      context: string;
+      whatHappened: string;
+      impact: string;
+      severity: string;
+      confidence: number;
+      lineNumbers: number[];
+      evidenceSnippet: string;
+    }, idx: number) => ({
+      id: `${transcript.id}-scenario-${idx}`,
+      callId: transcript.id,
+      title: scenario.title,
+      context: scenario.context,
+      whatHappened: scenario.whatHappened,
+      impact: scenario.impact,
+      severity: scenario.severity as Severity,
+      confidence: scenario.confidence,
+      lineNumbers: scenario.lineNumbers,
+      evidenceSnippet: scenario.evidenceSnippet,
+    }));
+  } catch (error) {
+    console.error('Error analyzing transcript scenarios:', error);
+    throw error;
+  }
+}
+
+// Open-ended flow: Generate enhanced fix suggestions with implementation details
+export async function generateEnhancedFixSuggestions(
+  apiKey: string,
+  model: string,
+  scenarios: Scenario[],
+  transcripts: Transcript[],
+  referenceScript: string | null,
+  knowledgeBase: string | null = null
+): Promise<EnhancedFix[]> {
+  if (scenarios.length === 0) {
+    return [];
+  }
+
+  const systemPrompt = `You are an expert call center operations consultant. Your task is to generate comprehensive, actionable solutions for identified performance scenarios.
+
+For each scenario, provide a detailed fix with implementation guidance. Think end-to-end:
+- WHY did this happen? (root cause)
+- WHAT type of solution is needed? (script, training, process, system)
+- WHERE should it be implemented? (specific location in flow/process)
+- WHAT exactly should be implemented? (concrete steps/content)
+- HOW should it look in practice? (before/after example)
+- HOW to validate it worked? (success criteria and testing)
+
+Fix types explained:
+- script: Changes to prompts, reference scripts, or bot instructions
+- training: Agent coaching, skills development, or knowledge gaps
+- process: Workflow changes, escalation procedures, quality checkpoints
+- system: Technical improvements, integrations, automation needs
+
+For each scenario, provide a JSON object with:
+- scenarioId: The ID of the scenario this addresses
+- title: Short descriptive title (e.g., "Add Empathy Steps", "Improve Information Gathering")
+- fixType: one of [script, training, process, system]
+- rootCause: Why this scenario happened (1-2 sentences)
+- suggestedSolution: What to do about it (overview, 2-3 sentences)
+- whereToImplement: Specific location in the flow/process/script where this applies
+- whatToImplement: Detailed steps or content to add/change (be very specific)
+- concreteExample: Before/after example or sample dialogue showing the improvement
+- successCriteria: How to measure if this fix worked (observable outcomes)
+- howToTest: Specific validation method (e.g., "Review next 10 calls for empathy statements", "Check if customers ask fewer clarifying questions")
+
+Be practical and actionable. Think like you're creating an implementation plan for a team.
+
+Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
+
+  const scenariosSummary = scenarios
+    .map(
+      (scenario) =>
+        `Scenario ID: ${scenario.id}\nTitle: ${scenario.title}\nContext: ${scenario.context}\nWhat Happened: ${scenario.whatHappened}\nImpact: ${scenario.impact}\nSeverity: ${scenario.severity}`
+    )
+    .join('\n\n---\n\n');
+
+  const userPrompt = `Scenarios identified:\n\n${scenariosSummary}\n\n${
+    referenceScript ? `Current Reference Script:\n${referenceScript}\n\n` : ''
+  }${
+    knowledgeBase ? `Current Knowledge Base:\n${knowledgeBase}\n\n` : ''
+  }Generate comprehensive, actionable fix suggestions with full implementation details for each scenario.`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    // Try to extract JSON array
+    let jsonStr = response.trim();
+
+    // If wrapped in markdown code blocks, remove them
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    // Find the first [ and last ]
+    const startIdx = jsonStr.indexOf('[');
+    const endIdx = jsonStr.lastIndexOf(']');
+
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+      console.error('No valid JSON array found in response:', response);
+      return [];
+    }
+
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+
+    let fixes;
+    try {
+      fixes = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Attempted to parse:', jsonStr);
+
+      // Try one more time with cleanup
+      try {
+        const cleaned = jsonStr
+          .replace(/,(\s*[}\]])/g, '$1')
+          .replace(/\n/g, ' ')
+          .replace(/\r/g, '');
+        fixes = JSON.parse(cleaned);
+      } catch (secondError) {
+        console.error('Failed to parse enhanced fixes after cleanup:', secondError);
+        return [];
+      }
+    }
+
+    if (!Array.isArray(fixes)) {
+      console.error('Parsed result is not an array:', fixes);
+      return [];
+    }
+
+    console.log(`Generated ${fixes.length} enhanced fixes`);
+
+    // Convert to EnhancedFix format with IDs
+    return fixes.map((fix: {
+      scenarioId: string;
+      title: string;
+      fixType: string;
+      rootCause: string;
+      suggestedSolution: string;
+      whereToImplement: string;
+      whatToImplement: string;
+      concreteExample: string;
+      successCriteria: string;
+      howToTest: string;
+    }, idx: number) => ({
+      id: `enhanced-fix-${idx}`,
+      scenarioId: fix.scenarioId,
+      title: fix.title,
+      fixType: fix.fixType as FixType,
+      rootCause: fix.rootCause,
+      suggestedSolution: fix.suggestedSolution,
+      whereToImplement: fix.whereToImplement,
+      whatToImplement: fix.whatToImplement,
+      concreteExample: fix.concreteExample,
+      successCriteria: fix.successCriteria,
+      howToTest: fix.howToTest,
+    }));
+  } catch (error) {
+    console.error('Error generating enhanced fix suggestions:', error);
     throw error;
   }
 }

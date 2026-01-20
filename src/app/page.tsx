@@ -14,8 +14,10 @@ import { RunButton } from '@/components/wizard/RunButton';
 import { KPICards } from '@/components/results/KPICards';
 import { Charts } from '@/components/results/Charts';
 import { IssueTable } from '@/components/results/IssueTable';
+import { ScenarioTable } from '@/components/results/ScenarioTable';
 import { CallViewer } from '@/components/results/CallViewer';
 import { FixesPanel } from '@/components/fixes/FixesPanel';
+import { EnhancedFixesList } from '@/components/fixes/EnhancedFixesList';
 import { AnalysisManager } from '@/components/analyses/AnalysisManager';
 import { AggregateResults } from '@/components/results/AggregateResults';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
@@ -211,7 +213,7 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig } = useAppStore();
+  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType } = useAppStore();
 
   const handleGenerateFixes = () => {
     generateFixes();
@@ -311,10 +313,19 @@ function ResultsPage() {
         </div>
       </motion.div>
 
-      <motion.div variants={itemVariants}><KPICards /></motion.div>
-      <motion.div variants={itemVariants}><Charts /></motion.div>
-      <motion.div variants={itemVariants}><IssueTable /></motion.div>
-      <motion.div variants={itemVariants}><CallViewer /></motion.div>
+      {flowType === 'objective' ? (
+        <>
+          <motion.div variants={itemVariants}><KPICards /></motion.div>
+          <motion.div variants={itemVariants}><Charts /></motion.div>
+          <motion.div variants={itemVariants}><IssueTable /></motion.div>
+          <motion.div variants={itemVariants}><CallViewer /></motion.div>
+        </>
+      ) : (
+        <>
+          <motion.div variants={itemVariants}><ScenarioTable /></motion.div>
+          <motion.div variants={itemVariants}><CallViewer /></motion.div>
+        </>
+      )}
     </motion.div>
   );
 }
@@ -401,7 +412,7 @@ function AggregatePage() {
 }
 
 function FixesPage() {
-  const { goToStep } = useAppStore();
+  const { goToStep, flowType } = useAppStore();
 
   return (
     <motion.div
@@ -441,7 +452,7 @@ function FixesPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <FixesPanel />
+        {flowType === 'objective' ? <FixesPanel /> : <EnhancedFixesList />}
       </motion.div>
     </motion.div>
   );

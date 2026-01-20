@@ -6,6 +6,10 @@ export type CheckType =
   | 'general_quality'
   | string; // Allow custom check IDs
 
+export type FlowType = 'objective' | 'open-ended';
+
+export type FixType = 'script' | 'training' | 'process' | 'system';
+
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 
 export type IssueType =
@@ -98,6 +102,45 @@ export interface FixSuggestions {
   generalFixes: Fix[];
 }
 
+// Open-ended flow types
+export interface Scenario {
+  id: string;
+  callId: string;
+  title: string; // e.g., "Empathy Gap - Customer Frustration Handling"
+  context: string; // "Lines 45-67, customer waited 2 weeks for resolution"
+  whatHappened: string; // What the agent did/didn't do
+  impact: string; // Effect on customer/outcome
+  severity: Severity;
+  confidence: number;
+  lineNumbers: number[];
+  evidenceSnippet: string;
+}
+
+export interface EnhancedFix {
+  id: string;
+  scenarioId: string;
+  title: string; // e.g., "Add Empathy Steps"
+  fixType: FixType; // 'script' | 'training' | 'process' | 'system'
+  rootCause: string; // Why this happened
+  suggestedSolution: string; // What to do
+  whereToImplement: string; // Where in the flow/process
+  whatToImplement: string; // Specific steps/content
+  concreteExample: string; // Before/after or example
+  successCriteria: string; // How to know it's fixed
+  howToTest: string; // Validation method
+}
+
+export interface ScenarioResults {
+  totalScenarios: number;
+  scenariosByType: Record<FixType, number>;
+  scenarios: Scenario[];
+  severityDistribution: Record<Severity, number>;
+}
+
+export interface EnhancedFixSuggestions {
+  fixes: EnhancedFix[];
+}
+
 export interface OpenAIConfig {
   apiKey: string;
   model: string;
@@ -120,6 +163,7 @@ export interface SavedAnalysisWithState extends SavedAnalysis {
 }
 
 export interface AnalysisState {
+  flowType: FlowType;
   transcripts: Transcript[];
   referenceScript: string;
   referenceEnabled: boolean;
@@ -129,10 +173,15 @@ export interface AnalysisState {
   openaiConfig: OpenAIConfig;
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
+  scenarioResults: ScenarioResults | null; // For open-ended flow
+  enhancedFixes: EnhancedFixSuggestions | null; // For open-ended flow
   selectedCallId: string | null;
 }
 
 export interface AppState {
+  // Flow type
+  flowType: FlowType;
+
   // Input state
   transcripts: Transcript[];
   referenceScript: string;
@@ -153,12 +202,18 @@ export interface AppState {
   currentAnalysisId: string | null;
   currentAnalysisName: string | null;
 
-  // Results state
+  // Results state - Objective flow
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
+
+  // Results state - Open-ended flow
+  scenarioResults: ScenarioResults | null;
+  enhancedFixes: EnhancedFixSuggestions | null;
+
   selectedCallId: string | null;
 
   // Actions
+  setFlowType: (flowType: FlowType) => void;
   setTranscripts: (transcripts: Transcript[]) => void;
   setReferenceScript: (script: string) => void;
   setReferenceEnabled: (enabled: boolean) => void;
@@ -180,7 +235,7 @@ export interface AppState {
   // Analysis management
   saveAnalysis: (name: string) => Promise<void>;
   loadAnalysis: (id: string) => Promise<void>;
-  createNewAnalysis: (name: string) => void;
+  createNewAnalysis: (name: string, flowType: FlowType) => void;
   getAnalysisState: () => AnalysisState;
   restoreAnalysisState: (state: AnalysisState) => void;
 }
