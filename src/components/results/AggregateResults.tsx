@@ -6,7 +6,25 @@ import { useAppStore } from '@/store/useAppStore';
 import { aggregateIssues } from '@/utils/aggregateIssues';
 import { aggregateCustomAudits } from '@/utils/customAuditAggregation';
 import { IssueType, Severity } from '@/types';
-import { BarChart3, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart } from 'lucide-react';
+import {
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
+} from 'recharts';
 
 const issueTypeLabels: Record<string, string> = {
   flow_deviation: 'Flow Deviation',
@@ -23,8 +41,19 @@ const severityClasses: Record<Severity, string> = {
   low: 'badge-low',
 };
 
+const SEVERITY_COLORS: Record<Severity, string> = {
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#22c55e',
+};
+
+const DIMENSION_COLORS = [
+  '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', '#6366f1', '#14b8a6', '#f43f5e'
+];
+
 export function AggregateResults() {
-  const { results, checks } = useAppStore();
+  const { results, checks, scenarioResults, flowType } = useAppStore();
 
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
@@ -62,6 +91,323 @@ export function AggregateResults() {
     [customIssues]
   );
 
+  // Aggregate scenarios for open-ended flow
+  const scenarioAggregation = useMemo(() => {
+    if (!scenarioResults?.scenarios) return null;
+
+    const scenarios = scenarioResults.scenarios;
+
+    // Group by dimension
+    const byDimension: Record<string, number> = {};
+    const bySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    const byCall: Record<string, number> = {};
+    let totalConfidence = 0;
+
+    scenarios.forEach(scenario => {
+      // Dimension
+      const dimension = scenario.dimension || 'Uncategorized';
+      byDimension[dimension] = (byDimension[dimension] || 0) + 1;
+
+      // Severity
+      bySeverity[scenario.severity]++;
+
+      // Call
+      byCall[scenario.callId] = (byCall[scenario.callId] || 0) + 1;
+
+      // Confidence
+      totalConfidence += scenario.confidence;
+    });
+
+    const avgConfidence = scenarios.length > 0 ? Math.round(totalConfidence / scenarios.length) : 0;
+
+    // Prepare chart data
+    const dimensionChartData = Object.entries(byDimension)
+      .map(([name, value]) => ({ name, value, percentage: Math.round((value / scenarios.length) * 100) }))
+      .sort((a, b) => b.value - a.value);
+
+    const severityChartData = Object.entries(bySeverity)
+      .filter(([_, value]) => value > 0)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        percentage: Math.round((value / scenarios.length) * 100)
+      }));
+
+    const callDistributionData = Object.entries(byCall)
+      .map(([callId, count]) => ({ callId, scenarios: count }))
+      .sort((a, b) => b.scenarios - a.scenarios)
+      .slice(0, 10); // Top 10 calls
+
+    return {
+      totalScenarios: scenarios.length,
+      uniqueDimensions: Object.keys(byDimension).length,
+      affectedCalls: Object.keys(byCall).length,
+      avgConfidence,
+      criticalCount: bySeverity.critical,
+      highCount: bySeverity.high,
+      dimensionChartData,
+      severityChartData,
+      callDistributionData,
+      bySeverity
+    };
+  }, [scenarioResults]);
+
+  // Early return if no data
+  if (!results && !scenarioResults) return null;
+
+  // If open-ended flow, show scenario aggregation
+  if (flowType === 'open-ended' && scenarioAggregation) {
+    return (
+      <div className="space-y-6">
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <motion.div
+            className="glass-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                <Target className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{scenarioAggregation.totalScenarios}</p>
+                <p className="text-xs text-[var(--color-slate-400)]">Total Scenarios</p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="glass-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <Brain className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{scenarioAggregation.uniqueDimensions}</p>
+                <p className="text-xs text-[var(--color-slate-400)]">Audit Dimensions</p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="glass-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">
+                  {scenarioAggregation.criticalCount + scenarioAggregation.highCount}
+                </p>
+                <p className="text-xs text-[var(--color-slate-400)]">High Priority</p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="glass-card p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{scenarioAggregation.avgConfidence}%</p>
+                <p className="text-xs text-[var(--color-slate-400)]">Avg Confidence</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Interactive Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Audit Dimensions Distribution */}
+          <motion.div
+            className="glass-card p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <PieChart className="w-5 h-5 text-purple-400" />
+              <h3 className="text-lg font-semibold text-white">Scenarios by Audit Dimension</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsPieChart>
+                <Pie
+                  data={scenarioAggregation.dimensionChartData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry: any) => `${entry.name.split(' ')[0]} (${entry.percentage}%)`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {scenarioAggregation.dimensionChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={DIMENSION_COLORS[index % DIMENSION_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+          </motion.div>
+
+          {/* Severity Distribution */}
+          <motion.div
+            className="glass-card p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-5 h-5 text-orange-400" />
+              <h3 className="text-lg font-semibold text-white">Severity Distribution</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsBarChart data={scenarioAggregation.severityChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+                <XAxis
+                  dataKey="name"
+                  stroke="#94a3b8"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis
+                  stroke="#94a3b8"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Bar dataKey="value" fill="#8884d8" radius={[8, 8, 0, 0]}>
+                  {scenarioAggregation.severityChartData.map((entry, index) => {
+                    const colorKey = entry.name.toLowerCase() as Severity;
+                    return <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[colorKey] || '#8884d8'} />;
+                  })}
+                </Bar>
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </motion.div>
+        </div>
+
+        {/* Call Distribution Chart */}
+        <motion.div
+          className="glass-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-blue-400" />
+            <h3 className="text-lg font-semibold text-white">Scenarios per Call (Top 10)</h3>
+            <span className="ml-auto text-sm text-[var(--color-slate-400)]">
+              {scenarioAggregation.affectedCalls} calls with scenarios
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsBarChart data={scenarioAggregation.callDistributionData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+              <XAxis
+                type="number"
+                stroke="#94a3b8"
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis
+                type="category"
+                dataKey="callId"
+                stroke="#94a3b8"
+                style={{ fontSize: '11px' }}
+                width={100}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  borderRadius: '8px',
+                  color: '#fff'
+                }}
+              />
+              <Bar dataKey="scenarios" fill="#3b82f6" radius={[0, 8, 8, 0]} />
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Dimension Details Table */}
+        <motion.div
+          className="glass-card overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <div className="p-4 border-b border-[var(--color-navy-700)]">
+            <h3 className="text-lg font-semibold text-white">Audit Dimension Breakdown</h3>
+            <p className="text-sm text-[var(--color-slate-400)] mt-1">
+              Detailed view of scenarios across audit dimensions
+            </p>
+          </div>
+
+          <div className="divide-y divide-[var(--color-navy-700)]">
+            {scenarioAggregation.dimensionChartData.map((dimension, index) => (
+              <motion.div
+                key={dimension.name}
+                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.9 + index * 0.05 }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: DIMENSION_COLORS[index % DIMENSION_COLORS.length] }}
+                    />
+                    <span className="text-base font-medium text-white">{dimension.name}</span>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white">{dimension.value}</p>
+                      <p className="text-xs text-[var(--color-slate-400)]">scenarios</p>
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                      <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>
+                      <p className="text-xs text-[var(--color-slate-400)]">of total</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Original objective flow content
   if (!results) return null;
 
   // Calculate overall statistics
