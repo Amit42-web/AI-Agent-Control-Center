@@ -568,15 +568,19 @@ For each scenario, provide a JSON object with:
 - severity: one of [low, medium, high, critical] - based on impact to customer
 - confidence: number between 0-100 - how confident you are this is a genuine issue
 - lineNumbers: array of line numbers where this scenario occurs
-- evidenceSnippet: relevant excerpt from the transcript (keep brief, max 200 chars, use simple ASCII if possible)
+- evidenceSnippet: relevant excerpt from the transcript (IMPORTANT: Keep under 150 chars, use ONLY ASCII characters, replace any Hindi/Devanagari text with "[Hindi text]" placeholder)
 
 Think like a call center trainer reviewing calls with agents. Be constructive, specific, and focus on actionable improvements.
 
-IMPORTANT JSON FORMATTING:
-- Ensure all string values are properly escaped
-- Replace newlines in evidence snippets with spaces
-- Avoid special unicode characters in evidence snippets if possible
+CRITICAL JSON FORMATTING REQUIREMENTS:
+- ALL string values MUST be properly escaped with backslashes
+- Evidence snippets: Use ONLY ASCII characters (a-z, A-Z, 0-9, basic punctuation)
+- If transcript contains Hindi/Devanagari/Unicode: Replace with "[Hindi text]" or "[Customer speaking in Hindi]"
+- Replace ALL newlines (\n) in evidence snippets with single spaces
+- Do NOT include actual Hindi/Devanagari characters in JSON output
 - Double-check JSON is valid before returning
+- Example good evidence: "CUSTOMER: [Hindi text] AGENT: I understand, let me help"
+- Example bad evidence: "CUSTOMER: लेकिन AGENT: थोड़ी देर..."
 
 Return ONLY a valid JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
 
@@ -657,9 +661,63 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
           scenarios = JSON.parse(salvaged);
           console.log('[SCENARIO ANALYSIS] Successfully parsed after aggressive salvage');
         } catch (thirdError) {
-          console.error('[SCENARIO ANALYSIS] All parsing attempts failed. Returning empty array.');
-          console.error('[SCENARIO ANALYSIS] This likely means the AI response contains complex unicode or malformed JSON.');
-          return [];
+          console.error('[SCENARIO ANALYSIS] All JSON parsing attempts failed.');
+          console.error('[SCENARIO ANALYSIS] Attempting manual field extraction as last resort...');
+
+          // Ultra-aggressive last resort: Manually extract scenario objects using pattern matching
+          try {
+            const manualScenarios: any[] = [];
+            // Split by objects (looking for patterns like "title": "...")
+            const objectMatches = jsonStr.match(/\{[^}]*"title"[^}]*\}/g);
+
+            if (objectMatches && objectMatches.length > 0) {
+              objectMatches.forEach((objStr) => {
+                try {
+                  // Try to clean and parse each object individually
+                  const cleanObj = objStr
+                    .replace(/[\n\r\t]/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .replace(/\\"/g, '"')
+                    .replace(/\\\\/g, '\\');
+
+                  const parsed = JSON.parse(cleanObj);
+                  manualScenarios.push(parsed);
+                } catch {
+                  // If individual object fails, try to extract fields manually
+                  const titleMatch = objStr.match(/"title":\s*"([^"]+)"/);
+                  const contextMatch = objStr.match(/"context":\s*"([^"]+)"/);
+                  const severityMatch = objStr.match(/"severity":\s*"([^"]+)"/);
+                  const confidenceMatch = objStr.match(/"confidence":\s*(\d+)/);
+                  const lineNumbersMatch = objStr.match(/"lineNumbers":\s*\[([\d,\s]+)\]/);
+
+                  if (titleMatch) {
+                    manualScenarios.push({
+                      title: titleMatch[1],
+                      context: contextMatch ? contextMatch[1] : 'Context extraction failed',
+                      whatHappened: 'Details could not be fully extracted due to parsing issues',
+                      impact: 'Impact assessment limited',
+                      severity: severityMatch ? severityMatch[1] : 'medium',
+                      confidence: confidenceMatch ? parseInt(confidenceMatch[1]) : 70,
+                      lineNumbers: lineNumbersMatch ? lineNumbersMatch[1].split(',').map(n => parseInt(n.trim())) : [],
+                      evidenceSnippet: 'Evidence snippet unavailable due to encoding issues'
+                    });
+                  }
+                }
+              });
+            }
+
+            if (manualScenarios.length > 0) {
+              console.log(`[SCENARIO ANALYSIS] Manual extraction succeeded! Found ${manualScenarios.length} scenarios`);
+              scenarios = manualScenarios;
+            } else {
+              console.error('[SCENARIO ANALYSIS] Manual extraction also failed. Returning empty array.');
+              return [];
+            }
+          } catch (manualError) {
+            console.error('[SCENARIO ANALYSIS] Even manual extraction failed:', manualError);
+            console.error('[SCENARIO ANALYSIS] This likely means the AI response contains severely malformed data.');
+            return [];
+          }
         }
       }
     }
