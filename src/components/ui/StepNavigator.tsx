@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
-import { Check, FileText, BarChart3, Wrench, FolderOpen, Save } from 'lucide-react';
+import { Check, FileText, BarChart3, Wrench, FolderOpen, Save, TrendingUp } from 'lucide-react';
 
 const steps = [
   { id: 'input', label: 'Configure', icon: FileText },
   { id: 'results', label: 'Results', icon: BarChart3 },
+  { id: 'aggregate', label: 'Aggregate', icon: TrendingUp },
   { id: 'fixes', label: 'Fixes', icon: Wrench },
 ] as const;
 
@@ -20,6 +21,7 @@ export function StepNavigator() {
   const getStepStatus = (stepId: typeof steps[number]['id']) => {
     if (stepId === 'input') return 'accessible';
     if (stepId === 'results') return results ? 'accessible' : 'locked';
+    if (stepId === 'aggregate') return results ? 'accessible' : 'locked';
     if (stepId === 'fixes') return fixes ? 'accessible' : 'locked';
     return 'locked';
   };
@@ -122,6 +124,7 @@ export function StepNavigator() {
                   <p className="text-xs opacity-70">
                     {step.id === 'input' && 'Setup analysis'}
                     {step.id === 'results' && 'View insights'}
+                    {step.id === 'aggregate' && 'Aggregated view'}
                     {step.id === 'fixes' && 'Get solutions'}
                   </p>
                 </div>
