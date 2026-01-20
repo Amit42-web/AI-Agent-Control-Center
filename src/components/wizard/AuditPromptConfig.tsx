@@ -68,34 +68,41 @@ export function AuditPromptConfig() {
       {!showFullPrompt && (
         <div className="bg-[var(--color-navy-800)] rounded-lg p-4 mb-4">
           <p className="text-sm text-[var(--color-slate-300)] mb-3">
-            <span className="font-semibold text-purple-400">Default comprehensive audit includes:</span>
+            <span className="font-semibold text-purple-400">Primary Audit Dimensions (A-G):</span>
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-[var(--color-slate-400)]">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span>Conversation Control Failures</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+              <span><strong>A.</strong> Conversation Control & Flow</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
+              <span><strong>B.</strong> Temporal Dynamics & Turn-Taking</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+              <span><strong>C.</strong> Context Tracking & Intent</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span>Temporal & Turn-Taking Issues</span>
+              <span><strong>D.</strong> Language Quality & Human-Likeness</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span>Intent & State Drift</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
+              <span><strong>E.</strong> Knowledge & Accuracy</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span>Language & Human-Likeness Erosion</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-pink-400"></div>
+              <span><strong>F.</strong> Process & Policy Adherence</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span>Evaluation Bias Traps</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span>Communication & Resolution Quality</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+              <span><strong>G.</strong> Novel & Emerging Issues ✨</span>
             </div>
           </div>
+          <p className="text-xs text-[var(--color-slate-500)] mt-3 italic">
+            ✨ Category G enables adaptive discovery of new issue types not covered by A-F
+          </p>
         </div>
       )}
 

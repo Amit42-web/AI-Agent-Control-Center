@@ -553,19 +553,32 @@ export async function analyzeTranscriptScenarios(
 
 Your task is to identify SCENARIOS where the agent underperformed or could improve.
 
-## Comprehensive Audit Dimensions:
+## Audit Dimensions & Framework:
 ${auditPrompt}
 
-CRITICAL: For each scenario you identify, you MUST tie it to one of the specific audit dimensions above. Look for nuanced, specific issues within each dimension - not just surface-level problems. Think deeply about conversation dynamics, timing, empathy, control, and bias.
+CRITICAL CATEGORIZATION RULES:
+1. For each scenario, you MUST assign it to ONE of the primary audit dimensions (A-G) defined above
+2. Use dimensions A-F for known issue types that fit those categories
+3. Use dimension G (Novel & Emerging Issues) for patterns that DON'T fit A-F clearly
+4. When using dimension G, explain why it's novel and which dimension it's closest to
+5. Look for nuanced, specific issues within each dimension - not just surface-level problems
+6. Think deeply about conversation dynamics, timing, empathy, control, and emerging patterns
 
 ${referenceScript ? `\n## Reference Script/Flow:\n${referenceScript}\n` : ''}
 ${knowledgeBase ? `\n## Knowledge Base:\n${knowledgeBase}\n` : ''}
 
 ## Output Format:
 For each scenario, provide a JSON object with:
-- title: Compelling, specific title that captures the essence (e.g., "Lost Conversation Control - Customer Dictated Flow", "Empathy Failure During Complaint Escalation", "Robotic Tone Eroded Natural Dialogue")
-- dimension: The specific audit dimension category this relates to (e.g., "Conversation Control Failures", "Temporal & Turn-Taking Issues", "Intent & State Drift", "Language & Human-Likeness Erosion", "Evaluation Bias Traps", "Communication Quality", "Problem Resolution", etc.)
-- context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, after customer expressed frustration about 2-week delay, agent failed to acknowledge emotion")
+- title: Compelling, specific title (e.g., "Lost Conversation Control - Customer Dictated Flow", "Cultural Insensitivity in Product Explanation")
+- dimension: The PRIMARY dimension label this fits into. Use EXACTLY ONE of:
+  * "Conversation Control & Flow Management" (A)
+  * "Temporal Dynamics & Turn-Taking" (B)
+  * "Context Tracking & Intent Alignment" (C)
+  * "Language Quality & Human-Likeness" (D)
+  * "Knowledge & Accuracy" (E)
+  * "Process & Policy Adherence" (F)
+  * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
+- context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
 - whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
 - impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
 - severity: one of [low, medium, high, critical] - based on actual impact to customer and business
@@ -579,8 +592,9 @@ IMPORTANT GUIDELINES:
 - Look for both OBVIOUS issues and SUBTLE patterns that manual reviews often miss
 - Consider the customer's emotional journey and experience
 - Identify moments where the agent could have been more effective
+- **ADAPTIVE MINDSET**: Stay alert for novel issue types (bias, privacy, AI-specific problems, emerging customer needs)
 
-Quality over quantity - each scenario should be meaningful and tied to a specific audit dimension.
+Quality over quantity - each scenario should be meaningful and tied to a specific dimension.
 
 Return ONLY a valid JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
 
