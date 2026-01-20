@@ -568,11 +568,17 @@ For each scenario, provide a JSON object with:
 - severity: one of [low, medium, high, critical] - based on impact to customer
 - confidence: number between 0-100 - how confident you are this is a genuine issue
 - lineNumbers: array of line numbers where this scenario occurs
-- evidenceSnippet: relevant excerpt from the transcript
+- evidenceSnippet: relevant excerpt from the transcript (keep brief, max 200 chars, use simple ASCII if possible)
 
 Think like a call center trainer reviewing calls with agents. Be constructive, specific, and focus on actionable improvements.
 
-Return ONLY a JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
+IMPORTANT JSON FORMATTING:
+- Ensure all string values are properly escaped
+- Replace newlines in evidence snippets with spaces
+- Avoid special unicode characters in evidence snippets if possible
+- Double-check JSON is valid before returning
+
+Return ONLY a valid JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
 
   const userPrompt = `Transcript to analyze:\n${transcriptText}`;
 
@@ -617,16 +623,44 @@ Return ONLY a JSON array of scenarios. If no concerning scenarios are found, ret
       console.error(`[SCENARIO ANALYSIS] JSON parse error for ${transcript.id}:`, parseError);
       console.error('[SCENARIO ANALYSIS] Attempted to parse:', jsonStr.substring(0, 1000));
 
-      // Try one more time with cleanup
+      // Try one more time with aggressive cleanup
       try {
-        const cleaned = jsonStr
-          .replace(/,(\s*[}\]])/g, '$1')
-          .replace(/\n/g, ' ')
-          .replace(/\r/g, '');
+        let cleaned = jsonStr
+          .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
+          .replace(/\n/g, '\\n')          // Escape newlines
+          .replace(/\r/g, '')             // Remove carriage returns
+          .replace(/\t/g, ' ')            // Replace tabs with spaces
+          .replace(/\\'/g, "'")           // Fix escaped single quotes
+          .replace(/\\\\/g, '\\');        // Fix double backslashes
+
         scenarios = JSON.parse(cleaned);
+        console.log('[SCENARIO ANALYSIS] Successfully parsed after cleanup');
       } catch (secondError) {
-        console.error('Failed to parse scenarios after cleanup:', secondError);
-        return [];
+        console.error('[SCENARIO ANALYSIS] Failed to parse scenarios after cleanup:', secondError);
+        console.error('[SCENARIO ANALYSIS] Cleaned string (first 1000 chars):', jsonStr.substring(0, 1000));
+
+        // Last resort: Try to manually fix common issues with evidence snippets
+        try {
+          // Sometimes the issue is unescaped quotes in evidence snippets
+          // This is a very aggressive fix - try to salvage what we can
+          let salvaged = jsonStr
+            .replace(/,(\s*[}\]])/g, '$1')
+            .replace(/[\n\r\t]/g, ' ')
+            .replace(/\s+/g, ' ')
+            // Try to fix unescaped quotes in string values
+            .replace(/"([^"]*)":\s*"([^"]*)"/g, (match, key, value) => {
+              // Escape any internal quotes in the value
+              const escapedValue = value.replace(/(?<!\\)"/g, '\\"');
+              return `"${key}": "${escapedValue}"`;
+            });
+
+          scenarios = JSON.parse(salvaged);
+          console.log('[SCENARIO ANALYSIS] Successfully parsed after aggressive salvage');
+        } catch (thirdError) {
+          console.error('[SCENARIO ANALYSIS] All parsing attempts failed. Returning empty array.');
+          console.error('[SCENARIO ANALYSIS] This likely means the AI response contains complex unicode or malformed JSON.');
+          return [];
+        }
       }
     }
 
