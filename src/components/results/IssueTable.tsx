@@ -47,7 +47,7 @@ export function IssueTable() {
   const [typeFilter, setTypeFilter] = useState<IssueType | 'all'>('all');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'aggregated' | 'detailed'>('aggregated');
+  const [viewMode, setViewMode] = useState<'aggregated' | 'detailed'>('detailed');
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
 
   if (!results) return null;
