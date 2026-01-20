@@ -180,9 +180,14 @@ export interface AnalysisState {
   selectedCallId: string | null;
 }
 
+export type ResultsViewMode = 'detailed' | 'overview';
+
 export interface AppState {
   // Flow type
   flowType: FlowType;
+
+  // Results view mode (detailed table or overview/aggregate charts)
+  resultsViewMode: ResultsViewMode;
 
   // Input state
   transcripts: Transcript[];
@@ -219,6 +224,7 @@ export interface AppState {
 
   // Actions
   setFlowType: (flowType: FlowType) => void;
+  setResultsViewMode: (mode: ResultsViewMode) => void;
   setTranscripts: (transcripts: Transcript[]) => void;
   setReferenceScript: (script: string) => void;
   setReferenceEnabled: (enabled: boolean) => void;

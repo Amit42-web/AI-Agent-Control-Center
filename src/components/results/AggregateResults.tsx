@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { aggregateIssues } from '@/utils/aggregateIssues';
 import { aggregateCustomAudits } from '@/utils/customAuditAggregation';
 import { IssueType, Severity } from '@/types';
-import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart, ArrowRight } from 'lucide-react';
 import {
   PieChart as RechartsPieChart,
   Pie,
@@ -53,7 +53,7 @@ const DIMENSION_COLORS = [
 ];
 
 export function AggregateResults() {
-  const { results, checks, scenarioResults, flowType } = useAppStore();
+  const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId } = useAppStore();
 
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
@@ -326,11 +326,20 @@ export function AggregateResults() {
             <TrendingUp className="w-5 h-5 text-blue-400" />
             <h3 className="text-lg font-semibold text-white">Scenarios per Call (Top 10)</h3>
             <span className="ml-auto text-sm text-[var(--color-slate-400)]">
-              {scenarioAggregation.affectedCalls} calls with scenarios
+              {scenarioAggregation.affectedCalls} calls with scenarios • Click bar to view call details
             </span>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <RechartsBarChart data={scenarioAggregation.callDistributionData} layout="vertical">
+            <RechartsBarChart
+              data={scenarioAggregation.callDistributionData}
+              layout="vertical"
+              onClick={(data) => {
+                if (data && data.activeLabel) {
+                  setSelectedCallId(String(data.activeLabel));
+                  setResultsViewMode('detailed');
+                }
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
               <XAxis
                 type="number"
@@ -351,8 +360,31 @@ export function AggregateResults() {
                   borderRadius: '8px',
                   color: '#fff'
                 }}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div style={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: '#fff'
+                      }}>
+                        <p style={{ marginBottom: '4px', fontWeight: 'bold' }}>{payload[0].payload.callId}</p>
+                        <p style={{ color: '#60a5fa' }}>{payload[0].value} scenarios</p>
+                        <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Click to view call details</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
               />
-              <Bar dataKey="scenarios" fill="#3b82f6" radius={[0, 8, 8, 0]} />
+              <Bar
+                dataKey="scenarios"
+                fill="#3b82f6"
+                radius={[0, 8, 8, 0]}
+                cursor="pointer"
+              />
             </RechartsBarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -367,7 +399,7 @@ export function AggregateResults() {
           <div className="p-4 border-b border-[var(--color-navy-700)]">
             <h3 className="text-lg font-semibold text-white">Audit Dimension Breakdown</h3>
             <p className="text-sm text-[var(--color-slate-400)] mt-1">
-              Detailed view of scenarios across audit dimensions
+              Click any dimension to view detailed scenarios
             </p>
           </div>
 
@@ -375,28 +407,37 @@ export function AggregateResults() {
             {scenarioAggregation.dimensionChartData.map((dimension, index) => (
               <motion.div
                 key={dimension.name}
-                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors"
+                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors cursor-pointer group"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.9 + index * 0.05 }}
+                onClick={() => {
+                  setResultsViewMode('detailed');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-3 h-3 rounded-full group-hover:scale-125 transition-transform"
                       style={{ backgroundColor: DIMENSION_COLORS[index % DIMENSION_COLORS.length] }}
                     />
-                    <span className="text-base font-medium text-white">{dimension.name}</span>
+                    <span className="text-base font-medium text-white group-hover:text-purple-300 transition-colors">
+                      {dimension.name}
+                    </span>
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-white">{dimension.value}</p>
+                      <p className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors">{dimension.value}</p>
                       <p className="text-xs text-[var(--color-slate-400)]">scenarios</p>
                     </div>
                     <div className="text-right min-w-[60px]">
                       <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>
                       <p className="text-xs text-[var(--color-slate-400)]">of total</p>
                     </div>
+                    <ArrowRight className="w-4 h-4 text-[var(--color-slate-500)] group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
                   </div>
                 </div>
               </motion.div>

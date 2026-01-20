@@ -21,7 +21,7 @@ import { FixesPanel } from '@/components/fixes/FixesPanel';
 import { EnhancedFixesList } from '@/components/fixes/EnhancedFixesList';
 import { AnalysisManager } from '@/components/analyses/AnalysisManager';
 import { AggregateResults } from '@/components/results/AggregateResults';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid } from 'lucide-react';
 
 function RunWizardPage() {
   const { flowType } = useAppStore();
@@ -222,7 +222,7 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType } = useAppStore();
+  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType, resultsViewMode, setResultsViewMode } = useAppStore();
 
   const handleGenerateFixes = () => {
     generateFixes();
@@ -255,10 +255,39 @@ function ResultsPage() {
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">Analysis Results</h2>
           <p className="text-[var(--color-slate-400)]">
-            Review detected issues and analytics from your voice bot calls.
+            Review {flowType === 'objective' ? 'detected issues and analytics' : 'scenarios and insights'} from your voice bot calls.
           </p>
         </div>
         <div className="flex items-end gap-3">
+          {/* View Mode Toggle */}
+          <div className="flex flex-col">
+            <label className="text-xs text-[var(--color-slate-400)] mb-1.5">View Mode</label>
+            <div className="flex items-center gap-1 bg-[var(--color-navy-800)] p-1 rounded-lg border border-[var(--color-navy-700)]">
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  resultsViewMode === 'detailed'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'text-[var(--color-slate-400)] hover:text-white hover:bg-[var(--color-navy-700)]'
+                }`}
+                onClick={() => setResultsViewMode('detailed')}
+              >
+                <List className="w-4 h-4" />
+                Detailed
+              </button>
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                  resultsViewMode === 'overview'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'text-[var(--color-slate-400)] hover:text-white hover:bg-[var(--color-navy-700)]'
+                }`}
+                onClick={() => setResultsViewMode('overview')}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Overview
+              </button>
+            </div>
+          </div>
+
           <div className="flex flex-col">
             <label className="text-xs text-[var(--color-slate-400)] mb-1.5">AI Model for Fixes</label>
             <select
@@ -285,15 +314,6 @@ function ResultsPage() {
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Input
-          </motion.button>
-          <motion.button
-            className="btn-secondary flex items-center gap-2"
-            onClick={() => goToStep('aggregate')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            View Aggregate
-            <ArrowRight className="w-4 h-4" />
           </motion.button>
           <motion.button
             className="btn-primary flex items-center gap-2"
@@ -323,6 +343,7 @@ function ResultsPage() {
       </motion.div>
 
       {flowType === 'objective' ? (
+        // Objective Flow - always show KPI, Charts, Table, Viewer
         <>
           <motion.div variants={itemVariants}><KPICards /></motion.div>
           <motion.div variants={itemVariants}><Charts /></motion.div>
@@ -330,9 +351,19 @@ function ResultsPage() {
           <motion.div variants={itemVariants}><CallViewer /></motion.div>
         </>
       ) : (
+        // Open-ended Flow - show based on view mode
         <>
-          <motion.div variants={itemVariants}><ScenarioTable /></motion.div>
-          <motion.div variants={itemVariants}><CallViewer /></motion.div>
+          {resultsViewMode === 'detailed' ? (
+            <>
+              <motion.div variants={itemVariants}><ScenarioTable /></motion.div>
+              <motion.div variants={itemVariants}><CallViewer /></motion.div>
+            </>
+          ) : (
+            <>
+              <motion.div variants={itemVariants}><AggregateResults /></motion.div>
+              <motion.div variants={itemVariants}><CallViewer /></motion.div>
+            </>
+          )}
         </>
       )}
     </motion.div>

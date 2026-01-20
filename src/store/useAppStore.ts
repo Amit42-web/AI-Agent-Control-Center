@@ -29,6 +29,7 @@ const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
 const initialState = {
   flowType: 'objective' as const,
+  resultsViewMode: 'detailed' as const,
   transcripts: [demoTranscript],
   referenceScript: defaultReferenceScript,
   referenceEnabled: true,
@@ -56,6 +57,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   ...initialState,
 
   setFlowType: (flowType) => set({ flowType }),
+
+  setResultsViewMode: (mode) => set({ resultsViewMode: mode }),
 
   setTranscripts: (transcripts: Transcript[]) => set({ transcripts }),
 
