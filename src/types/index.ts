@@ -107,6 +107,7 @@ export interface Scenario {
   id: string;
   callId: string;
   title: string; // e.g., "Empathy Gap - Customer Frustration Handling"
+  dimension?: string; // Which audit dimension this relates to (e.g., "Conversation Control", "Empathy & Tone")
   context: string; // "Lines 45-67, customer waited 2 weeks for resolution"
   whatHappened: string; // What the agent did/didn't do
   impact: string; // Effect on customer/outcome

@@ -553,25 +553,34 @@ export async function analyzeTranscriptScenarios(
 
 Your task is to identify SCENARIOS where the agent underperformed or could improve.
 
-## Audit Instructions:
+## Comprehensive Audit Dimensions:
 ${auditPrompt}
+
+CRITICAL: For each scenario you identify, you MUST tie it to one of the specific audit dimensions above. Look for nuanced, specific issues within each dimension - not just surface-level problems. Think deeply about conversation dynamics, timing, empathy, control, and bias.
 
 ${referenceScript ? `\n## Reference Script/Flow:\n${referenceScript}\n` : ''}
 ${knowledgeBase ? `\n## Knowledge Base:\n${knowledgeBase}\n` : ''}
 
 ## Output Format:
 For each scenario, provide a JSON object with:
-- title: Concise title describing the scenario (e.g., "Empathy Gap During Customer Frustration", "Incomplete Information Gathering")
-- context: Where/when this occurred (e.g., "Lines 45-67, customer expressed frustration about delayed order")
-- whatHappened: What the agent did or didn't do (be specific and objective)
-- impact: How this affected the customer experience or call outcome
-- severity: one of [low, medium, high, critical] - based on impact to customer
-- confidence: number between 0-100 - how confident you are this is a genuine issue
+- title: Compelling, specific title that captures the essence (e.g., "Lost Conversation Control - Customer Dictated Flow", "Empathy Failure During Complaint Escalation", "Robotic Tone Eroded Natural Dialogue")
+- dimension: The specific audit dimension category this relates to (e.g., "Conversation Control Failures", "Temporal & Turn-Taking Issues", "Intent & State Drift", "Language & Human-Likeness Erosion", "Evaluation Bias Traps", "Communication Quality", "Problem Resolution", etc.)
+- context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, after customer expressed frustration about 2-week delay, agent failed to acknowledge emotion")
+- whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
+- impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
+- severity: one of [low, medium, high, critical] - based on actual impact to customer and business
+- confidence: number between 0-100 - how confident you are this is a genuine issue worth addressing
 - lineNumbers: array of line numbers where this scenario occurs (e.g., [19, 20, 21, 22] for lines 19-22)
 
-IMPORTANT: Do NOT include evidence snippets or transcript excerpts. Just provide the line numbers - the UI will display the actual transcript lines.
+IMPORTANT GUIDELINES:
+- Do NOT include evidence snippets or transcript excerpts in the JSON - just provide line numbers
+- Think like an experienced call center trainer who notices subtle patterns and missed opportunities
+- Be constructive, specific, and actionable - not just critical
+- Look for both OBVIOUS issues and SUBTLE patterns that manual reviews often miss
+- Consider the customer's emotional journey and experience
+- Identify moments where the agent could have been more effective
 
-Think like a call center trainer reviewing calls with agents. Be constructive, specific, and focus on actionable improvements.
+Quality over quantity - each scenario should be meaningful and tied to a specific audit dimension.
 
 Return ONLY a valid JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
 
@@ -722,6 +731,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
     // Convert to Scenario format with IDs
     return scenarios.map((scenario: {
       title: string;
+      dimension?: string;
       context: string;
       whatHappened: string;
       impact: string;
@@ -732,6 +742,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
       id: `${transcript.id}-scenario-${idx}`,
       callId: transcript.id,
       title: scenario.title,
+      dimension: scenario.dimension,
       context: scenario.context,
       whatHappened: scenario.whatHappened,
       impact: scenario.impact,

@@ -131,12 +131,18 @@ export function AuditPromptConfig() {
         <div className="flex items-center gap-2">
           <motion.button
             className="btn-secondary text-sm flex items-center gap-2"
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={() => {
+              if (!isEditing) {
+                // When enabling editing, automatically show the prompt
+                setShowFullPrompt(true);
+              }
+              setIsEditing(!isEditing);
+            }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
             <Edit3 className="w-4 h-4" />
-            {isEditing ? 'Stop Editing' : 'Customize Prompt'}
+            {isEditing ? 'Done Editing' : 'Customize Prompt'}
           </motion.button>
 
           {isCustomized && (

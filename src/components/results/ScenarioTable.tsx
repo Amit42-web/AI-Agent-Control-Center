@@ -122,95 +122,136 @@ export function ScenarioTable() {
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                {/* Header Row */}
-                <div className="flex items-center gap-3 mb-2">
+                {/* Header Row with Badges */}
+                <div className="flex items-center flex-wrap gap-2 mb-3">
                   <span className={`badge ${severityClasses[scenario.severity]}`}>
                     {scenario.severity}
                   </span>
-                  <span className="text-xs text-[var(--color-slate-400)]">
-                    Confidence: {scenario.confidence}%
+                  {scenario.dimension && (
+                    <span className="px-2.5 py-1 text-xs rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-medium">
+                      {scenario.dimension}
+                    </span>
+                  )}
+                  <span className="text-xs text-[var(--color-slate-400)] ml-auto">
+                    {scenario.confidence}% confidence
                   </span>
                   <button
-                    className="px-2 py-1 text-xs bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] rounded font-mono text-[var(--color-slate-200)] transition-colors"
+                    className="px-2.5 py-1 text-xs bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] rounded font-mono text-[var(--color-slate-200)] transition-colors"
                     onClick={() => setSelectedCallId(scenario.callId)}
                   >
                     {scenario.callId}
                   </button>
                 </div>
 
-                {/* Title */}
-                <h4 className="text-lg font-semibold text-purple-300 mb-2">
+                {/* Title - More Prominent */}
+                <h4 className="text-xl font-bold text-white mb-3 leading-tight">
                   {scenario.title}
                 </h4>
 
-                {/* Context */}
-                <div className="flex items-start gap-2 mb-2">
-                  <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-[var(--color-slate-300)]">
-                    <span className="text-[var(--color-slate-400)]">Context:</span> {scenario.context}
+                {/* Context - More Visual */}
+                <div className="bg-[var(--color-navy-800)] rounded-lg p-3 mb-3 border-l-3 border-blue-500">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-blue-400 mb-1">Context</p>
+                      <p className="text-sm text-[var(--color-slate-200)] leading-relaxed">
+                        {scenario.context}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Preview of Impact */}
+                <div className="mb-3">
+                  <p className="text-sm text-[var(--color-slate-300)] leading-relaxed">
+                    <span className="font-semibold text-orange-400">Impact:</span> {scenario.impact}
                   </p>
                 </div>
 
-                {/* Toggle Details */}
+                {/* Toggle Details - More Prominent */}
                 <button
-                  className="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                  className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-purple-500/10"
                   onClick={() => toggleExpanded(scenario.id)}
                 >
-                  {expandedScenarios.has(scenario.id) ? 'Hide' : 'Show'} full details
+                  {expandedScenarios.has(scenario.id) ? (
+                    <>
+                      <span>Hide full details</span>
+                      <span className="text-xs">▲</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>View complete analysis with transcript evidence</span>
+                      <span className="text-xs">▼</span>
+                    </>
+                  )}
                 </button>
 
                 {/* Expanded Details */}
                 {expandedScenarios.has(scenario.id) && (
                   <motion.div
-                    className="mt-4 space-y-3"
+                    className="mt-4 space-y-4"
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                   >
-                    {/* What Happened */}
-                    <div className="bg-[var(--color-navy-900)] rounded-lg p-3 border-l-2 border-orange-500">
-                      <p className="text-xs font-semibold text-orange-400 mb-1">What Happened:</p>
-                      <p className="text-sm text-[var(--color-slate-300)]">
+                    {/* What Happened - Detailed Analysis */}
+                    <div className="bg-gradient-to-r from-orange-500/10 to-transparent rounded-lg p-4 border-l-3 border-orange-500">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-400" />
+                        <p className="text-sm font-bold text-orange-400">What Happened</p>
+                      </div>
+                      <p className="text-sm text-[var(--color-slate-200)] leading-relaxed">
                         {scenario.whatHappened}
                       </p>
                     </div>
 
-                    {/* Impact */}
-                    <div className="bg-[var(--color-navy-900)] rounded-lg p-3 border-l-2 border-red-500">
-                      <p className="text-xs font-semibold text-red-400 mb-1">Impact:</p>
-                      <p className="text-sm text-[var(--color-slate-300)]">
+                    {/* Impact - Business & Customer Effect */}
+                    <div className="bg-gradient-to-r from-red-500/10 to-transparent rounded-lg p-4 border-l-3 border-red-500">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                        <p className="text-sm font-bold text-red-400">Customer & Business Impact</p>
+                      </div>
+                      <p className="text-sm text-[var(--color-slate-200)] leading-relaxed">
                         {scenario.impact}
                       </p>
                     </div>
 
-                    {/* Evidence - Actual Transcript */}
-                    <div className="bg-[var(--color-navy-900)] rounded-lg p-3 border-l-2 border-blue-500">
-                      <p className="text-xs font-semibold text-blue-400 mb-2">
-                        Transcript Evidence (Lines {scenario.lineNumbers.join(', ')}):
-                      </p>
-                      <div className="space-y-2">
+                    {/* Evidence - Actual Transcript with Better Styling */}
+                    <div className="bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg p-4 border-l-3 border-blue-500">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Info className="w-4 h-4 text-blue-400" />
+                        <p className="text-sm font-bold text-blue-400">
+                          Transcript Evidence
+                        </p>
+                        <span className="text-xs text-[var(--color-slate-400)] ml-auto">
+                          Lines {scenario.lineNumbers.join(', ')}
+                        </span>
+                      </div>
+                      <div className="space-y-2 bg-[var(--color-navy-900)] rounded-lg p-3">
                         {getTranscriptLines(scenario.callId, scenario.lineNumbers).map((line: any, idx: number) => (
-                          <div key={idx} className="text-sm">
-                            <div className="flex items-start gap-2">
-                              <span className="text-[var(--color-slate-500)] font-mono text-xs flex-shrink-0">
+                          <div key={idx} className="text-sm border-l-2 border-[var(--color-navy-700)] pl-3 py-1">
+                            <div className="flex items-start gap-3">
+                              <span className="text-[var(--color-slate-500)] font-mono text-xs flex-shrink-0 min-w-[50px]">
                                 [{line.lineNumber}]
                                 {line.timestamp && (
-                                  <span className="ml-1 text-[var(--color-slate-600)]">
+                                  <span className="block text-[10px] text-[var(--color-slate-600)] mt-0.5">
                                     {line.timestamp}
                                   </span>
                                 )}
                               </span>
-                              <span className="text-[var(--color-slate-300)]">
-                                <span className={`font-semibold ${line.speaker === 'agent' ? 'text-blue-300' : 'text-green-300'}`}>
-                                  {line.speaker.toUpperCase()}:
-                                </span>{' '}
-                                {line.text}
-                              </span>
+                              <div className="flex-1">
+                                <span className={`font-bold text-xs ${line.speaker === 'agent' ? 'text-blue-400' : 'text-green-400'}`}>
+                                  {line.speaker.toUpperCase()}
+                                </span>
+                                <p className="text-[var(--color-slate-200)] mt-1 leading-relaxed">
+                                  {line.text}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         ))}
                         {scenario.lineNumbers.length === 0 && (
-                          <p className="text-xs text-[var(--color-slate-500)] italic">
+                          <p className="text-xs text-[var(--color-slate-500)] italic text-center py-2">
                             No specific lines identified for this scenario
                           </p>
                         )}
