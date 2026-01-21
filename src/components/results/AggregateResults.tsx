@@ -157,18 +157,28 @@ export function AggregateResults() {
 
     const avgConfidence = scenarios.length > 0 ? Math.round(totalConfidence / scenarios.length) : 0;
 
-    // Prepare chart data
-    const dimensionChartData = Object.entries(byDimension)
-      .map(([name, value]) => ({
-        name,
-        fullName: name,
-        shortName: dimensionLabels[name]?.short || name,
-        icon: dimensionLabels[name]?.icon || '📊',
-        value,
-        uniqueCalls: byDimensionCalls[name]?.size || 0,
-        percentage: Math.round((value / scenarios.length) * 100)
-      }))
-      .sort((a, b) => b.value - a.value);
+    // Prepare chart data - include ALL dimensions, even those with 0 scenarios
+    const allDimensionNames = Object.keys(dimensionLabels);
+    const dimensionChartData = allDimensionNames
+      .map(fullName => {
+        const value = byDimension[fullName] || 0;
+        return {
+          name: fullName,
+          fullName,
+          shortName: dimensionLabels[fullName]?.short || fullName,
+          icon: dimensionLabels[fullName]?.icon || '📊',
+          value,
+          uniqueCalls: byDimensionCalls[fullName]?.size || 0,
+          percentage: scenarios.length > 0 ? Math.round((value / scenarios.length) * 100) : 0,
+          hasIssues: value > 0
+        };
+      })
+      .sort((a, b) => {
+        // Sort: dimensions with issues first (by count desc), then dimensions without issues
+        if (a.hasIssues && !b.hasIssues) return -1;
+        if (!a.hasIssues && b.hasIssues) return 1;
+        return b.value - a.value;
+      });
 
     const severityChartData = Object.entries(bySeverity)
       .filter(([_, value]) => value > 0)
@@ -307,9 +317,9 @@ export function AggregateResults() {
               <RechartsPieChart
                 onClick={(data) => {
                   if (data && data.activeLabel) {
-                    const clickedDimension = scenarioAggregation.dimensionChartData.find(
-                      d => d.shortName === data.activeLabel
-                    );
+                    const clickedDimension = scenarioAggregation.dimensionChartData
+                      .filter(d => d.hasIssues)
+                      .find(d => d.shortName === data.activeLabel);
                     if (clickedDimension) {
                       setSelectedDimension(clickedDimension.fullName);
                       setResultsViewMode('detailed');
@@ -319,7 +329,7 @@ export function AggregateResults() {
                 }}
               >
                 <Pie
-                  data={scenarioAggregation.dimensionChartData}
+                  data={scenarioAggregation.dimensionChartData.filter(d => d.hasIssues)}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -329,7 +339,7 @@ export function AggregateResults() {
                   dataKey="value"
                   cursor="pointer"
                 >
-                  {scenarioAggregation.dimensionChartData.map((entry, index) => (
+                  {scenarioAggregation.dimensionChartData.filter(d => d.hasIssues).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={DIMENSION_COLORS[index % DIMENSION_COLORS.length]} />
                   ))}
                 </Pie>
@@ -881,6 +891,7 @@ function DimensionBreakdownWithAggregation({
       <div className="divide-y divide-[var(--color-navy-700)]">
         {dimensionChartData.map((dimension, dimensionIndex) => {
           const isDimensionExpanded = expandedDimensions.has(dimension.fullName);
+          const hasIssues = dimension.value > 0;
           // Filter aggregated scenarios for this dimension
           const dimensionAggregatedScenarios = aggregatedScenarios.filter(
             agg => agg.dimension === dimension.fullName
@@ -890,47 +901,70 @@ function DimensionBreakdownWithAggregation({
             <div key={dimension.name}>
               {/* Dimension Header */}
               <motion.div
-                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors cursor-pointer group"
+                className={`p-4 transition-colors ${hasIssues ? 'hover:bg-[var(--color-navy-800)] cursor-pointer' : 'cursor-default opacity-60'} group`}
                 initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+                animate={{ opacity: hasIssues ? 1 : 0.6, x: 0 }}
                 transition={{ delay: 0.9 + dimensionIndex * 0.05 }}
-                onClick={() => toggleDimension(dimension.fullName)}
+                onClick={() => hasIssues && toggleDimension(dimension.fullName)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <motion.div
-                      animate={{ rotate: isDimensionExpanded ? 90 : 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <ArrowRight className="w-4 h-4 text-[var(--color-slate-400)] flex-shrink-0" />
-                    </motion.div>
+                    {hasIssues ? (
+                      <motion.div
+                        animate={{ rotate: isDimensionExpanded ? 90 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <ArrowRight className="w-4 h-4 text-[var(--color-slate-400)] flex-shrink-0" />
+                      </motion.div>
+                    ) : (
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    )}
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0 group-hover:scale-125 transition-transform"
-                      style={{ backgroundColor: DIMENSION_COLORS[dimensionIndex % DIMENSION_COLORS.length] }}
+                      style={{
+                        backgroundColor: hasIssues
+                          ? DIMENSION_COLORS[dimensionIndex % DIMENSION_COLORS.length]
+                          : 'rgba(34, 197, 94, 0.3)' // green with opacity
+                      }}
                     />
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-lg">{dimension.icon}</span>
                       <div>
-                        <p className="text-base font-medium text-white group-hover:text-purple-300 transition-colors">
-                          {dimension.shortName}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className={`text-base font-medium transition-colors ${hasIssues ? 'text-white group-hover:text-purple-300' : 'text-[var(--color-slate-400)]'}`}>
+                            {dimension.shortName}
+                          </p>
+                          {!hasIssues && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                              No issues
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-[var(--color-slate-500)]">{dimension.fullName}</p>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-6 flex-shrink-0">
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors">{dimension.value}</p>
-                      <p className="text-xs text-[var(--color-slate-400)]">scenarios</p>
+                      <p className={`text-2xl font-bold transition-colors ${hasIssues ? 'text-white group-hover:text-purple-300' : 'text-green-500'}`}>
+                        {hasIssues ? dimension.value : '✓'}
+                      </p>
+                      <p className="text-xs text-[var(--color-slate-400)]">
+                        {hasIssues ? 'scenarios' : 'clean'}
+                      </p>
                     </div>
-                    <div className="text-right min-w-[60px]">
-                      <p className="text-lg font-semibold text-blue-400">{dimension.uniqueCalls}</p>
-                      <p className="text-xs text-[var(--color-slate-400)]">calls</p>
-                    </div>
-                    <div className="text-right min-w-[60px]">
-                      <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>
-                      <p className="text-xs text-[var(--color-slate-400)]">of total</p>
-                    </div>
+                    {hasIssues && (
+                      <>
+                        <div className="text-right min-w-[60px]">
+                          <p className="text-lg font-semibold text-blue-400">{dimension.uniqueCalls}</p>
+                          <p className="text-xs text-[var(--color-slate-400)]">calls</p>
+                        </div>
+                        <div className="text-right min-w-[60px]">
+                          <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>
+                          <p className="text-xs text-[var(--color-slate-400)]">of total</p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </motion.div>
