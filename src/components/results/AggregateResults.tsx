@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { aggregateIssues } from '@/utils/aggregateIssues';
 import { aggregateCustomAudits } from '@/utils/customAuditAggregation';
+import { aggregateScenarios, AggregatedScenario } from '@/utils/aggregateScenarios';
 import { IssueType, Severity } from '@/types';
 import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart, ArrowRight } from 'lucide-react';
 import {
@@ -117,6 +118,9 @@ export function AggregateResults() {
 
     const scenarios = scenarioResults.scenarios;
 
+    // Aggregate similar scenarios
+    const aggregatedScenarios = aggregateScenarios(scenarios);
+
     // Group by dimension
     const byDimension: Record<string, number> = {};
     const byDimensionCalls: Record<string, Set<string>> = {}; // Track unique calls per dimension
@@ -198,7 +202,8 @@ export function AggregateResults() {
       severityChartData,
       rootCauseChartData,
       callDistributionData,
-      bySeverity
+      bySeverity,
+      aggregatedScenarios
     };
   }, [scenarioResults]);
 
@@ -667,6 +672,11 @@ export function AggregateResults() {
             ))}
           </div>
         </motion.div>
+
+        {/* Aggregated Scenarios - Grouped by Similarity */}
+        {scenarioAggregation.aggregatedScenarios && scenarioAggregation.aggregatedScenarios.length > 0 && (
+          <AggregatedScenariosView aggregated={scenarioAggregation.aggregatedScenarios} />
+        )}
       </div>
     );
   }
@@ -869,5 +879,183 @@ export function AggregateResults() {
         </motion.div>
       )}
     </div>
+  );
+}
+
+// Component to display aggregated scenarios with expandable groups
+function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenario[] }) {
+  const { setSelectedCallId, setResultsViewMode, setSelectedDimension } = useAppStore();
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
+
+  const toggleGroup = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
+    } else {
+      newExpanded.add(groupKey);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
+  const severityClasses: Record<Severity, string> = {
+    critical: 'badge-critical',
+    high: 'badge-high',
+    medium: 'badge-medium',
+    low: 'badge-low',
+  };
+
+  const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+    prompt: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '📝' },
+    flow: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🔄' },
+    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '👤' },
+    process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
+    system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
+    knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
+  };
+
+  return (
+    <motion.div
+      className="glass-card overflow-hidden"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.9 }}
+    >
+      <div className="p-4 border-b border-[var(--color-navy-700)]">
+        <h3 className="text-lg font-semibold text-white">Aggregated Scenarios</h3>
+        <p className="text-sm text-[var(--color-slate-400)] mt-1">
+          Similar scenarios grouped together • {aggregated.length} unique pattern{aggregated.length !== 1 ? 's' : ''} identified
+        </p>
+      </div>
+
+      <div className="divide-y divide-[var(--color-navy-700)]">
+        {aggregated.map((group, index) => {
+          const isExpanded = expandedGroups.has(group.groupKey);
+
+          return (
+            <motion.div
+              key={group.id}
+              className="hover:bg-[var(--color-navy-800)] transition-colors"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1.0 + index * 0.05 }}
+            >
+              {/* Group Header */}
+              <div
+                className="p-4 cursor-pointer"
+                onClick={() => toggleGroup(group.groupKey)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    {/* Title and Badges */}
+                    <div className="flex items-center flex-wrap gap-2 mb-2">
+                      <span className={`badge ${severityClasses[group.severity]}`}>
+                        {group.severity}
+                      </span>
+                      {group.rootCauseType && rootCauseColors[group.rootCauseType] && (
+                        <span className={`px-2.5 py-1 text-xs rounded-full ${rootCauseColors[group.rootCauseType].bg} ${rootCauseColors[group.rootCauseType].text} border ${rootCauseColors[group.rootCauseType].border} font-medium`}>
+                          {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType}
+                        </span>
+                      )}
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        {group.dimension}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-base font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                      {group.title}
+                    </h4>
+
+                    {/* Pattern */}
+                    <p className="text-sm text-[var(--color-slate-300)] mb-3">
+                      {group.pattern}
+                    </p>
+
+                    {/* Stats */}
+                    <div className="flex items-center gap-6 text-sm flex-wrap">
+                      <div>
+                        <span className="text-[var(--color-slate-400)]">Occurrences: </span>
+                        <span className="font-semibold text-purple-400">{group.occurrences}</span>
+                      </div>
+                      <div>
+                        <span className="text-[var(--color-slate-400)]">Calls Affected: </span>
+                        <span className="font-semibold text-blue-400">{group.uniqueCalls}</span>
+                      </div>
+                      <div>
+                        <span className="text-[var(--color-slate-400)]">Avg Confidence: </span>
+                        <span className="font-semibold text-green-400">{group.avgConfidence}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expand/Collapse Icon */}
+                  <div className="flex-shrink-0">
+                    <motion.div
+                      animate={{ rotate: isExpanded ? 90 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-[var(--color-slate-400)]"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded Individual Scenarios */}
+              {isExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="bg-[var(--color-navy-900)] border-t border-[var(--color-navy-700)]"
+                >
+                  <div className="p-4">
+                    <p className="text-xs text-[var(--color-slate-400)] mb-3 font-semibold uppercase tracking-wide">
+                      Individual Instances ({group.scenarios.length})
+                    </p>
+
+                    <div className="space-y-2">
+                      {group.scenarios.map((scenario) => (
+                        <div
+                          key={scenario.id}
+                          className="p-3 rounded-lg bg-[var(--color-navy-800)] hover:bg-[var(--color-navy-750)] transition-colors cursor-pointer border border-[var(--color-navy-700)]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCallId(scenario.callId);
+                            setResultsViewMode('detailed');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-mono text-blue-400">{scenario.callId}</span>
+                                <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                <span className="text-xs text-[var(--color-slate-400)]">Lines {scenario.lineNumbers[0]}-{scenario.lineNumbers[scenario.lineNumbers.length - 1]}</span>
+                                {scenario.title !== group.title && (
+                                  <>
+                                    <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                    <span className="text-xs text-[var(--color-slate-400)] italic">{scenario.title}</span>
+                                  </>
+                                )}
+                              </div>
+                              <p className="text-sm text-[var(--color-slate-300)] truncate">
+                                {scenario.whatHappened}
+                              </p>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-[var(--color-slate-500)] flex-shrink-0 mt-1" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
