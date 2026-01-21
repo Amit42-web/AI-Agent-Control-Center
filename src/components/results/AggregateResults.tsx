@@ -52,6 +52,15 @@ const DIMENSION_COLORS = [
   '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', '#6366f1', '#14b8a6', '#f43f5e'
 ];
 
+const ROOT_CAUSE_COLORS: Record<string, string> = {
+  prompt: '#a855f7',    // purple-500
+  flow: '#06b6d4',      // cyan-500
+  training: '#10b981',  // green-500
+  process: '#f97316',   // orange-500
+  system: '#ef4444',    // red-500
+  knowledge: '#eab308', // yellow-500
+};
+
 export function AggregateResults() {
   const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId } = useAppStore();
 
@@ -100,6 +109,7 @@ export function AggregateResults() {
     // Group by dimension
     const byDimension: Record<string, number> = {};
     const bySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    const byRootCause: Record<string, number> = {};
     const byCall: Record<string, number> = {};
     let totalConfidence = 0;
 
@@ -110,6 +120,11 @@ export function AggregateResults() {
 
       // Severity
       bySeverity[scenario.severity]++;
+
+      // Root Cause
+      if (scenario.rootCauseType) {
+        byRootCause[scenario.rootCauseType] = (byRootCause[scenario.rootCauseType] || 0) + 1;
+      }
 
       // Call
       byCall[scenario.callId] = (byCall[scenario.callId] || 0) + 1;
@@ -138,6 +153,14 @@ export function AggregateResults() {
       .sort((a, b) => b.scenarios - a.scenarios)
       .slice(0, 10); // Top 10 calls
 
+    const rootCauseChartData = Object.entries(byRootCause)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        percentage: Math.round((value / scenarios.length) * 100)
+      }))
+      .sort((a, b) => b.value - a.value);
+
     return {
       totalScenarios: scenarios.length,
       uniqueDimensions: Object.keys(byDimension).length,
@@ -147,6 +170,7 @@ export function AggregateResults() {
       highCount: bySeverity.high,
       dimensionChartData,
       severityChartData,
+      rootCauseChartData,
       callDistributionData,
       bySeverity
     };
@@ -314,6 +338,131 @@ export function AggregateResults() {
             </ResponsiveContainer>
           </motion.div>
         </div>
+
+        {/* Root Cause Distribution Chart */}
+        {scenarioAggregation.rootCauseChartData && scenarioAggregation.rootCauseChartData.length > 0 && (
+          <motion.div
+            className="glass-card p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.65 }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-5 h-5 text-purple-400" />
+              <h3 className="text-lg font-semibold text-white">Root Cause Analysis</h3>
+            </div>
+            <p className="text-sm text-[var(--color-slate-400)] mb-4">
+              Understanding <span className="font-semibold text-white">WHY</span> issues happen enables targeted solutions
+            </p>
+
+            {/* Key Insight Box */}
+            <div className="bg-gradient-to-r from-purple-500/10 to-transparent border-l-4 border-purple-500 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">💡</div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-purple-300 mb-1">Actionable Insight:</p>
+                  <p className="text-sm text-[var(--color-slate-300)]">
+                    <span className="font-bold text-white">
+                      {scenarioAggregation.rootCauseChartData[0]?.value || 0} scenarios
+                    </span>
+                    {' '}are <span className="font-semibold text-purple-400">{scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase()}</span> issues
+                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'prompt' || scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
+                      ? ' - Check the Fixes tab for exact copy-paste solutions you can implement immediately!'
+                      : ` - These require ${scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training' ? 'coaching and skill development' : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge' ? 'knowledge base updates' : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'process' ? 'workflow and procedure changes' : 'technical system improvements'}.`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsBarChart data={scenarioAggregation.rootCauseChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+                <XAxis
+                  dataKey="name"
+                  stroke="#94a3b8"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis
+                  stroke="#94a3b8"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      const rootCauseKey = data.name.toLowerCase();
+                      return (
+                        <div style={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(148, 163, 184, 0.2)',
+                          borderRadius: '8px',
+                          padding: '12px',
+                          color: '#fff',
+                          maxWidth: '250px'
+                        }}>
+                          <p style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '14px' }}>{data.name} Issues</p>
+                          <p style={{ color: '#60a5fa', marginBottom: '8px' }}>{data.value} scenarios ({data.percentage}%)</p>
+                          <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
+                            {rootCauseKey === 'prompt' && '📝 Agent instructions need updates'}
+                            {rootCauseKey === 'flow' && '🔄 Conversation script has gaps'}
+                            {rootCauseKey === 'training' && '👤 Agent needs coaching'}
+                            {rootCauseKey === 'process' && '⚙️ Business workflow issues'}
+                            {rootCauseKey === 'system' && '💻 Technical limitations'}
+                            {rootCauseKey === 'knowledge' && '📚 Information missing from KB'}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="value" fill="#8884d8" radius={[8, 8, 0, 0]}>
+                  {scenarioAggregation.rootCauseChartData.map((entry, index) => {
+                    const rootCauseKey = entry.name.toLowerCase();
+                    return (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={ROOT_CAUSE_COLORS[rootCauseKey] || '#8884d8'}
+                      />
+                    );
+                  })}
+                </Bar>
+              </RechartsBarChart>
+            </ResponsiveContainer>
+
+            {/* Root Cause Legend with Icons */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+              {scenarioAggregation.rootCauseChartData.map((item, index) => {
+                const rootCauseKey = item.name.toLowerCase();
+                const icons: Record<string, string> = {
+                  prompt: '📝', flow: '🔄', training: '👤',
+                  process: '⚙️', system: '💻', knowledge: '📚'
+                };
+                return (
+                  <div
+                    key={item.name}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: ROOT_CAUSE_COLORS[rootCauseKey] || '#8884d8' }}
+                    />
+                    <span className="text-[var(--color-slate-300)]">
+                      {icons[rootCauseKey]} {item.name}: {item.value}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
 
         {/* Call Distribution Chart */}
         <motion.div
