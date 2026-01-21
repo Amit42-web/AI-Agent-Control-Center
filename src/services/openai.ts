@@ -578,6 +578,13 @@ For each scenario, provide a JSON object with:
   * "Knowledge & Accuracy" (E)
   * "Process & Policy Adherence" (F)
   * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
+- rootCauseType: WHY this issue happened. Use EXACTLY ONE of:
+  * "prompt" - Agent's system instructions/prompts are inadequate or incorrect
+  * "flow" - Conversation script/flow structure has gaps or errors
+  * "training" - Agent lacks skills, knowledge, or coaching in this area
+  * "process" - Business process, workflow, or procedures are flawed
+  * "system" - Technical limitation, bug, or system capability issue
+  * "knowledge" - Information missing from knowledge base or reference materials
 - context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
 - whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
 - impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
@@ -746,6 +753,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
     return scenarios.map((scenario: {
       title: string;
       dimension?: string;
+      rootCauseType?: string;
       context: string;
       whatHappened: string;
       impact: string;
@@ -757,6 +765,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
       callId: transcript.id,
       title: scenario.title,
       dimension: scenario.dimension,
+      rootCauseType: scenario.rootCauseType as any,
       context: scenario.context,
       whatHappened: scenario.whatHappened,
       impact: scenario.impact,
@@ -786,7 +795,7 @@ export async function generateEnhancedFixSuggestions(
   const systemPrompt = `You are an expert call center operations consultant. Your task is to generate comprehensive, actionable solutions for identified performance scenarios.
 
 For each scenario, provide a detailed fix with implementation guidance. Think end-to-end:
-- WHY did this happen? (root cause)
+- WHY did this happen? (root cause TYPE and detailed explanation)
 - WHAT type of solution is needed? (script, training, process, system)
 - WHERE should it be implemented? (specific location in flow/process)
 - WHAT exactly should be implemented? (concrete steps/content)
@@ -799,17 +808,40 @@ Fix types explained:
 - process: Workflow changes, escalation procedures, quality checkpoints
 - system: Technical improvements, integrations, automation needs
 
+Root cause types explained:
+- prompt: Agent's system instructions/prompts are inadequate
+- flow: Conversation script/flow structure has gaps
+- training: Agent lacks skills or coaching
+- process: Business workflow is flawed
+- system: Technical limitation or bug
+- knowledge: Information missing from knowledge base
+
 For each scenario, provide a JSON object with:
 - scenarioId: The ID of the scenario this addresses
 - title: Short descriptive title (e.g., "Add Empathy Steps", "Improve Information Gathering")
 - fixType: one of [script, training, process, system]
-- rootCause: Why this scenario happened (1-2 sentences)
+- rootCauseType: one of [prompt, flow, training, process, system, knowledge] - WHY this issue happened
+- rootCause: Detailed explanation of why this scenario happened (1-2 sentences)
 - suggestedSolution: What to do about it (overview, 2-3 sentences)
 - whereToImplement: Specific location in the flow/process/script where this applies
 - whatToImplement: Detailed steps or content to add/change (be very specific)
 - concreteExample: Before/after example or sample dialogue showing the improvement
 - successCriteria: How to measure if this fix worked (observable outcomes)
-- howToTest: Specific validation method (e.g., "Review next 10 calls for empathy statements", "Check if customers ask fewer clarifying questions")
+- howToTest: Specific validation method (e.g., "Review next 10 calls for empathy statements")
+
+**CRITICAL - For PROMPT or FLOW fixes, ALSO provide a "promptFix" object:**
+{
+  "action": "add" | "replace" | "remove",
+  "targetSection": "Specific section name (e.g., 'State S0 - Availability Check' or 'System Prompt - Empathy Guidelines')",
+  "lineNumber": optional number if you can identify exact line,
+  "exactContent": "The EXACT text to add or use as replacement - make this copy-paste ready",
+  "beforeText": "For 'replace' action - the text to be replaced"
+}
+
+Examples:
+- If rootCauseType is "prompt": Add promptFix with exact system instruction text to add
+- If rootCauseType is "flow": Add promptFix with exact script dialogue to add/replace
+- If rootCauseType is "training/process/system/knowledge": Do NOT include promptFix (not applicable)
 
 Be practical and actionable. Think like you're creating an implementation plan for a team.
 
@@ -818,7 +850,7 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
   const scenariosSummary = scenarios
     .map(
       (scenario) =>
-        `Scenario ID: ${scenario.id}\nTitle: ${scenario.title}\nContext: ${scenario.context}\nWhat Happened: ${scenario.whatHappened}\nImpact: ${scenario.impact}\nSeverity: ${scenario.severity}`
+        `Scenario ID: ${scenario.id}\nTitle: ${scenario.title}\n${scenario.rootCauseType ? `Root Cause Type: ${scenario.rootCauseType}\n` : ''}Context: ${scenario.context}\nWhat Happened: ${scenario.whatHappened}\nImpact: ${scenario.impact}\nSeverity: ${scenario.severity}`
     )
     .join('\n\n---\n\n');
 
@@ -885,6 +917,7 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
       scenarioId: string;
       title: string;
       fixType: string;
+      rootCauseType?: string;
       rootCause: string;
       suggestedSolution: string;
       whereToImplement: string;
@@ -892,11 +925,13 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
       concreteExample: string;
       successCriteria: string;
       howToTest: string;
+      promptFix?: any;
     }, idx: number) => ({
       id: `enhanced-fix-${idx}`,
       scenarioId: fix.scenarioId,
       title: fix.title,
       fixType: fix.fixType as FixType,
+      rootCauseType: (fix.rootCauseType || 'training') as any,
       rootCause: fix.rootCause,
       suggestedSolution: fix.suggestedSolution,
       whereToImplement: fix.whereToImplement,
@@ -904,6 +939,7 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
       concreteExample: fix.concreteExample,
       successCriteria: fix.successCriteria,
       howToTest: fix.howToTest,
+      promptFix: fix.promptFix,
     }));
   } catch (error) {
     console.error('Error generating enhanced fix suggestions:', error);

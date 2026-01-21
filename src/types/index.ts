@@ -9,6 +9,7 @@ export type CheckType =
 export type FlowType = 'objective' | 'open-ended';
 
 export type FixType = 'script' | 'training' | 'process' | 'system';
+export type RootCauseType = 'prompt' | 'flow' | 'training' | 'process' | 'system' | 'knowledge';
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -108,6 +109,7 @@ export interface Scenario {
   callId: string;
   title: string; // e.g., "Empathy Gap - Customer Frustration Handling"
   dimension?: string; // Which audit dimension this relates to (e.g., "Conversation Control", "Empathy & Tone")
+  rootCauseType?: RootCauseType; // Why this happened: prompt/flow/training/process/system/knowledge
   context: string; // "Lines 45-67, customer waited 2 weeks for resolution"
   whatHappened: string; // What the agent did/didn't do
   impact: string; // Effect on customer/outcome
@@ -117,18 +119,31 @@ export interface Scenario {
   // evidenceSnippet removed - we'll show actual transcript lines in UI instead
 }
 
+export interface PromptFix {
+  action: 'add' | 'replace' | 'remove';
+  targetSection: string; // e.g., "State S0 - Availability Check" or "System Prompt - Line 15"
+  lineNumber?: number; // Specific line number if known
+  exactContent: string; // The exact text to add or use as replacement
+  beforeText?: string; // For "replace" action - what to replace
+  visualDiff?: string; // Optional formatted diff for display
+}
+
 export interface EnhancedFix {
   id: string;
   scenarioId: string;
   title: string; // e.g., "Add Empathy Steps"
   fixType: FixType; // 'script' | 'training' | 'process' | 'system'
-  rootCause: string; // Why this happened
+  rootCauseType: RootCauseType; // Why this happened: 'prompt' | 'flow' | 'training' | 'process' | 'system' | 'knowledge'
+  rootCause: string; // Detailed explanation of why this happened
   suggestedSolution: string; // What to do
   whereToImplement: string; // Where in the flow/process
   whatToImplement: string; // Specific steps/content
   concreteExample: string; // Before/after or example
   successCriteria: string; // How to know it's fixed
   howToTest: string; // Validation method
+
+  // For prompt/flow fixes - exact implementation details
+  promptFix?: PromptFix;
 }
 
 export interface ScenarioResults {
