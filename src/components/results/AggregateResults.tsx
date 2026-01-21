@@ -606,77 +606,11 @@ export function AggregateResults() {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Dimension Details Table */}
-        <motion.div
-          className="glass-card overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-        >
-          <div className="p-4 border-b border-[var(--color-navy-700)]">
-            <h3 className="text-lg font-semibold text-white">Audit Dimension Breakdown</h3>
-            <p className="text-sm text-[var(--color-slate-400)] mt-1">
-              Click any dimension to filter and view its scenarios
-            </p>
-          </div>
-
-          <div className="divide-y divide-[var(--color-navy-700)]">
-            {scenarioAggregation.dimensionChartData.map((dimension, index) => (
-              <motion.div
-                key={dimension.name}
-                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors cursor-pointer group"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.9 + index * 0.05 }}
-                onClick={() => {
-                  setSelectedDimension(dimension.fullName);
-                  setResultsViewMode('detailed');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0 group-hover:scale-125 transition-transform"
-                      style={{ backgroundColor: DIMENSION_COLORS[index % DIMENSION_COLORS.length] }}
-                    />
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">{dimension.icon}</span>
-                      <div>
-                        <p className="text-base font-medium text-white group-hover:text-purple-300 transition-colors">
-                          {dimension.shortName}
-                        </p>
-                        <p className="text-xs text-[var(--color-slate-500)]">{dimension.fullName}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6 flex-shrink-0">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors">{dimension.value}</p>
-                      <p className="text-xs text-[var(--color-slate-400)]">scenarios</p>
-                    </div>
-                    <div className="text-right min-w-[60px]">
-                      <p className="text-lg font-semibold text-blue-400">{dimension.uniqueCalls}</p>
-                      <p className="text-xs text-[var(--color-slate-400)]">calls</p>
-                    </div>
-                    <div className="text-right min-w-[60px]">
-                      <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>
-                      <p className="text-xs text-[var(--color-slate-400)]">of total</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-[var(--color-slate-500)] group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Aggregated Scenarios - Grouped by Similarity */}
-        {scenarioAggregation.aggregatedScenarios && scenarioAggregation.aggregatedScenarios.length > 0 && (
-          <AggregatedScenariosView aggregated={scenarioAggregation.aggregatedScenarios} />
-        )}
+        {/* Dimension Breakdown with Nested Aggregated Scenarios */}
+        <DimensionBreakdownWithAggregation
+          dimensionChartData={scenarioAggregation.dimensionChartData}
+          aggregatedScenarios={scenarioAggregation.aggregatedScenarios}
+        />
       </div>
     );
   }
@@ -879,6 +813,272 @@ export function AggregateResults() {
         </motion.div>
       )}
     </div>
+  );
+}
+
+// Component to display dimensions with nested aggregated scenarios
+function DimensionBreakdownWithAggregation({
+  dimensionChartData,
+  aggregatedScenarios
+}: {
+  dimensionChartData: any[];
+  aggregatedScenarios: AggregatedScenario[];
+}) {
+  const { setSelectedCallId, setResultsViewMode, setSelectedDimension } = useAppStore();
+  const [expandedDimensions, setExpandedDimensions] = React.useState<Set<string>>(new Set());
+  const [expandedScenarios, setExpandedScenarios] = React.useState<Set<string>>(new Set());
+
+  const toggleDimension = (dimensionName: string) => {
+    const newExpanded = new Set(expandedDimensions);
+    if (newExpanded.has(dimensionName)) {
+      newExpanded.delete(dimensionName);
+    } else {
+      newExpanded.add(dimensionName);
+    }
+    setExpandedDimensions(newExpanded);
+  };
+
+  const toggleScenario = (scenarioKey: string) => {
+    const newExpanded = new Set(expandedScenarios);
+    if (newExpanded.has(scenarioKey)) {
+      newExpanded.delete(scenarioKey);
+    } else {
+      newExpanded.add(scenarioKey);
+    }
+    setExpandedScenarios(newExpanded);
+  };
+
+  const severityClasses: Record<Severity, string> = {
+    critical: 'badge-critical',
+    high: 'badge-high',
+    medium: 'badge-medium',
+    low: 'badge-low',
+  };
+
+  const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+    prompt: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '📝' },
+    flow: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🔄' },
+    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '👤' },
+    process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
+    system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
+    knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
+  };
+
+  return (
+    <motion.div
+      className="glass-card overflow-hidden"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.8 }}
+    >
+      <div className="p-4 border-b border-[var(--color-navy-700)]">
+        <h3 className="text-lg font-semibold text-white">Audit Dimension Breakdown</h3>
+        <p className="text-sm text-[var(--color-slate-400)] mt-1">
+          Click any dimension to expand and view aggregated scenarios
+        </p>
+      </div>
+
+      <div className="divide-y divide-[var(--color-navy-700)]">
+        {dimensionChartData.map((dimension, dimensionIndex) => {
+          const isDimensionExpanded = expandedDimensions.has(dimension.fullName);
+          // Filter aggregated scenarios for this dimension
+          const dimensionAggregatedScenarios = aggregatedScenarios.filter(
+            agg => agg.dimension === dimension.fullName
+          );
+
+          return (
+            <div key={dimension.name}>
+              {/* Dimension Header */}
+              <motion.div
+                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors cursor-pointer group"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.9 + dimensionIndex * 0.05 }}
+                onClick={() => toggleDimension(dimension.fullName)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <motion.div
+                      animate={{ rotate: isDimensionExpanded ? 90 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ArrowRight className="w-4 h-4 text-[var(--color-slate-400)] flex-shrink-0" />
+                    </motion.div>
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0 group-hover:scale-125 transition-transform"
+                      style={{ backgroundColor: DIMENSION_COLORS[dimensionIndex % DIMENSION_COLORS.length] }}
+                    />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">{dimension.icon}</span>
+                      <div>
+                        <p className="text-base font-medium text-white group-hover:text-purple-300 transition-colors">
+                          {dimension.shortName}
+                        </p>
+                        <p className="text-xs text-[var(--color-slate-500)]">{dimension.fullName}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6 flex-shrink-0">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors">{dimension.value}</p>
+                      <p className="text-xs text-[var(--color-slate-400)]">scenarios</p>
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                      <p className="text-lg font-semibold text-blue-400">{dimension.uniqueCalls}</p>
+                      <p className="text-xs text-[var(--color-slate-400)]">calls</p>
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                      <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>
+                      <p className="text-xs text-[var(--color-slate-400)]">of total</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Expanded Aggregated Scenarios for this Dimension */}
+              {isDimensionExpanded && dimensionAggregatedScenarios.length > 0 && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="bg-[var(--color-navy-900)]"
+                >
+                  <div className="px-4 py-2">
+                    <p className="text-xs text-[var(--color-slate-400)] mb-3 font-semibold uppercase tracking-wide">
+                      {dimensionAggregatedScenarios.length} Aggregated Pattern{dimensionAggregatedScenarios.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+
+                  {dimensionAggregatedScenarios.map((group, groupIndex) => {
+                    const isScenarioExpanded = expandedScenarios.has(group.groupKey);
+
+                    return (
+                      <div
+                        key={group.id}
+                        className="border-t border-[var(--color-navy-700)]"
+                      >
+                        {/* Aggregated Scenario Header */}
+                        <div
+                          className="px-4 py-3 hover:bg-[var(--color-navy-800)] cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleScenario(group.groupKey);
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              {/* Badges */}
+                              <div className="flex items-center flex-wrap gap-2 mb-2">
+                                <span className={`badge ${severityClasses[group.severity]}`}>
+                                  {group.severity}
+                                </span>
+                                {group.rootCauseType && rootCauseColors[group.rootCauseType] && (
+                                  <span className={`px-2 py-0.5 text-xs rounded-full ${rootCauseColors[group.rootCauseType].bg} ${rootCauseColors[group.rootCauseType].text} border ${rootCauseColors[group.rootCauseType].border} font-medium`}>
+                                    {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Title */}
+                              <h4 className="text-sm font-semibold text-white mb-2">
+                                {group.title}
+                              </h4>
+
+                              {/* Pattern */}
+                              <p className="text-xs text-[var(--color-slate-300)] mb-2">
+                                {group.pattern}
+                              </p>
+
+                              {/* Stats */}
+                              <div className="flex items-center gap-4 text-xs flex-wrap">
+                                <div>
+                                  <span className="text-[var(--color-slate-400)]">Occurrences: </span>
+                                  <span className="font-semibold text-purple-400">{group.occurrences}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[var(--color-slate-400)]">Calls: </span>
+                                  <span className="font-semibold text-blue-400">{group.uniqueCalls}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[var(--color-slate-400)]">Confidence: </span>
+                                  <span className="font-semibold text-green-400">{group.avgConfidence}%</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Expand Icon */}
+                            <motion.div
+                              animate={{ rotate: isScenarioExpanded ? 90 : 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="flex-shrink-0"
+                            >
+                              <ArrowRight className="w-4 h-4 text-[var(--color-slate-400)]" />
+                            </motion.div>
+                          </div>
+                        </div>
+
+                        {/* Individual Scenario Instances */}
+                        {isScenarioExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="bg-[var(--color-navy-950)] border-t border-[var(--color-navy-700)]"
+                          >
+                            <div className="px-4 py-3">
+                              <p className="text-xs text-[var(--color-slate-500)] mb-2 font-semibold uppercase tracking-wide">
+                                Individual Instances ({group.scenarios.length})
+                              </p>
+
+                              <div className="space-y-2">
+                                {group.scenarios.map((scenario) => (
+                                  <div
+                                    key={scenario.id}
+                                    className="p-2 rounded bg-[var(--color-navy-800)] hover:bg-[var(--color-navy-750)] transition-colors cursor-pointer border border-[var(--color-navy-700)]"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedCallId(scenario.callId);
+                                      setResultsViewMode('detailed');
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="text-xs font-mono text-blue-400">{scenario.callId}</span>
+                                          <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                          <span className="text-xs text-[var(--color-slate-400)]">Lines {scenario.lineNumbers[0]}-{scenario.lineNumbers[scenario.lineNumbers.length - 1]}</span>
+                                          {scenario.title !== group.title && (
+                                            <>
+                                              <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                              <span className="text-xs text-[var(--color-slate-400)] italic">{scenario.title}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                        <p className="text-xs text-[var(--color-slate-300)] truncate">
+                                          {scenario.whatHappened}
+                                        </p>
+                                      </div>
+                                      <ArrowRight className="w-3 h-3 text-[var(--color-slate-500)] flex-shrink-0 mt-0.5" />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
 
