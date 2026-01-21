@@ -49,6 +49,7 @@ const initialState = {
   scenarioResults: null,
   enhancedFixes: null,
   selectedCallId: null,
+  selectedDimension: null,
   currentAnalysisId: null,
   currentAnalysisName: null,
 };
@@ -391,6 +392,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSelectedCallId: (id: string | null) => set({ selectedCallId: id }),
+
+  setSelectedDimension: (dimension: string | null) => set({ selectedDimension: dimension }),
 
   goToStep: (step) => set({ currentStep: step }),
 

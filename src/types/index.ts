@@ -236,10 +236,12 @@ export interface AppState {
   enhancedFixes: EnhancedFixSuggestions | null;
 
   selectedCallId: string | null;
+  selectedDimension: string | null; // For filtering scenarios by dimension
 
   // Actions
   setFlowType: (flowType: FlowType) => void;
   setResultsViewMode: (mode: ResultsViewMode) => void;
+  setSelectedDimension: (dimension: string | null) => void;
   setTranscripts: (transcripts: Transcript[]) => void;
   setReferenceScript: (script: string) => void;
   setReferenceEnabled: (enabled: boolean) => void;

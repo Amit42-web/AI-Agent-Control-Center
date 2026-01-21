@@ -61,8 +61,19 @@ const ROOT_CAUSE_COLORS: Record<string, string> = {
   knowledge: '#eab308', // yellow-500
 };
 
+// Dimension short labels for cleaner display
+const dimensionLabels: Record<string, { short: string; icon: string }> = {
+  'Conversation Control & Flow Management': { short: 'Flow Control', icon: '🔄' },
+  'Temporal Dynamics & Turn-Taking': { short: 'Turn-Taking', icon: '⏱️' },
+  'Context Tracking & Intent Alignment': { short: 'Context & Intent', icon: '🎯' },
+  'Language Quality & Human-Likeness': { short: 'Language Quality', icon: '💬' },
+  'Knowledge & Accuracy': { short: 'Knowledge', icon: '📚' },
+  'Process & Policy Adherence': { short: 'Process', icon: '📋' },
+  'Novel & Emerging Issues': { short: 'Novel Issues', icon: '✨' },
+};
+
 export function AggregateResults() {
-  const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId } = useAppStore();
+  const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedDimension } = useAppStore();
 
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
@@ -108,6 +119,7 @@ export function AggregateResults() {
 
     // Group by dimension
     const byDimension: Record<string, number> = {};
+    const byDimensionCalls: Record<string, Set<string>> = {}; // Track unique calls per dimension
     const bySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
     const byRootCause: Record<string, number> = {};
     const byCall: Record<string, number> = {};
@@ -117,6 +129,12 @@ export function AggregateResults() {
       // Dimension
       const dimension = scenario.dimension || 'Uncategorized';
       byDimension[dimension] = (byDimension[dimension] || 0) + 1;
+
+      // Track unique calls per dimension
+      if (!byDimensionCalls[dimension]) {
+        byDimensionCalls[dimension] = new Set();
+      }
+      byDimensionCalls[dimension].add(scenario.callId);
 
       // Severity
       bySeverity[scenario.severity]++;
@@ -137,7 +155,15 @@ export function AggregateResults() {
 
     // Prepare chart data
     const dimensionChartData = Object.entries(byDimension)
-      .map(([name, value]) => ({ name, value, percentage: Math.round((value / scenarios.length) * 100) }))
+      .map(([name, value]) => ({
+        name,
+        fullName: name,
+        shortName: dimensionLabels[name]?.short || name,
+        icon: dimensionLabels[name]?.icon || '📊',
+        value,
+        uniqueCalls: byDimensionCalls[name]?.size || 0,
+        percentage: Math.round((value / scenarios.length) * 100)
+      }))
       .sort((a, b) => b.value - a.value);
 
     const severityChartData = Object.entries(bySeverity)
@@ -265,21 +291,38 @@ export function AggregateResults() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <div className="flex items-center gap-2 mb-4">
-              <PieChart className="w-5 h-5 text-purple-400" />
-              <h3 className="text-lg font-semibold text-white">Scenarios by Audit Dimension</h3>
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <PieChart className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">Scenarios by Audit Dimension</h3>
+              </div>
+              <p className="text-xs text-[var(--color-slate-400)] ml-7">Click any segment to filter scenarios</p>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-              <RechartsPieChart>
+              <RechartsPieChart
+                onClick={(data) => {
+                  if (data && data.activeLabel) {
+                    const clickedDimension = scenarioAggregation.dimensionChartData.find(
+                      d => d.shortName === data.activeLabel
+                    );
+                    if (clickedDimension) {
+                      setSelectedDimension(clickedDimension.fullName);
+                      setResultsViewMode('detailed');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }
+                }}
+              >
                 <Pie
                   data={scenarioAggregation.dimensionChartData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={(entry: any) => `${entry.name.split(' ')[0]} (${entry.percentage}%)`}
+                  label={(entry: any) => `${entry.icon} ${entry.shortName} (${entry.percentage}%)`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
+                  cursor="pointer"
                 >
                   {scenarioAggregation.dimensionChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={DIMENSION_COLORS[index % DIMENSION_COLORS.length]} />
@@ -291,6 +334,26 @@ export function AggregateResults() {
                     border: '1px solid rgba(148, 163, 184, 0.2)',
                     borderRadius: '8px',
                     color: '#fff'
+                  }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div style={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(148, 163, 184, 0.2)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          color: '#fff'
+                        }}>
+                          <p style={{ marginBottom: '4px', fontWeight: 'bold' }}>{data.icon} {data.shortName}</p>
+                          <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>{data.fullName}</p>
+                          <p style={{ color: '#60a5fa' }}>{data.value} scenarios across {data.uniqueCalls} calls</p>
+                          <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Click to filter</p>
+                        </div>
+                      );
+                    }
+                    return null;
                   }}
                 />
               </RechartsPieChart>
@@ -548,7 +611,7 @@ export function AggregateResults() {
           <div className="p-4 border-b border-[var(--color-navy-700)]">
             <h3 className="text-lg font-semibold text-white">Audit Dimension Breakdown</h3>
             <p className="text-sm text-[var(--color-slate-400)] mt-1">
-              Click any dimension to view detailed scenarios
+              Click any dimension to filter and view its scenarios
             </p>
           </div>
 
@@ -561,6 +624,7 @@ export function AggregateResults() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.9 + index * 0.05 }}
                 onClick={() => {
+                  setSelectedDimension(dimension.fullName);
                   setResultsViewMode('detailed');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
@@ -568,19 +632,29 @@ export function AggregateResults() {
                 whileTap={{ scale: 0.99 }}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div
-                      className="w-3 h-3 rounded-full group-hover:scale-125 transition-transform"
+                      className="w-3 h-3 rounded-full flex-shrink-0 group-hover:scale-125 transition-transform"
                       style={{ backgroundColor: DIMENSION_COLORS[index % DIMENSION_COLORS.length] }}
                     />
-                    <span className="text-base font-medium text-white group-hover:text-purple-300 transition-colors">
-                      {dimension.name}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">{dimension.icon}</span>
+                      <div>
+                        <p className="text-base font-medium text-white group-hover:text-purple-300 transition-colors">
+                          {dimension.shortName}
+                        </p>
+                        <p className="text-xs text-[var(--color-slate-500)]">{dimension.fullName}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-6 flex-shrink-0">
                     <div className="text-right">
                       <p className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors">{dimension.value}</p>
                       <p className="text-xs text-[var(--color-slate-400)]">scenarios</p>
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                      <p className="text-lg font-semibold text-blue-400">{dimension.uniqueCalls}</p>
+                      <p className="text-xs text-[var(--color-slate-400)]">calls</p>
                     </div>
                     <div className="text-right min-w-[60px]">
                       <p className="text-lg font-semibold text-purple-400">{dimension.percentage}%</p>

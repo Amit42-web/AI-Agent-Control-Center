@@ -23,7 +23,7 @@ const rootCauseColors: Record<string, { bg: string; text: string; border: string
 };
 
 export function ScenarioTable() {
-  const { scenarioResults, transcripts, setSelectedCallId } = useAppStore();
+  const { scenarioResults, transcripts, setSelectedCallId, selectedDimension, setSelectedDimension } = useAppStore();
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedScenarios, setExpandedScenarios] = useState<Set<string>>(new Set());
@@ -49,6 +49,7 @@ export function ScenarioTable() {
 
   const filteredScenarios = scenarioResults.scenarios.filter((scenario) => {
     if (severityFilter !== 'all' && scenario.severity !== severityFilter) return false;
+    if (selectedDimension && scenario.dimension !== selectedDimension) return false;
     if (
       searchTerm &&
       !scenario.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -117,6 +118,20 @@ export function ScenarioTable() {
             <option value="low">Low</option>
           </select>
         </div>
+
+        {/* Active Dimension Filter */}
+        {selectedDimension && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-xs text-[var(--color-slate-400)]">Filtered by dimension:</span>
+            <button
+              onClick={() => setSelectedDimension(null)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 transition-colors text-purple-300 text-sm border border-purple-500/30"
+            >
+              <span>📊 {selectedDimension}</span>
+              <span className="text-xs hover:text-white transition-colors">✕</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Scenarios List */}
