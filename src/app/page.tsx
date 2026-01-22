@@ -283,7 +283,7 @@ function ResultsPage() {
                 onClick={() => setResultsViewMode('overview')}
               >
                 <LayoutGrid className="w-4 h-4" />
-                Overview
+                Aggregated
               </button>
             </div>
           </div>
@@ -343,12 +343,21 @@ function ResultsPage() {
       </motion.div>
 
       {flowType === 'objective' ? (
-        // Objective Flow - always show KPI, Charts, Table, Viewer
+        // Objective Flow - show based on view mode
         <>
-          <motion.div variants={itemVariants}><KPICards /></motion.div>
-          <motion.div variants={itemVariants}><Charts /></motion.div>
-          <motion.div variants={itemVariants}><IssueTable /></motion.div>
-          <motion.div variants={itemVariants}><CallViewer /></motion.div>
+          {resultsViewMode === 'detailed' ? (
+            <>
+              <motion.div variants={itemVariants}><KPICards /></motion.div>
+              <motion.div variants={itemVariants}><Charts /></motion.div>
+              <motion.div variants={itemVariants}><IssueTable /></motion.div>
+              <motion.div variants={itemVariants}><CallViewer /></motion.div>
+            </>
+          ) : (
+            <>
+              <motion.div variants={itemVariants}><AggregateResults /></motion.div>
+              <motion.div variants={itemVariants}><CallViewer /></motion.div>
+            </>
+          )}
         </>
       ) : (
         // Open-ended Flow - show based on view mode
