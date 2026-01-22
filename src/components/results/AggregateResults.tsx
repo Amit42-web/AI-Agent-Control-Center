@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { aggregateIssues } from '@/utils/aggregateIssues';
 import { aggregateCustomAudits } from '@/utils/customAuditAggregation';
 import { aggregateScenarios, AggregatedScenario } from '@/utils/aggregateScenarios';
-import { IssueType, Severity } from '@/types';
+import { IssueType, Severity, AggregatedIssue, CheckConfig, DetectedIssue } from '@/types';
 import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart, ArrowRight } from 'lucide-react';
 import {
   PieChart as RechartsPieChart,
@@ -746,9 +746,9 @@ function CheckPillarOverview({
   customIssues,
   checks
 }: {
-  standardIssues: any[];
-  customIssues: any[];
-  checks: any[];
+  standardIssues: AggregatedIssue[];
+  customIssues: AggregatedIssue[];
+  checks: CheckConfig[];
 }) {
   const allIssues = [...standardIssues, ...customIssues];
 
@@ -756,7 +756,7 @@ function CheckPillarOverview({
   const pillarGroups: Record<string, {
     name: string;
     icon: string;
-    issues: any[];
+    issues: AggregatedIssue[];
     totalCalls: number;
     totalOccurrences: number;
     color: string;
@@ -777,7 +777,7 @@ function CheckPillarOverview({
 
   allIssues.forEach(issue => {
     const category = checkCategories[issue.type] || {
-      name: issue.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+      name: issue.type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
       icon: '📊',
       color: 'cyan'
     };
@@ -876,7 +876,7 @@ function ObjectiveIssuesBreakdown({
   subtitle,
   customStyle = false
 }: {
-  aggregatedIssues: any[];
+  aggregatedIssues: AggregatedIssue[];
   getIssueTypeLabel: (type: IssueType) => string;
   title: string;
   subtitle: string;
@@ -1007,7 +1007,7 @@ function ObjectiveIssuesBreakdown({
                     </p>
 
                     <div className="space-y-2">
-                      {issue.instances.map((instance: any) => (
+                      {issue.instances.map((instance: DetectedIssue) => (
                         <div
                           key={instance.id}
                           className="p-3 rounded-lg bg-[var(--color-navy-800)] hover:bg-[var(--color-navy-750)] transition-colors cursor-pointer border border-[var(--color-navy-700)]"
