@@ -707,14 +707,12 @@ export function AggregateResults() {
         </motion.div>
       </div>
 
-      {/* Checks Overview by Pillar */}
-      {(aggregatedStandardIssues.length > 0 || aggregatedCustomIssues.length > 0) && (
-        <CheckPillarOverview
-          standardIssues={aggregatedStandardIssues}
-          customIssues={aggregatedCustomIssues}
-          checks={checks}
-        />
-      )}
+      {/* Checks Overview by Pillar - Always show to display all enabled checks */}
+      <CheckPillarOverview
+        standardIssues={aggregatedStandardIssues}
+        customIssues={aggregatedCustomIssues}
+        checks={checks}
+      />
 
       {/* Standard Checks Aggregation - Hierarchical View */}
       {aggregatedStandardIssues.length > 0 && (
@@ -750,6 +748,12 @@ function CheckPillarOverview({
   customIssues: AggregatedIssue[];
   checks: CheckConfig[];
 }) {
+  // Early return if checks is not an array
+  if (!Array.isArray(checks)) {
+    console.error('CheckPillarOverview: checks is not an array', checks);
+    return null;
+  }
+
   const allIssues = [...standardIssues, ...customIssues];
 
   // Define all possible check categories (standard checks)
