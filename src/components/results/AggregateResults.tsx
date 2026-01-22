@@ -835,6 +835,19 @@ function CheckPillarOverview({
     return b.totalOccurrences - a.totalOccurrences;
   });
 
+  // Static color mapping for Tailwind CSS (can't use dynamic classes)
+  const getColorClasses = (color: string) => {
+    const colorMap: Record<string, { bg: string; text: string }> = {
+      blue: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
+      orange: { bg: 'bg-orange-500/20', text: 'text-orange-400' },
+      green: { bg: 'bg-green-500/20', text: 'text-green-400' },
+      purple: { bg: 'bg-purple-500/20', text: 'text-purple-400' },
+      pink: { bg: 'bg-pink-500/20', text: 'text-pink-400' },
+      cyan: { bg: 'bg-cyan-500/20', text: 'text-cyan-400' },
+    };
+    return colorMap[color] || { bg: 'bg-cyan-500/20', text: 'text-cyan-400' };
+  };
+
   return (
     <motion.div
       className="glass-card overflow-hidden"
@@ -850,80 +863,83 @@ function CheckPillarOverview({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-        {sortedPillars.map((pillar, index) => (
-          <motion.div
-            key={pillar.name}
-            className={`p-4 rounded-lg bg-gradient-to-br transition-colors ${
-              pillar.hasIssues
-                ? 'from-[var(--color-navy-800)] to-[var(--color-navy-900)] border border-[var(--color-navy-700)] hover:border-[var(--color-navy-600)]'
-                : 'from-green-500/5 to-[var(--color-navy-900)] border border-green-500/20 opacity-60'
-            }`}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: pillar.hasIssues ? 1 : 0.6, scale: 1 }}
-            transition={{ delay: 0.5 + index * 0.05 }}
-          >
-            <div className="flex items-start gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                pillar.hasIssues ? `bg-${pillar.color}-500/20` : 'bg-green-500/20'
-              }`}>
-                {pillar.hasIssues ? (
-                  <span className="text-xl">{pillar.icon}</span>
-                ) : (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="text-sm font-semibold text-white">{pillar.name}</h4>
-                  {!pillar.hasIssues && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
-                      No issues
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[var(--color-slate-400)]">
+        {sortedPillars.map((pillar, index) => {
+          const colorClasses = getColorClasses(pillar.color);
+          return (
+            <motion.div
+              key={pillar.name}
+              className={`p-4 rounded-lg bg-gradient-to-br transition-colors ${
+                pillar.hasIssues
+                  ? 'from-[var(--color-navy-800)] to-[var(--color-navy-900)] border border-[var(--color-navy-700)] hover:border-[var(--color-navy-600)]'
+                  : 'from-green-500/5 to-[var(--color-navy-900)] border border-green-500/20 opacity-60'
+              }`}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: pillar.hasIssues ? 1 : 0.6, scale: 1 }}
+              transition={{ delay: 0.5 + index * 0.05 }}
+            >
+              <div className="flex items-start gap-3 mb-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  pillar.hasIssues ? colorClasses.bg : 'bg-green-500/20'
+                }`}>
                   {pillar.hasIssues ? (
-                    `${pillar.issues.length} issue type${pillar.issues.length !== 1 ? 's' : ''}`
+                    <span className="text-xl">{pillar.icon}</span>
                   ) : (
-                    '✓ Clean'
+                    <CheckCircle className="w-5 h-5 text-green-500" />
                   )}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-2 rounded bg-[var(--color-navy-950)]">
-                <p className={`text-2xl font-bold ${
-                  pillar.hasIssues ? `text-${pillar.color}-400` : 'text-green-500'
-                }`}>{pillar.totalOccurrences}</p>
-                <p className="text-xs text-[var(--color-slate-400)]">Occurrences</p>
-              </div>
-              <div className="p-2 rounded bg-[var(--color-navy-950)]">
-                <p className={`text-2xl font-bold ${
-                  pillar.hasIssues ? `text-${pillar.color}-400` : 'text-green-500'
-                }`}>{pillar.totalCalls}</p>
-                <p className="text-xs text-[var(--color-slate-400)]">Calls Affected</p>
-              </div>
-            </div>
-
-            {/* Issue types in this pillar - only show if has issues */}
-            {pillar.hasIssues && (
-              <div className="mt-3 pt-3 border-t border-[var(--color-navy-700)]">
-                <p className="text-xs text-[var(--color-slate-500)] mb-2">Issues:</p>
-                <div className="flex flex-wrap gap-1">
-                  {pillar.issues.map((issue, idx) => (
-                    <span
-                      key={idx}
-                      className="text-xs px-2 py-0.5 rounded bg-[var(--color-navy-950)] text-[var(--color-slate-300)]"
-                    >
-                      {issue.occurrences}× {issue.type.replace(/_/g, ' ')}
-                    </span>
-                  ))}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="text-sm font-semibold text-white">{pillar.name}</h4>
+                    {!pillar.hasIssues && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
+                        No issues
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--color-slate-400)]">
+                    {pillar.hasIssues ? (
+                      `${pillar.issues.length} issue type${pillar.issues.length !== 1 ? 's' : ''}`
+                    ) : (
+                      '✓ Clean'
+                    )}
+                  </p>
                 </div>
               </div>
-            )}
-          </motion.div>
-        ))}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-2 rounded bg-[var(--color-navy-950)]">
+                  <p className={`text-2xl font-bold ${
+                    pillar.hasIssues ? colorClasses.text : 'text-green-500'
+                  }`}>{pillar.totalOccurrences}</p>
+                  <p className="text-xs text-[var(--color-slate-400)]">Occurrences</p>
+                </div>
+                <div className="p-2 rounded bg-[var(--color-navy-950)]">
+                  <p className={`text-2xl font-bold ${
+                    pillar.hasIssues ? colorClasses.text : 'text-green-500'
+                  }`}>{pillar.totalCalls}</p>
+                  <p className="text-xs text-[var(--color-slate-400)]">Calls Affected</p>
+                </div>
+              </div>
+
+              {/* Issue types in this pillar - only show if has issues */}
+              {pillar.hasIssues && (
+                <div className="mt-3 pt-3 border-t border-[var(--color-navy-700)]">
+                  <p className="text-xs text-[var(--color-slate-500)] mb-2">Issues:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {pillar.issues.map((issue, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs px-2 py-0.5 rounded bg-[var(--color-navy-950)] text-[var(--color-slate-300)]"
+                      >
+                        {issue.occurrences}× {issue.type.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
