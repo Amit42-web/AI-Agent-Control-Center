@@ -140,9 +140,25 @@ export function EnhancedFixesList() {
       {/* Fixes List */}
       <div className="space-y-4">
         {filteredFixes.map((fix, index) => {
-          const config = fixTypeConfig[fix.fixType];
+          const config = fixTypeConfig[fix.fixType] || {
+            icon: FileText,
+            color: 'blue',
+            label: 'Unknown',
+          };
           const Icon = config.icon;
           const isExpanded = expandedFixes.has(fix.id);
+
+          // Static color mapping for Tailwind CSS
+          const getColorClasses = (color: string) => {
+            const colorMap: Record<string, { border: string; bg: string; bgLight: string; text: string }> = {
+              blue: { border: 'border-blue-500', bg: 'bg-blue-500/5', bgLight: 'bg-blue-500/20', text: 'text-blue-400' },
+              green: { border: 'border-green-500', bg: 'bg-green-500/5', bgLight: 'bg-green-500/20', text: 'text-green-400' },
+              purple: { border: 'border-purple-500', bg: 'bg-purple-500/5', bgLight: 'bg-purple-500/20', text: 'text-purple-400' },
+              orange: { border: 'border-orange-500', bg: 'bg-orange-500/5', bgLight: 'bg-orange-500/20', text: 'text-orange-400' },
+            };
+            return colorMap[color] || colorMap['blue'];
+          };
+          const colorClasses = getColorClasses(config.color);
 
           return (
             <motion.div
@@ -154,16 +170,16 @@ export function EnhancedFixesList() {
             >
               {/* Header */}
               <div
-                className={`p-4 border-l-4 border-${config.color}-500 bg-${config.color}-500/5 cursor-pointer`}
+                className={`p-4 border-l-4 ${colorClasses.border} ${colorClasses.bg} cursor-pointer`}
                 onClick={() => toggleExpanded(fix.id)}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <div className={`w-8 h-8 rounded-lg bg-${config.color}-500/20 flex items-center justify-center`}>
-                        <Icon className={`w-4 h-4 text-${config.color}-400`} />
+                      <div className={`w-8 h-8 rounded-lg ${colorClasses.bgLight} flex items-center justify-center`}>
+                        <Icon className={`w-4 h-4 ${colorClasses.text}`} />
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded bg-${config.color}-500/20 text-${config.color}-400`}>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded ${colorClasses.bgLight} ${colorClasses.text}`}>
                         {config.label}
                       </span>
                       {fix.rootCauseType && rootCauseColors[fix.rootCauseType] && (
