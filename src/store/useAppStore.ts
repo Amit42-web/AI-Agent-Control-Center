@@ -363,26 +363,36 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         set({ fixes: validatedFixes, currentStep: 'fixes', isRunning: false });
       } else if (flowType === 'open-ended' && scenarioResults) {
-        // Open-ended flow: Generate enhanced fixes
-        const enhancedFixesArray = await generateEnhancedFixSuggestions(
+        // Open-ended flow: Convert scenarios to issues format and use same fix generation
+        const issuesFromScenarios = scenarioResults.scenarios.map((scenario, index) => ({
+          id: scenario.id || `scenario-${index}`,
+          type: scenario.dimension?.toLowerCase().replace(/\s+/g, '_') || 'general_quality',
+          callId: scenario.callId,
+          severity: scenario.severity,
+          confidence: scenario.confidence,
+          explanation: scenario.context,
+          evidenceSnippet: scenario.context,
+          lineNumbers: [1], // Scenarios don't have specific line numbers
+          isCustomCheck: false
+        }));
+
+        // Generate fixes using the same function as objective flow
+        const fixes = await generateFixSuggestions(
           apiKey,
           openaiConfig.model,
-          scenarioResults.scenarios,
+          issuesFromScenarios,
           transcripts,
           referenceEnabled ? referenceScript : null,
           knowledgeBaseEnabled ? knowledgeBase : null
         );
 
-        // Ensure enhancedFixes have the proper structure
-        const validatedEnhancedFixes = {
-          fixes: Array.isArray(enhancedFixesArray) ? enhancedFixesArray : []
+        // Ensure fixes have the proper structure
+        const validatedFixes = {
+          scriptFixes: Array.isArray(fixes?.scriptFixes) ? fixes.scriptFixes : [],
+          generalFixes: Array.isArray(fixes?.generalFixes) ? fixes.generalFixes : []
         };
 
-        set({
-          enhancedFixes: validatedEnhancedFixes,
-          currentStep: 'fixes',
-          isRunning: false
-        });
+        set({ fixes: validatedFixes, currentStep: 'fixes', isRunning: false });
       }
     } catch (error) {
       console.error('Error generating fixes:', error);
