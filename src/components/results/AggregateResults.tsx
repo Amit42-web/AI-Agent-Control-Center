@@ -707,122 +707,370 @@ export function AggregateResults() {
         </motion.div>
       </div>
 
-      {/* Standard Checks Aggregation */}
-      {aggregatedStandardIssues.length > 0 && (
-        <motion.div
-          className="glass-card overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="p-4 border-b border-[var(--color-navy-700)]">
-            <h3 className="text-lg font-semibold text-white">Standard Checks - Aggregated View</h3>
-            <p className="text-sm text-[var(--color-slate-400)] mt-1">
-              Issues grouped by type across all calls
-            </p>
-          </div>
+      {/* Checks Overview by Pillar */}
+      {(aggregatedStandardIssues.length > 0 || aggregatedCustomIssues.length > 0) && (
+        <CheckPillarOverview
+          standardIssues={aggregatedStandardIssues}
+          customIssues={aggregatedCustomIssues}
+          checks={checks}
+        />
+      )}
 
-          <div className="divide-y divide-[var(--color-navy-700)]">
-            {aggregatedStandardIssues.map((issue, index) => (
+      {/* Standard Checks Aggregation - Hierarchical View */}
+      {aggregatedStandardIssues.length > 0 && (
+        <ObjectiveIssuesBreakdown
+          aggregatedIssues={aggregatedStandardIssues}
+          getIssueTypeLabel={getIssueTypeLabel}
+          title="Standard Checks - Aggregated View"
+          subtitle="Issues grouped by type with expandable details"
+        />
+      )}
+
+      {/* Custom Audits Aggregation - Hierarchical View */}
+      {aggregatedCustomIssues.length > 0 && (
+        <ObjectiveIssuesBreakdown
+          aggregatedIssues={aggregatedCustomIssues}
+          getIssueTypeLabel={getIssueTypeLabel}
+          title="Custom Audits - Aggregated View"
+          subtitle="Open-ended audit findings grouped by similarity"
+          customStyle={true}
+        />
+      )}
+    </div>
+  );
+}
+
+// Component to display check pillar overview
+function CheckPillarOverview({
+  standardIssues,
+  customIssues,
+  checks
+}: {
+  standardIssues: any[];
+  customIssues: any[];
+  checks: any[];
+}) {
+  const allIssues = [...standardIssues, ...customIssues];
+
+  // Group issues by their check/pillar
+  const pillarGroups: Record<string, {
+    name: string;
+    icon: string;
+    issues: any[];
+    totalCalls: number;
+    totalOccurrences: number;
+    color: string;
+  }> = {};
+
+  const checkCategories: Record<string, { name: string; icon: string; color: string }> = {
+    flow_compliance: { name: 'Flow Compliance', icon: '🔄', color: 'blue' },
+    flow_deviation: { name: 'Flow Compliance', icon: '🔄', color: 'blue' },
+    repetition: { name: 'Repetition Detection', icon: '🔁', color: 'orange' },
+    repetition_loop: { name: 'Repetition Detection', icon: '🔁', color: 'orange' },
+    language_alignment: { name: 'Language Alignment', icon: '🌐', color: 'green' },
+    language_mismatch: { name: 'Language Alignment', icon: '🌐', color: 'green' },
+    restart_reset: { name: 'Restart/Reset Detection', icon: '↻', color: 'purple' },
+    mid_call_restart: { name: 'Restart/Reset Detection', icon: '↻', color: 'purple' },
+    general_quality: { name: 'General Quality', icon: '✨', color: 'pink' },
+    quality_issue: { name: 'General Quality', icon: '✨', color: 'pink' },
+  };
+
+  allIssues.forEach(issue => {
+    const category = checkCategories[issue.type] || {
+      name: issue.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+      icon: '📊',
+      color: 'cyan'
+    };
+
+    const key = category.name;
+    if (!pillarGroups[key]) {
+      pillarGroups[key] = {
+        name: category.name,
+        icon: category.icon,
+        issues: [],
+        totalCalls: 0,
+        totalOccurrences: 0,
+        color: category.color
+      };
+    }
+
+    pillarGroups[key].issues.push(issue);
+    pillarGroups[key].totalCalls += issue.affectedCallIds.length;
+    pillarGroups[key].totalOccurrences += issue.occurrences;
+  });
+
+  const sortedPillars = Object.values(pillarGroups).sort((a, b) => b.totalOccurrences - a.totalOccurrences);
+
+  return (
+    <motion.div
+      className="glass-card overflow-hidden"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+    >
+      <div className="p-4 border-b border-[var(--color-navy-700)]">
+        <h3 className="text-lg font-semibold text-white">Check Pillars Overview</h3>
+        <p className="text-sm text-[var(--color-slate-400)] mt-1">
+          Issues grouped by check category • {sortedPillars.length} active pillar{sortedPillars.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+        {sortedPillars.map((pillar, index) => (
+          <motion.div
+            key={pillar.name}
+            className="p-4 rounded-lg bg-gradient-to-br from-[var(--color-navy-800)] to-[var(--color-navy-900)] border border-[var(--color-navy-700)] hover:border-[var(--color-navy-600)] transition-colors"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5 + index * 0.05 }}
+          >
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-lg bg-${pillar.color}-500/20 flex items-center justify-center flex-shrink-0`}>
+                <span className="text-xl">{pillar.icon}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-semibold text-white mb-1">{pillar.name}</h4>
+                <p className="text-xs text-[var(--color-slate-400)]">
+                  {pillar.issues.length} issue type{pillar.issues.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-2 rounded bg-[var(--color-navy-950)]">
+                <p className={`text-2xl font-bold text-${pillar.color}-400`}>{pillar.totalOccurrences}</p>
+                <p className="text-xs text-[var(--color-slate-400)]">Occurrences</p>
+              </div>
+              <div className="p-2 rounded bg-[var(--color-navy-950)]">
+                <p className={`text-2xl font-bold text-${pillar.color}-400`}>{pillar.totalCalls}</p>
+                <p className="text-xs text-[var(--color-slate-400)]">Calls Affected</p>
+              </div>
+            </div>
+
+            {/* Issue types in this pillar */}
+            <div className="mt-3 pt-3 border-t border-[var(--color-navy-700)]">
+              <p className="text-xs text-[var(--color-slate-500)] mb-2">Issues:</p>
+              <div className="flex flex-wrap gap-1">
+                {pillar.issues.map((issue, idx) => (
+                  <span
+                    key={idx}
+                    className="text-xs px-2 py-0.5 rounded bg-[var(--color-navy-950)] text-[var(--color-slate-300)]"
+                  >
+                    {issue.occurrences}× {issue.type.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// Component to display objective flow issues with expandable details
+function ObjectiveIssuesBreakdown({
+  aggregatedIssues,
+  getIssueTypeLabel,
+  title,
+  subtitle,
+  customStyle = false
+}: {
+  aggregatedIssues: any[];
+  getIssueTypeLabel: (type: IssueType) => string;
+  title: string;
+  subtitle: string;
+  customStyle?: boolean;
+}) {
+  const { setSelectedCallId, setResultsViewMode } = useAppStore();
+  const [expandedIssues, setExpandedIssues] = React.useState<Set<string>>(new Set());
+
+  const toggleIssue = (issueId: string) => {
+    const newExpanded = new Set(expandedIssues);
+    if (newExpanded.has(issueId)) {
+      newExpanded.delete(issueId);
+    } else {
+      newExpanded.add(issueId);
+    }
+    setExpandedIssues(newExpanded);
+  };
+
+  const severityClasses: Record<Severity, string> = {
+    critical: 'badge-critical',
+    high: 'badge-high',
+    medium: 'badge-medium',
+    low: 'badge-low',
+  };
+
+  const checkIcons: Record<string, string> = {
+    flow_compliance: '🔄',
+    flow_deviation: '🔄',
+    repetition: '🔁',
+    repetition_loop: '🔁',
+    language_alignment: '🌐',
+    language_mismatch: '🌐',
+    restart_reset: '↻',
+    mid_call_restart: '↻',
+    general_quality: '✨',
+    quality_issue: '✨',
+  };
+
+  return (
+    <motion.div
+      className="glass-card overflow-hidden"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+    >
+      <div className={`p-4 border-b ${customStyle ? 'border-purple-500/30 bg-purple-500/5' : 'border-[var(--color-navy-700)]'}`}>
+        <h3 className={`text-lg font-semibold ${customStyle ? 'text-purple-300' : 'text-white'}`}>{title}</h3>
+        <p className="text-sm text-[var(--color-slate-400)] mt-1">
+          {subtitle} • {aggregatedIssues.length} unique pattern{aggregatedIssues.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+
+      <div className="divide-y divide-[var(--color-navy-700)]">
+        {aggregatedIssues.map((issue, index) => {
+          const isExpanded = expandedIssues.has(issue.id);
+          const icon = checkIcons[issue.type] || '📊';
+
+          return (
+            <div key={issue.id}>
+              {/* Issue Header */}
               <motion.div
-                key={issue.id}
-                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors"
+                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors cursor-pointer group"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.6 + index * 0.05 }}
+                onClick={() => toggleIssue(issue.id)}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`badge ${severityClasses[issue.severity]}`}>
-                        {issue.severity}
-                      </span>
-                      <span className="text-lg font-medium text-white">
-                        {getIssueTypeLabel(issue.type)}
-                      </span>
-                      <span className="text-sm text-[var(--color-slate-400)]">
-                        Confidence: {issue.avgConfidence}%
-                      </span>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <motion.div
+                      animate={{ rotate: isExpanded ? 90 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ArrowRight className="w-4 h-4 text-[var(--color-slate-400)] flex-shrink-0" />
+                    </motion.div>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-lg">{icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className={`badge ${severityClasses[issue.severity]}`}>
+                            {issue.severity}
+                          </span>
+                          <h4 className={`text-base font-semibold group-hover:text-purple-300 transition-colors ${customStyle ? 'text-purple-300' : 'text-white'}`}>
+                            {getIssueTypeLabel(issue.type)}
+                          </h4>
+                        </div>
+                        <p className="text-sm text-[var(--color-slate-300)]">
+                          {issue.pattern}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-[var(--color-slate-300)] mb-3">
-                      {issue.pattern}
-                    </p>
-                    <div className="flex items-center gap-6 text-sm">
-                      <div>
-                        <span className="text-[var(--color-slate-400)]">Occurrences: </span>
-                        <span className="font-semibold text-blue-400">{issue.occurrences}</span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-slate-400)]">Calls Affected: </span>
-                        <span className="font-semibold text-blue-400">{issue.affectedCallIds.length}</span>
-                      </div>
+                  </div>
+                  <div className="flex items-center gap-6 flex-shrink-0">
+                    <div className="text-right">
+                      <p className={`text-2xl font-bold group-hover:text-purple-300 transition-colors ${customStyle ? 'text-purple-400' : 'text-white'}`}>
+                        {issue.occurrences}
+                      </p>
+                      <p className="text-xs text-[var(--color-slate-400)]">occurrences</p>
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                      <p className={`text-lg font-semibold ${customStyle ? 'text-purple-400' : 'text-blue-400'}`}>
+                        {issue.affectedCallIds.length}
+                      </p>
+                      <p className="text-xs text-[var(--color-slate-400)]">calls</p>
+                    </div>
+                    <div className="text-right min-w-[60px]">
+                      <p className={`text-lg font-semibold ${customStyle ? 'text-purple-400' : 'text-green-400'}`}>
+                        {issue.avgConfidence}%
+                      </p>
+                      <p className="text-xs text-[var(--color-slate-400)]">confidence</p>
                     </div>
                   </div>
                 </div>
               </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
 
-      {/* Custom Audits Aggregation */}
-      {aggregatedCustomIssues.length > 0 && (
-        <motion.div
-          className="glass-card overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <div className="p-4 border-b border-purple-500/30 bg-purple-500/5">
-            <h3 className="text-lg font-semibold text-purple-300">Custom Audits - Aggregated View</h3>
-            <p className="text-sm text-[var(--color-slate-400)] mt-1">
-              Open-ended audit findings grouped by similarity
-            </p>
-          </div>
-
-          <div className="divide-y divide-[var(--color-navy-700)]">
-            {aggregatedCustomIssues.map((issue, index) => (
-              <motion.div
-                key={issue.id}
-                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.8 + index * 0.05 }}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`badge ${severityClasses[issue.severity]}`}>
-                        {issue.severity}
-                      </span>
-                      <span className="text-lg font-medium text-purple-300">
-                        {getIssueTypeLabel(issue.type)}
-                      </span>
-                      <span className="text-sm text-[var(--color-slate-400)]">
-                        Confidence: {issue.avgConfidence}%
-                      </span>
-                    </div>
-                    <p className="text-sm text-[var(--color-slate-300)] mb-3">
-                      {issue.pattern}
+              {/* Expanded Individual Issue Instances */}
+              {isExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="bg-[var(--color-navy-900)] border-t border-[var(--color-navy-700)]"
+                >
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-[var(--color-slate-400)] mb-3 font-semibold uppercase tracking-wide">
+                      Individual Instances ({issue.instances.length}) • Click to view call details
                     </p>
-                    <div className="flex items-center gap-6 text-sm">
-                      <div>
-                        <span className="text-[var(--color-slate-400)]">Occurrences: </span>
-                        <span className="font-semibold text-purple-400">{issue.occurrences}</span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-slate-400)]">Calls Affected: </span>
-                        <span className="font-semibold text-purple-400">{issue.affectedCallIds.length}</span>
-                      </div>
+
+                    <div className="space-y-2">
+                      {issue.instances.map((instance: any) => (
+                        <div
+                          key={instance.id}
+                          className="p-3 rounded-lg bg-[var(--color-navy-800)] hover:bg-[var(--color-navy-750)] transition-colors cursor-pointer border border-[var(--color-navy-700)]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCallId(instance.callId);
+                            setResultsViewMode('detailed');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="text-xs font-mono text-blue-400">{instance.callId}</span>
+                                <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                <span className="text-xs text-[var(--color-slate-400)]">
+                                  Lines {instance.lineNumbers[0]}-{instance.lineNumbers[instance.lineNumbers.length - 1]}
+                                </span>
+                                <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                <span className={`text-xs px-2 py-0.5 rounded ${severityClasses[instance.severity]}`}>
+                                  {instance.severity}
+                                </span>
+                                <span className="text-xs text-[var(--color-slate-500)]">•</span>
+                                <span className="text-xs text-green-400">{instance.confidence}% confidence</span>
+                              </div>
+                              <p className="text-sm text-[var(--color-slate-300)] mb-1">
+                                {instance.explanation}
+                              </p>
+                              {instance.evidenceSnippet && (
+                                <p className="text-xs text-[var(--color-slate-400)] italic line-clamp-2">
+                                  "{instance.evidenceSnippet}"
+                                </p>
+                              )}
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-[var(--color-slate-500)] flex-shrink-0 mt-1" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
+
+                    {/* Evidence Snippets Preview */}
+                    {issue.evidenceSnippets && issue.evidenceSnippets.length > 0 && (
+                      <div className="mt-4 p-3 rounded-lg bg-[var(--color-navy-950)] border border-[var(--color-navy-700)]">
+                        <p className="text-xs text-[var(--color-slate-400)] mb-2 font-semibold">
+                          Sample Evidence Snippets:
+                        </p>
+                        <div className="space-y-2">
+                          {issue.evidenceSnippets.slice(0, 3).map((snippet: string, idx: number) => (
+                            <p key={idx} className="text-xs text-[var(--color-slate-300)] italic">
+                              "{snippet}"
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-    </div>
+                </motion.div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
 
