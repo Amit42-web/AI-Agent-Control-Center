@@ -379,87 +379,6 @@ function ResultsPage() {
   );
 }
 
-function AggregatePage() {
-  const { goToStep, generateFixes, isRunning } = useAppStore();
-
-  const handleGenerateFixes = () => {
-    generateFixes();
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
-
-  return (
-    <motion.div
-      className="space-y-8"
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      exit={{ opacity: 0, x: -20 }}
-    >
-      <motion.div className="flex items-center justify-between" variants={itemVariants}>
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-2">Aggregate Analysis</h2>
-          <p className="text-[var(--color-slate-400)]">
-            View aggregated insights and patterns across all analyzed calls.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <motion.button
-            className="btn-secondary flex items-center gap-2"
-            onClick={() => goToStep('results')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Results
-          </motion.button>
-          <motion.button
-            className="btn-primary flex items-center gap-2"
-            onClick={handleGenerateFixes}
-            disabled={isRunning}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {isRunning ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                >
-                  <Sparkles className="w-4 h-4" />
-                </motion.div>
-                Generating Fixes...
-              </>
-            ) : (
-              <>
-                Next: Generate Fixes
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </motion.button>
-        </div>
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <AggregateResults />
-      </motion.div>
-    </motion.div>
-  );
-}
-
 function FixesPage() {
   const { goToStep, flowType } = useAppStore();
 
@@ -527,7 +446,6 @@ export default function Home() {
             {currentStep === 'input' && <RunWizardPage key="input" />}
             {currentStep === 'running' && <RunningPage key="running" />}
             {currentStep === 'results' && <ResultsPage key="results" />}
-            {currentStep === 'aggregate' && <AggregatePage key="aggregate" />}
             {currentStep === 'fixes' && <FixesPage key="fixes" />}
           </AnimatePresence>
         </div>

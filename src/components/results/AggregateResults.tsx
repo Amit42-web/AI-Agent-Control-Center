@@ -752,17 +752,8 @@ function CheckPillarOverview({
 }) {
   const allIssues = [...standardIssues, ...customIssues];
 
-  // Group issues by their check/pillar
-  const pillarGroups: Record<string, {
-    name: string;
-    icon: string;
-    issues: AggregatedIssue[];
-    totalCalls: number;
-    totalOccurrences: number;
-    color: string;
-  }> = {};
-
-  const checkCategories: Record<string, { name: string; icon: string; color: string }> = {
+  // Define all possible check categories (standard checks)
+  const allCheckCategories: Record<string, { name: string; icon: string; color: string }> = {
     flow_compliance: { name: 'Flow Compliance', icon: '🔄', color: 'blue' },
     flow_deviation: { name: 'Flow Compliance', icon: '🔄', color: 'blue' },
     repetition: { name: 'Repetition Detection', icon: '🔁', color: 'orange' },
@@ -775,8 +766,44 @@ function CheckPillarOverview({
     quality_issue: { name: 'General Quality', icon: '✨', color: 'pink' },
   };
 
+  // Initialize pillar groups with ALL enabled checks (start with 0)
+  const pillarGroups: Record<string, {
+    name: string;
+    icon: string;
+    issues: AggregatedIssue[];
+    totalCalls: number;
+    totalOccurrences: number;
+    color: string;
+    hasIssues: boolean;
+  }> = {};
+
+  // Initialize all enabled checks in pillarGroups
+  checks.forEach(check => {
+    if (check.enabled) {
+      const category = allCheckCategories[check.id] || {
+        name: check.name,
+        icon: '📊',
+        color: 'cyan'
+      };
+
+      const key = category.name;
+      if (!pillarGroups[key]) {
+        pillarGroups[key] = {
+          name: category.name,
+          icon: category.icon,
+          issues: [],
+          totalCalls: 0,
+          totalOccurrences: 0,
+          color: category.color,
+          hasIssues: false
+        };
+      }
+    }
+  });
+
+  // Now populate with actual issues
   allIssues.forEach(issue => {
-    const category = checkCategories[issue.type] || {
+    const category = allCheckCategories[issue.type] || {
       name: issue.type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
       icon: '📊',
       color: 'cyan'
@@ -790,16 +817,23 @@ function CheckPillarOverview({
         issues: [],
         totalCalls: 0,
         totalOccurrences: 0,
-        color: category.color
+        color: category.color,
+        hasIssues: false
       };
     }
 
     pillarGroups[key].issues.push(issue);
     pillarGroups[key].totalCalls += issue.affectedCallIds.length;
     pillarGroups[key].totalOccurrences += issue.occurrences;
+    pillarGroups[key].hasIssues = true;
   });
 
-  const sortedPillars = Object.values(pillarGroups).sort((a, b) => b.totalOccurrences - a.totalOccurrences);
+  // Sort: pillars with issues first (by occurrences), then clean pillars
+  const sortedPillars = Object.values(pillarGroups).sort((a, b) => {
+    if (a.hasIssues && !b.hasIssues) return -1;
+    if (!a.hasIssues && b.hasIssues) return 1;
+    return b.totalOccurrences - a.totalOccurrences;
+  });
 
   return (
     <motion.div
@@ -819,48 +853,75 @@ function CheckPillarOverview({
         {sortedPillars.map((pillar, index) => (
           <motion.div
             key={pillar.name}
-            className="p-4 rounded-lg bg-gradient-to-br from-[var(--color-navy-800)] to-[var(--color-navy-900)] border border-[var(--color-navy-700)] hover:border-[var(--color-navy-600)] transition-colors"
+            className={`p-4 rounded-lg bg-gradient-to-br transition-colors ${
+              pillar.hasIssues
+                ? 'from-[var(--color-navy-800)] to-[var(--color-navy-900)] border border-[var(--color-navy-700)] hover:border-[var(--color-navy-600)]'
+                : 'from-green-500/5 to-[var(--color-navy-900)] border border-green-500/20 opacity-60'
+            }`}
             initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            animate={{ opacity: pillar.hasIssues ? 1 : 0.6, scale: 1 }}
             transition={{ delay: 0.5 + index * 0.05 }}
           >
             <div className="flex items-start gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-lg bg-${pillar.color}-500/20 flex items-center justify-center flex-shrink-0`}>
-                <span className="text-xl">{pillar.icon}</span>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                pillar.hasIssues ? `bg-${pillar.color}-500/20` : 'bg-green-500/20'
+              }`}>
+                {pillar.hasIssues ? (
+                  <span className="text-xl">{pillar.icon}</span>
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-semibold text-white mb-1">{pillar.name}</h4>
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-sm font-semibold text-white">{pillar.name}</h4>
+                  {!pillar.hasIssues && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
+                      No issues
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-[var(--color-slate-400)]">
-                  {pillar.issues.length} issue type{pillar.issues.length !== 1 ? 's' : ''}
+                  {pillar.hasIssues ? (
+                    `${pillar.issues.length} issue type${pillar.issues.length !== 1 ? 's' : ''}`
+                  ) : (
+                    '✓ Clean'
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="p-2 rounded bg-[var(--color-navy-950)]">
-                <p className={`text-2xl font-bold text-${pillar.color}-400`}>{pillar.totalOccurrences}</p>
+                <p className={`text-2xl font-bold ${
+                  pillar.hasIssues ? `text-${pillar.color}-400` : 'text-green-500'
+                }`}>{pillar.totalOccurrences}</p>
                 <p className="text-xs text-[var(--color-slate-400)]">Occurrences</p>
               </div>
               <div className="p-2 rounded bg-[var(--color-navy-950)]">
-                <p className={`text-2xl font-bold text-${pillar.color}-400`}>{pillar.totalCalls}</p>
+                <p className={`text-2xl font-bold ${
+                  pillar.hasIssues ? `text-${pillar.color}-400` : 'text-green-500'
+                }`}>{pillar.totalCalls}</p>
                 <p className="text-xs text-[var(--color-slate-400)]">Calls Affected</p>
               </div>
             </div>
 
-            {/* Issue types in this pillar */}
-            <div className="mt-3 pt-3 border-t border-[var(--color-navy-700)]">
-              <p className="text-xs text-[var(--color-slate-500)] mb-2">Issues:</p>
-              <div className="flex flex-wrap gap-1">
-                {pillar.issues.map((issue, idx) => (
-                  <span
-                    key={idx}
-                    className="text-xs px-2 py-0.5 rounded bg-[var(--color-navy-950)] text-[var(--color-slate-300)]"
-                  >
-                    {issue.occurrences}× {issue.type.replace(/_/g, ' ')}
-                  </span>
-                ))}
+            {/* Issue types in this pillar - only show if has issues */}
+            {pillar.hasIssues && (
+              <div className="mt-3 pt-3 border-t border-[var(--color-navy-700)]">
+                <p className="text-xs text-[var(--color-slate-500)] mb-2">Issues:</p>
+                <div className="flex flex-wrap gap-1">
+                  {pillar.issues.map((issue, idx) => (
+                    <span
+                      key={idx}
+                      className="text-xs px-2 py-0.5 rounded bg-[var(--color-navy-950)] text-[var(--color-slate-300)]"
+                    >
+                      {issue.occurrences}× {issue.type.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         ))}
       </div>
