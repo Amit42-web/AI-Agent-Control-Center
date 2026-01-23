@@ -117,9 +117,13 @@ export function AggregateResults() {
     if (!scenarioResults?.scenarios) return null;
 
     const scenarios = scenarioResults.scenarios;
+    console.log('[AggregateResults] Total scenarios:', scenarios.length);
+    console.log('[AggregateResults] First scenario:', scenarios[0]);
 
     // Aggregate similar scenarios
     const aggregatedScenarios = aggregateScenarios(scenarios);
+    console.log('[AggregateResults] Aggregated scenarios:', aggregatedScenarios.length);
+    console.log('[AggregateResults] First aggregated:', aggregatedScenarios[0]);
 
     // Group by dimension
     const byDimension: Record<string, number> = {};
@@ -159,6 +163,9 @@ export function AggregateResults() {
 
     // Prepare chart data - include ALL dimensions, even those with 0 scenarios
     const allDimensionNames = Object.keys(dimensionLabels);
+    console.log('[AggregateResults] byDimension:', byDimension);
+    console.log('[AggregateResults] allDimensionNames:', allDimensionNames);
+
     const dimensionChartData = allDimensionNames
       .map(fullName => {
         const value = byDimension[fullName] || 0;
@@ -179,6 +186,8 @@ export function AggregateResults() {
         if (!a.hasIssues && b.hasIssues) return 1;
         return b.value - a.value;
       });
+
+    console.log('[AggregateResults] dimensionChartData:', dimensionChartData);
 
     const severityChartData = Object.entries(bySeverity)
       .filter(([_, value]) => value > 0)
