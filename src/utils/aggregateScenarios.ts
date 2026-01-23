@@ -54,7 +54,9 @@ export function aggregateScenarios(scenarios: Scenario[]): AggregatedScenario[] 
 
   // Step 1: Group by dimension and root cause
   const primaryGroups = scenarios.reduce((acc, scenario) => {
-    const dimension = scenario.dimension || 'Uncategorized';
+    // Normalize dimension by removing (A), (B), etc. suffix
+    const rawDimension = scenario.dimension || 'Uncategorized';
+    const dimension = rawDimension.replace(/\s*\([A-G]\)\s*$/, '').trim();
     const rootCause = scenario.rootCauseType || 'unknown';
     const key = `${dimension}||${rootCause}`;
 

@@ -134,8 +134,9 @@ export function AggregateResults() {
     let totalConfidence = 0;
 
     scenarios.forEach(scenario => {
-      // Dimension
-      const dimension = scenario.dimension || 'Uncategorized';
+      // Dimension - normalize by removing (A), (B), etc. suffix to match dimensionLabels
+      const rawDimension = scenario.dimension || 'Uncategorized';
+      const dimension = rawDimension.replace(/\s*\([A-G]\)\s*$/, '').trim();
       byDimension[dimension] = (byDimension[dimension] || 0) + 1;
 
       // Track unique calls per dimension
