@@ -18,6 +18,7 @@ interface ScriptSection {
 export function FixesPanel() {
   const { fixes, referenceEnabled, referenceScript, openaiConfig } = useAppStore();
   const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [showFinalScript, setShowFinalScript] = useState(false);
   const [finalScript, setFinalScript] = useState('');
   const [scriptSections, setScriptSections] = useState<ScriptSection[]>([]);
@@ -251,20 +252,10 @@ export function FixesPanel() {
           {selectedFixIds.size > 0 && (
             <button
               className="btn-primary flex items-center gap-2"
-              onClick={generateFinalScript}
-              disabled={isGeneratingScript}
+              onClick={() => setShowReviewModal(true)}
             >
-              {isGeneratingScript ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Analyzing placement...
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4" />
-                  Generate Final Script ({selectedFixIds.size})
-                </>
-              )}
+              <FileText className="w-4 h-4" />
+              Review & Generate Script ({selectedFixIds.size})
             </button>
           )}
           <button className="btn-secondary flex items-center gap-2" onClick={exportFixes}>
@@ -377,6 +368,271 @@ export function FixesPanel() {
             Based on the enabled checks, no significant issues were found that require fixes.
           </p>
         </motion.div>
+      )}
+
+      {/* Two-Column Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <motion.div
+            className="glass-card max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <div className="p-6 border-b border-[var(--color-navy-700)]">
+              <h3 className="text-2xl font-semibold text-white mb-2">Review Selected Fixes</h3>
+              <p className="text-sm text-[var(--color-slate-400)]">
+                Review the {selectedFixIds.size} selected fix{selectedFixIds.size !== 1 ? 'es' : ''} organized by category before generating the final script
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+              {/* Left Column: Organized Fixes */}
+              <div className="space-y-6 overflow-y-auto pr-4">
+                <h4 className="text-lg font-semibold text-white sticky top-0 bg-[var(--color-navy-800)] py-2 z-10">
+                  📋 Fixes by Category
+                </h4>
+
+                {(() => {
+                  const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
+                  const scriptFixes = selectedFixes.filter(f => fixes.scriptFixes.some(sf => sf.id === f.id));
+                  const generalFixes = selectedFixes.filter(f => fixes.generalFixes.some(gf => gf.id === f.id));
+
+                  return (
+                    <>
+                      {/* Script/Prompt Fixes */}
+                      {scriptFixes.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-purple-400" />
+                            <h5 className="font-semibold text-purple-300">
+                              Script/Prompt Fixes ({scriptFixes.length})
+                            </h5>
+                          </div>
+                          <div className="space-y-2 pl-7">
+                            {(() => {
+                              const adds = scriptFixes.filter(f => !f.action || f.action === 'add');
+                              const replaces = scriptFixes.filter(f => f.action === 'replace');
+                              const removes = scriptFixes.filter(f => f.action === 'remove');
+
+                              return (
+                                <>
+                                  {adds.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-green-400 font-semibold mb-2">✅ Additions ({adds.length})</p>
+                                      {adds.map(fix => (
+                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-green-500">
+                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
+                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {replaces.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-yellow-400 font-semibold mb-2">✏️ Replacements ({replaces.length})</p>
+                                      {replaces.map(fix => (
+                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-yellow-500">
+                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
+                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {removes.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-red-400 font-semibold mb-2">🗑️ Removals ({removes.length})</p>
+                                      {removes.map(fix => (
+                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-red-500">
+                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
+                                          {fix.targetContent && (
+                                            <p className="text-xs text-[var(--color-slate-400)] line-clamp-2 line-through">
+                                              {fix.targetContent}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* General Quality Fixes */}
+                      {generalFixes.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-teal-400" />
+                            <h5 className="font-semibold text-teal-300">
+                              General Quality Fixes ({generalFixes.length})
+                            </h5>
+                          </div>
+                          <div className="space-y-2 pl-7">
+                            {(() => {
+                              const adds = generalFixes.filter(f => !f.action || f.action === 'add');
+                              const replaces = generalFixes.filter(f => f.action === 'replace');
+                              const removes = generalFixes.filter(f => f.action === 'remove');
+
+                              return (
+                                <>
+                                  {adds.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-green-400 font-semibold mb-2">✅ Additions ({adds.length})</p>
+                                      {adds.map(fix => (
+                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-green-500">
+                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
+                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {replaces.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-yellow-400 font-semibold mb-2">✏️ Replacements ({replaces.length})</p>
+                                      {replaces.map(fix => (
+                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-yellow-500">
+                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
+                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {removes.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-red-400 font-semibold mb-2">🗑️ Removals ({removes.length})</p>
+                                      {removes.map(fix => (
+                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-red-500">
+                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
+                                          {fix.targetContent && (
+                                            <p className="text-xs text-[var(--color-slate-400)] line-clamp-2 line-through">
+                                              {fix.targetContent}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Right Column: Summary and Stats */}
+              <div className="space-y-6 overflow-y-auto pl-4 border-l border-[var(--color-navy-700)]">
+                <h4 className="text-lg font-semibold text-white sticky top-0 bg-[var(--color-navy-800)] py-2 z-10">
+                  📊 Summary & Impact
+                </h4>
+
+                {(() => {
+                  const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
+                  const scriptFixes = selectedFixes.filter(f => fixes.scriptFixes.some(sf => sf.id === f.id));
+                  const generalFixes = selectedFixes.filter(f => fixes.generalFixes.some(gf => gf.id === f.id));
+                  const addCount = selectedFixes.filter(f => !f.action || f.action === 'add').length;
+                  const replaceCount = selectedFixes.filter(f => f.action === 'replace').length;
+                  const removeCount = selectedFixes.filter(f => f.action === 'remove').length;
+
+                  return (
+                    <>
+                      {/* Overall Statistics */}
+                      <div className="glass-card p-4 space-y-3">
+                        <h6 className="text-sm font-semibold text-white mb-3">Overall Statistics</h6>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="text-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                            <div className="text-2xl font-bold text-purple-300">{scriptFixes.length}</div>
+                            <div className="text-xs text-[var(--color-slate-400)] mt-1">Script Fixes</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-teal-500/10 border border-teal-500/30">
+                            <div className="text-2xl font-bold text-teal-300">{generalFixes.length}</div>
+                            <div className="text-xs text-[var(--color-slate-400)] mt-1">Quality Fixes</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Breakdown */}
+                      <div className="glass-card p-4 space-y-3">
+                        <h6 className="text-sm font-semibold text-white mb-3">Actions Breakdown</h6>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2 rounded bg-green-500/10">
+                            <span className="text-sm text-green-300">✅ Additions</span>
+                            <span className="text-sm font-bold text-green-200">{addCount}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded bg-yellow-500/10">
+                            <span className="text-sm text-yellow-300">✏️ Replacements</span>
+                            <span className="text-sm font-bold text-yellow-200">{replaceCount}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded bg-red-500/10">
+                            <span className="text-sm text-red-300">🗑️ Removals</span>
+                            <span className="text-sm font-bold text-red-200">{removeCount}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Impact Preview */}
+                      <div className="glass-card p-4 space-y-3">
+                        <h6 className="text-sm font-semibold text-white mb-3">What Happens Next</h6>
+                        <ul className="space-y-2 text-sm text-[var(--color-slate-300)]">
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400 mt-0.5">1.</span>
+                            <span>AI will analyze optimal placement for additions in your script</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400 mt-0.5">2.</span>
+                            <span>Replacements and removals will be applied to the reference script</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400 mt-0.5">3.</span>
+                            <span>Final script will show visual diff with green bars for new content</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400 mt-0.5">4.</span>
+                            <span>You'll be able to copy the clean final script to clipboard</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[var(--color-navy-700)] flex items-center justify-between bg-[var(--color-navy-900)]">
+              <button
+                className="btn-secondary"
+                onClick={() => setShowReviewModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary flex items-center gap-2"
+                onClick={async () => {
+                  setShowReviewModal(false);
+                  await generateFinalScript();
+                }}
+                disabled={isGeneratingScript}
+              >
+                {isGeneratingScript ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Confirm & Generate Final Script
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
 
       {/* Final Script Modal */}
