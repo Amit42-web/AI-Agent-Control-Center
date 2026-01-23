@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, RotateCcw, Edit3, Eye, EyeOff, Save, BookOpen } from 'lucide-react';
+import { Brain, RotateCcw, Edit3, Eye, EyeOff, Save, BookOpen, RefreshCw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
 
@@ -24,14 +24,30 @@ export function AuditPromptConfig() {
 
   // Load saved templates from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('auditPromptTemplates');
-    if (saved) {
-      try {
-        setSavedTemplates(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to load templates:', e);
+    const loadTemplates = () => {
+      const saved = localStorage.getItem('auditPromptTemplates');
+      if (saved) {
+        try {
+          const templates = JSON.parse(saved);
+          setSavedTemplates(templates);
+          console.log('Loaded templates:', templates);
+        } catch (e) {
+          console.error('Failed to load templates:', e);
+        }
       }
-    }
+    };
+
+    loadTemplates();
+
+    // Listen for storage changes (when templates are saved/deleted)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'auditPromptTemplates') {
+        loadTemplates();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const handleReset = () => {
@@ -74,6 +90,23 @@ export function AuditPromptConfig() {
       const updated = savedTemplates.filter(t => t.id !== templateId);
       setSavedTemplates(updated);
       localStorage.setItem('auditPromptTemplates', JSON.stringify(updated));
+    }
+  };
+
+  const handleRefreshTemplates = () => {
+    const saved = localStorage.getItem('auditPromptTemplates');
+    if (saved) {
+      try {
+        const templates = JSON.parse(saved);
+        setSavedTemplates(templates);
+        alert(`Refreshed! Found ${templates.length} template(s).`);
+      } catch (e) {
+        console.error('Failed to refresh templates:', e);
+        alert('Failed to load templates. Check console for details.');
+      }
+    } else {
+      setSavedTemplates([]);
+      alert('No templates found in storage.');
     }
   };
 
@@ -222,17 +255,18 @@ export function AuditPromptConfig() {
             Save as Template
           </motion.button>
 
-          {savedTemplates.length > 0 && (
-            <motion.button
-              className="btn-secondary text-sm flex items-center gap-2"
-              onClick={() => setShowLoadModal(true)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <BookOpen className="w-4 h-4" />
-              Load Template ({savedTemplates.length})
-            </motion.button>
-          )}
+          <motion.button
+            className={`btn-secondary text-sm flex items-center gap-2 ${
+              savedTemplates.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            onClick={() => savedTemplates.length > 0 && setShowLoadModal(true)}
+            whileHover={savedTemplates.length > 0 ? { scale: 1.02 } : {}}
+            whileTap={savedTemplates.length > 0 ? { scale: 0.98 } : {}}
+            disabled={savedTemplates.length === 0}
+          >
+            <BookOpen className="w-4 h-4" />
+            Load Template {savedTemplates.length > 0 && `(${savedTemplates.length})`}
+          </motion.button>
 
           {isCustomized && (
             <motion.button
@@ -339,54 +373,78 @@ export function AuditPromptConfig() {
             exit={{ scale: 0.9, y: 20 }}
           >
             <div className="p-6 border-b border-[var(--color-navy-700)]">
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Load Audit Prompt Template
-              </h2>
-              <p className="text-[var(--color-slate-400)]">
-                Select a saved template to load. Your current prompt will be replaced.
-              </p>
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    Load Audit Prompt Template
+                  </h2>
+                  <p className="text-[var(--color-slate-400)]">
+                    Select a saved template to load. Your current prompt will be replaced.
+                  </p>
+                </div>
+                <motion.button
+                  className="btn-secondary text-sm flex items-center gap-2 flex-shrink-0"
+                  onClick={handleRefreshTemplates}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  title="Refresh template list"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </motion.button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-3">
-                {savedTemplates.map(template => (
-                  <div
-                    key={template.id}
-                    className="glass-card p-4 hover:bg-[var(--color-navy-700)] transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="text-white font-semibold mb-1">
-                          {template.name}
-                        </h3>
-                        <p className="text-xs text-[var(--color-slate-400)]">
-                          Saved on {new Date(template.createdAt).toLocaleString()}
-                        </p>
-                        <p className="text-xs text-[var(--color-slate-500)] mt-1">
-                          {template.prompt.length} characters
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <motion.button
-                          className="btn-primary text-sm px-3 py-1.5"
-                          onClick={() => handleLoadTemplate(template)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          Load
-                        </motion.button>
-                        <motion.button
-                          className="btn-secondary text-sm px-3 py-1.5 text-red-400"
-                          onClick={() => handleDeleteTemplate(template.id)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          Delete
-                        </motion.button>
+              {savedTemplates.length === 0 ? (
+                <div className="text-center py-12">
+                  <BookOpen className="w-12 h-12 text-[var(--color-slate-600)] mx-auto mb-4" />
+                  <p className="text-[var(--color-slate-400)] mb-2">No saved templates found</p>
+                  <p className="text-xs text-[var(--color-slate-500)]">
+                    Save your current audit prompt as a template to see it here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {savedTemplates.map(template => (
+                    <div
+                      key={template.id}
+                      className="glass-card p-4 hover:bg-[var(--color-navy-700)] transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-white font-semibold mb-1">
+                            {template.name}
+                          </h3>
+                          <p className="text-xs text-[var(--color-slate-400)]">
+                            Saved on {new Date(template.createdAt).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-[var(--color-slate-500)] mt-1">
+                            {template.prompt.length} characters
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <motion.button
+                            className="btn-primary text-sm px-3 py-1.5"
+                            onClick={() => handleLoadTemplate(template)}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            Load
+                          </motion.button>
+                          <motion.button
+                            className="btn-secondary text-sm px-3 py-1.5 text-red-400"
+                            onClick={() => handleDeleteTemplate(template.id)}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            Delete
+                          </motion.button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="p-6 border-t border-[var(--color-navy-700)]">
               <motion.button
