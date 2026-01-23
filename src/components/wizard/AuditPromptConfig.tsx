@@ -1,19 +1,79 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, RotateCcw, Edit3, Eye, EyeOff } from 'lucide-react';
+import { Brain, RotateCcw, Edit3, Eye, EyeOff, Save, BookOpen } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
+
+interface SavedTemplate {
+  id: string;
+  name: string;
+  prompt: string;
+  createdAt: string;
+}
 
 export function AuditPromptConfig() {
   const { auditPrompt, setAuditPrompt } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
+
+  // Load saved templates from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('auditPromptTemplates');
+    if (saved) {
+      try {
+        setSavedTemplates(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load templates:', e);
+      }
+    }
+  }, []);
 
   const handleReset = () => {
     if (confirm('Reset to default comprehensive audit prompt?')) {
       setAuditPrompt(defaultAuditPrompt);
+    }
+  };
+
+  const handleSaveTemplate = () => {
+    if (!templateName.trim()) {
+      alert('Please enter a template name');
+      return;
+    }
+
+    const newTemplate: SavedTemplate = {
+      id: Date.now().toString(),
+      name: templateName.trim(),
+      prompt: auditPrompt,
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [...savedTemplates, newTemplate];
+    setSavedTemplates(updated);
+    localStorage.setItem('auditPromptTemplates', JSON.stringify(updated));
+    setTemplateName('');
+    setShowSaveModal(false);
+    alert(`Template "${newTemplate.name}" saved successfully!`);
+  };
+
+  const handleLoadTemplate = (template: SavedTemplate) => {
+    if (confirm(`Load template "${template.name}"? Your current prompt will be replaced.`)) {
+      setAuditPrompt(template.prompt);
+      setShowLoadModal(false);
+    }
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    const template = savedTemplates.find(t => t.id === templateId);
+    if (template && confirm(`Delete template "${template.name}"?`)) {
+      const updated = savedTemplates.filter(t => t.id !== templateId);
+      setSavedTemplates(updated);
+      localStorage.setItem('auditPromptTemplates', JSON.stringify(updated));
     }
   };
 
@@ -135,7 +195,7 @@ export function AuditPromptConfig() {
 
       {/* Actions */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <motion.button
             className="btn-secondary text-sm flex items-center gap-2"
             onClick={() => {
@@ -151,6 +211,28 @@ export function AuditPromptConfig() {
             <Edit3 className="w-4 h-4" />
             {isEditing ? 'Done Editing' : 'Customize Prompt'}
           </motion.button>
+
+          <motion.button
+            className="btn-secondary text-sm flex items-center gap-2"
+            onClick={() => setShowSaveModal(true)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Save className="w-4 h-4" />
+            Save as Template
+          </motion.button>
+
+          {savedTemplates.length > 0 && (
+            <motion.button
+              className="btn-secondary text-sm flex items-center gap-2"
+              onClick={() => setShowLoadModal(true)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <BookOpen className="w-4 h-4" />
+              Load Template ({savedTemplates.length})
+            </motion.button>
+          )}
 
           {isCustomized && (
             <motion.button
@@ -175,10 +257,150 @@ export function AuditPromptConfig() {
         <p className="text-xs text-[var(--color-slate-300)] leading-relaxed">
           <span className="font-semibold text-purple-400">💡 Tip:</span>{' '}
           The default prompt covers comprehensive quality dimensions. You can customize it to:
-          add domain-specific criteria, emphasize certain aspects, or go completely open-ended
-          for maximum flexibility.
+          add domain-specific criteria, emphasize certain aspects, or save as a template for reuse.
         </p>
       </div>
+
+      {/* Save Template Modal */}
+      {showSaveModal && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowSaveModal(false)}
+          />
+          <motion.div
+            className="glass-card max-w-md w-full p-6 relative z-10"
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+          >
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Save Audit Prompt Template
+            </h2>
+            <p className="text-[var(--color-slate-400)] mb-6">
+              Save your current audit prompt as a template for future use.
+            </p>
+            <input
+              type="text"
+              placeholder="e.g., 8-Pillar Quality Audit"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveTemplate();
+                if (e.key === 'Escape') setShowSaveModal(false);
+              }}
+              className="w-full px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-white placeholder-[var(--color-slate-500)] focus:outline-none focus:ring-2 focus:ring-purple-500 mb-6"
+              autoFocus
+            />
+            <div className="flex items-center gap-3">
+              <motion.button
+                className="flex-1 btn-primary flex items-center justify-center gap-2"
+                onClick={handleSaveTemplate}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Save className="w-4 h-4" />
+                Save Template
+              </motion.button>
+              <motion.button
+                className="flex-1 btn-secondary"
+                onClick={() => setShowSaveModal(false)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Cancel
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Load Template Modal */}
+      {showLoadModal && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowLoadModal(false)}
+          />
+          <motion.div
+            className="glass-card max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col relative z-10"
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+          >
+            <div className="p-6 border-b border-[var(--color-navy-700)]">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Load Audit Prompt Template
+              </h2>
+              <p className="text-[var(--color-slate-400)]">
+                Select a saved template to load. Your current prompt will be replaced.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
+                {savedTemplates.map(template => (
+                  <div
+                    key={template.id}
+                    className="glass-card p-4 hover:bg-[var(--color-navy-700)] transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="text-white font-semibold mb-1">
+                          {template.name}
+                        </h3>
+                        <p className="text-xs text-[var(--color-slate-400)]">
+                          Saved on {new Date(template.createdAt).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-[var(--color-slate-500)] mt-1">
+                          {template.prompt.length} characters
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <motion.button
+                          className="btn-primary text-sm px-3 py-1.5"
+                          onClick={() => handleLoadTemplate(template)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          Load
+                        </motion.button>
+                        <motion.button
+                          className="btn-secondary text-sm px-3 py-1.5 text-red-400"
+                          onClick={() => handleDeleteTemplate(template.id)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          Delete
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 border-t border-[var(--color-navy-700)]">
+              <motion.button
+                className="btn-secondary w-full"
+                onClick={() => setShowLoadModal(false)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Close
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   );
 }
