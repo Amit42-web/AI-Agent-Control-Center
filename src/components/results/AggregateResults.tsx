@@ -454,11 +454,11 @@ export function AggregateResults() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="flex gap-2">
                   <span className="text-purple-400 flex-shrink-0">📝 Prompt:</span>
-                  <span className="text-slate-300">Agent's <strong>system instructions</strong> need updates (configuration fixes)</span>
+                  <span className="text-slate-300">Agent's <strong>system instructions</strong> need updates (quick config fix)</span>
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-green-400 flex-shrink-0">👤 Training:</span>
-                  <span className="text-slate-300">Agent needs <strong>coaching &amp; skill development</strong> (human training)</span>
+                  <span className="text-green-400 flex-shrink-0">🎓 Training:</span>
+                  <span className="text-slate-300">AI model needs <strong>training data/examples/fine-tuning</strong> (ML work)</span>
                 </div>
                 <div className="flex gap-2">
                   <span className="text-cyan-400 flex-shrink-0">🔄 Flow:</span>
@@ -478,7 +478,7 @@ export function AggregateResults() {
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-slate-700/50 text-xs text-slate-400">
-                <strong className="text-purple-300">Key difference:</strong> <span className="text-purple-400">Prompt</span> = fix the <em>configuration</em> • <span className="text-green-400">Training</span> = coach the <em>person/agent</em>
+                <strong className="text-purple-300">Key difference:</strong> <span className="text-purple-400">Prompt</span> = change <em>instructions</em> (quick fix) • <span className="text-green-400">Training</span> = improve <em>AI model</em> (needs ML work)
               </div>
             </div>
 
@@ -498,7 +498,7 @@ export function AggregateResults() {
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
                       ? ' - Update conversation scripts/flows. Check the Fixes tab for exact solutions!'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training'
-                      ? ' - Provide coaching and skill development to the agent (human training, not configuration)'
+                      ? ' - AI model needs training data, examples, or fine-tuning (requires ML work, not just config)'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge'
                       ? ' - Add missing information to knowledge base or reference materials'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'process'
@@ -547,7 +547,7 @@ export function AggregateResults() {
                           <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
                             {rootCauseKey === 'prompt' && '📝 Fix: Update agent\'s system instructions/prompts (configuration change)'}
                             {rootCauseKey === 'flow' && '🔄 Fix: Update conversation script/flow structure'}
-                            {rootCauseKey === 'training' && '👤 Fix: Provide coaching & skill development to agent (human training)'}
+                            {rootCauseKey === 'training' && '🎓 Fix: Add training data, examples, or fine-tune AI model (ML work)'}
                             {rootCauseKey === 'process' && '⚙️ Fix: Revise business workflows & procedures'}
                             {rootCauseKey === 'system' && '💻 Fix: Address technical limitations or system bugs'}
                             {rootCauseKey === 'knowledge' && '📚 Fix: Add missing information to knowledge base'}
@@ -577,7 +577,7 @@ export function AggregateResults() {
               {scenarioAggregation.rootCauseChartData.map((item, index) => {
                 const rootCauseKey = item.name.toLowerCase();
                 const icons: Record<string, string> = {
-                  prompt: '📝', flow: '🔄', training: '👤',
+                  prompt: '📝', flow: '🔄', training: '🎓',
                   process: '⚙️', system: '💻', knowledge: '📚'
                 };
                 return (
@@ -1254,7 +1254,7 @@ function DimensionBreakdownWithAggregation({
   const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
     prompt: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '📝' },
     flow: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🔄' },
-    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '👤' },
+    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🎓' },
     process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
     system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
     knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
@@ -1527,7 +1527,7 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
   const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
     prompt: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '📝' },
     flow: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🔄' },
-    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '👤' },
+    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🎓' },
     process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
     system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
     knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },

@@ -580,7 +580,7 @@ For each scenario, provide a JSON object with:
   * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
 - rootCauseType: WHY this issue happened. You MUST select EXACTLY ONE of these 6 values (DO NOT use "N/A", "unknown", or any other value):
   * "prompt" - Agent's SYSTEM INSTRUCTIONS/PROMPTS need updates (FIX: change configuration/settings)
-  * "training" - Agent needs COACHING & SKILL DEVELOPMENT (FIX: train the human/agent, not config changes)
+  * "training" - AI model needs TRAINING DATA/EXAMPLES/FINE-TUNING (FIX: ML work, provide examples, not just config)
   * "flow" - Conversation SCRIPT/FLOW STRUCTURE has gaps or errors (FIX: update conversation scripts)
   * "knowledge" - INFORMATION IS MISSING from knowledge base or reference materials (FIX: add to KB/docs)
   * "process" - BUSINESS WORKFLOW/PROCEDURES are flawed (FIX: revise business processes)
@@ -588,9 +588,9 @@ For each scenario, provide a JSON object with:
 
   CRITICAL DISTINCTION - Prompt vs Training:
   - Use "prompt" when the agent's system instructions, prompts, or configuration need to be changed
-  - Use "training" when the agent (human or AI) needs coaching, practice, or skill development
+  - Use "training" when the AI model needs training data, examples, or fine-tuning to improve behavior
   - Example "prompt": Agent's greeting message is wrong → fix the prompt template
-  - Example "training": Agent knows what to say but executes it poorly → coach the agent
+  - Example "training": Agent struggles with a pattern despite correct instructions → needs training examples
 
   If uncertain, choose the closest match from these 6 options. Never use any value other than these exact 6 strings.
 - context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
