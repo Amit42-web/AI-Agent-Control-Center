@@ -579,12 +579,19 @@ For each scenario, provide a JSON object with:
   * "Process & Policy Adherence" (F)
   * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
 - rootCauseType: WHY this issue happened. You MUST select EXACTLY ONE of these 6 values (DO NOT use "N/A", "unknown", or any other value):
-  * "prompt" - Agent's system instructions/prompts are inadequate or incorrect
-  * "flow" - Conversation script/flow structure has gaps or errors
-  * "training" - Agent lacks skills, knowledge, or coaching in this area
-  * "process" - Business process, workflow, or procedures are flawed
-  * "system" - Technical limitation, bug, or system capability issue
-  * "knowledge" - Information missing from knowledge base or reference materials
+  * "prompt" - Agent's SYSTEM INSTRUCTIONS/PROMPTS need updates (FIX: change configuration/settings)
+  * "training" - Agent needs COACHING & SKILL DEVELOPMENT (FIX: train the human/agent, not config changes)
+  * "flow" - Conversation SCRIPT/FLOW STRUCTURE has gaps or errors (FIX: update conversation scripts)
+  * "knowledge" - INFORMATION IS MISSING from knowledge base or reference materials (FIX: add to KB/docs)
+  * "process" - BUSINESS WORKFLOW/PROCEDURES are flawed (FIX: revise business processes)
+  * "system" - TECHNICAL LIMITATIONS, bugs, or system capability issues (FIX: engineering/dev work)
+
+  CRITICAL DISTINCTION - Prompt vs Training:
+  - Use "prompt" when the agent's system instructions, prompts, or configuration need to be changed
+  - Use "training" when the agent (human or AI) needs coaching, practice, or skill development
+  - Example "prompt": Agent's greeting message is wrong → fix the prompt template
+  - Example "training": Agent knows what to say but executes it poorly → coach the agent
+
   If uncertain, choose the closest match from these 6 options. Never use any value other than these exact 6 strings.
 - context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
 - whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced

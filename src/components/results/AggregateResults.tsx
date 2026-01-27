@@ -148,10 +148,11 @@ export function AggregateResults() {
       // Severity
       bySeverity[scenario.severity]++;
 
-      // Root Cause - only count valid root cause types
+      // Root Cause - only count valid root cause types (strictly enforce to prevent N/A values)
       const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
-      if (scenario.rootCauseType && validRootCauseTypes.includes(scenario.rootCauseType)) {
-        byRootCause[scenario.rootCauseType] = (byRootCause[scenario.rootCauseType] || 0) + 1;
+      const normalizedRootCause = scenario.rootCauseType?.toLowerCase();
+      if (normalizedRootCause && validRootCauseTypes.includes(normalizedRootCause)) {
+        byRootCause[normalizedRootCause] = (byRootCause[normalizedRootCause] || 0) + 1;
       }
 
       // Call
@@ -444,6 +445,43 @@ export function AggregateResults() {
               Understanding <span className="font-semibold text-white">WHY</span> issues happen enables targeted solutions
             </p>
 
+            {/* Category Explanations Panel */}
+            <div className="mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
+              <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Brain className="w-4 h-4 text-purple-400" />
+                What each category means:
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="flex gap-2">
+                  <span className="text-purple-400 flex-shrink-0">📝 Prompt:</span>
+                  <span className="text-slate-300">Agent's <strong>system instructions</strong> need updates (configuration fixes)</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-green-400 flex-shrink-0">👤 Training:</span>
+                  <span className="text-slate-300">Agent needs <strong>coaching &amp; skill development</strong> (human training)</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-cyan-400 flex-shrink-0">🔄 Flow:</span>
+                  <span className="text-slate-300">Conversation <strong>script/flow structure</strong> has gaps or errors</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-yellow-400 flex-shrink-0">📚 Knowledge:</span>
+                  <span className="text-slate-300"><strong>Information missing</strong> from knowledge base or docs</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-orange-400 flex-shrink-0">⚙️ Process:</span>
+                  <span className="text-slate-300">Business <strong>workflow/procedures</strong> are flawed</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-red-400 flex-shrink-0">💻 System:</span>
+                  <span className="text-slate-300"><strong>Technical limitations</strong>, bugs, or system capability issues</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-slate-700/50 text-xs text-slate-400">
+                <strong className="text-purple-300">Key difference:</strong> <span className="text-purple-400">Prompt</span> = fix the <em>configuration</em> • <span className="text-green-400">Training</span> = coach the <em>person/agent</em>
+              </div>
+            </div>
+
             {/* Key Insight Box */}
             <div className="bg-gradient-to-r from-purple-500/10 to-transparent border-l-4 border-purple-500 rounded-lg p-4 mb-4">
               <div className="flex items-start gap-3">
@@ -455,9 +493,17 @@ export function AggregateResults() {
                       {scenarioAggregation.rootCauseChartData[0]?.value || 0} scenarios
                     </span>
                     {' '}are <span className="font-semibold text-purple-400">{scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase()}</span> issues
-                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'prompt' || scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
-                      ? ' - Check the Fixes tab for exact copy-paste solutions you can implement immediately!'
-                      : ` - These require ${scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training' ? 'coaching and skill development' : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge' ? 'knowledge base updates' : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'process' ? 'workflow and procedure changes' : 'technical system improvements'}.`
+                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'prompt'
+                      ? ' - Update agent system instructions/prompts. Check the Fixes tab for exact solutions!'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
+                      ? ' - Update conversation scripts/flows. Check the Fixes tab for exact solutions!'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training'
+                      ? ' - Provide coaching and skill development to the agent (human training, not configuration)'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge'
+                      ? ' - Add missing information to knowledge base or reference materials'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'process'
+                      ? ' - Revise business workflows, procedures, and policies'
+                      : ' - Address technical limitations, bugs, or system capability issues'
                     }
                   </p>
                 </div>
@@ -499,12 +545,12 @@ export function AggregateResults() {
                           <p style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '14px' }}>{data.name} Issues</p>
                           <p style={{ color: '#60a5fa', marginBottom: '8px' }}>{data.value} scenarios ({data.percentage}%)</p>
                           <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
-                            {rootCauseKey === 'prompt' && '📝 Agent instructions need updates'}
-                            {rootCauseKey === 'flow' && '🔄 Conversation script has gaps'}
-                            {rootCauseKey === 'training' && '👤 Agent needs coaching'}
-                            {rootCauseKey === 'process' && '⚙️ Business workflow issues'}
-                            {rootCauseKey === 'system' && '💻 Technical limitations'}
-                            {rootCauseKey === 'knowledge' && '📚 Information missing from KB'}
+                            {rootCauseKey === 'prompt' && '📝 Fix: Update agent\'s system instructions/prompts (configuration change)'}
+                            {rootCauseKey === 'flow' && '🔄 Fix: Update conversation script/flow structure'}
+                            {rootCauseKey === 'training' && '👤 Fix: Provide coaching & skill development to agent (human training)'}
+                            {rootCauseKey === 'process' && '⚙️ Fix: Revise business workflows & procedures'}
+                            {rootCauseKey === 'system' && '💻 Fix: Address technical limitations or system bugs'}
+                            {rootCauseKey === 'knowledge' && '📚 Fix: Add missing information to knowledge base'}
                           </p>
                         </div>
                       );
