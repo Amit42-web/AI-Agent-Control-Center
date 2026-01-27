@@ -578,13 +578,14 @@ For each scenario, provide a JSON object with:
   * "Knowledge & Accuracy" (E)
   * "Process & Policy Adherence" (F)
   * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
-- rootCauseType: WHY this issue happened. Use EXACTLY ONE of:
+- rootCauseType: WHY this issue happened. You MUST select EXACTLY ONE of these 6 values (DO NOT use "N/A", "unknown", or any other value):
   * "prompt" - Agent's system instructions/prompts are inadequate or incorrect
   * "flow" - Conversation script/flow structure has gaps or errors
   * "training" - Agent lacks skills, knowledge, or coaching in this area
   * "process" - Business process, workflow, or procedures are flawed
   * "system" - Technical limitation, bug, or system capability issue
   * "knowledge" - Information missing from knowledge base or reference materials
+  If uncertain, choose the closest match from these 6 options. Never use any value other than these exact 6 strings.
 - context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
 - whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
 - impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
@@ -749,6 +750,9 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
 
     console.log(`Found ${scenarios.length} scenarios in transcript ${transcript.id}`);
 
+    // Valid root cause types
+    const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
+
     // Convert to Scenario format with IDs
     return scenarios.map((scenario: {
       title: string;
@@ -760,19 +764,30 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
       severity: string;
       confidence: number;
       lineNumbers: number[];
-    }, idx: number) => ({
-      id: `${transcript.id}-scenario-${idx}`,
-      callId: transcript.id,
-      title: scenario.title,
-      dimension: scenario.dimension,
-      rootCauseType: scenario.rootCauseType as any,
-      context: scenario.context,
-      whatHappened: scenario.whatHappened,
-      impact: scenario.impact,
-      severity: scenario.severity as Severity,
-      confidence: scenario.confidence,
-      lineNumbers: scenario.lineNumbers || [],
-    }));
+    }, idx: number) => {
+      // Validate and normalize rootCauseType
+      let rootCauseType = scenario.rootCauseType?.toLowerCase();
+
+      // If rootCauseType is invalid (e.g., "N/A", "unknown", etc.), set to undefined
+      if (rootCauseType && !validRootCauseTypes.includes(rootCauseType)) {
+        console.warn(`[Scenario ${transcript.id}-${idx}] Invalid rootCauseType "${scenario.rootCauseType}" - setting to undefined. Valid values are: ${validRootCauseTypes.join(', ')}`);
+        rootCauseType = undefined;
+      }
+
+      return {
+        id: `${transcript.id}-scenario-${idx}`,
+        callId: transcript.id,
+        title: scenario.title,
+        dimension: scenario.dimension,
+        rootCauseType: rootCauseType as any,
+        context: scenario.context,
+        whatHappened: scenario.whatHappened,
+        impact: scenario.impact,
+        severity: scenario.severity as Severity,
+        confidence: scenario.confidence,
+        lineNumbers: scenario.lineNumbers || [],
+      };
+    });
   } catch (error) {
     console.error('Error analyzing transcript scenarios:', error);
     throw error;
@@ -912,6 +927,9 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
 
     console.log(`Generated ${fixes.length} enhanced fixes`);
 
+    // Valid root cause types
+    const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
+
     // Convert to EnhancedFix format with IDs
     return fixes.map((fix: {
       scenarioId: string;
@@ -926,21 +944,32 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
       successCriteria: string;
       howToTest: string;
       promptFix?: any;
-    }, idx: number) => ({
-      id: `enhanced-fix-${idx}`,
-      scenarioId: fix.scenarioId,
-      title: fix.title,
-      fixType: fix.fixType as FixType,
-      rootCauseType: (fix.rootCauseType || 'training') as any,
-      rootCause: fix.rootCause,
-      suggestedSolution: fix.suggestedSolution,
-      whereToImplement: fix.whereToImplement,
-      whatToImplement: fix.whatToImplement,
-      concreteExample: fix.concreteExample,
-      successCriteria: fix.successCriteria,
-      howToTest: fix.howToTest,
-      promptFix: fix.promptFix,
-    }));
+    }, idx: number) => {
+      // Validate and normalize rootCauseType
+      let rootCauseType = fix.rootCauseType?.toLowerCase() || 'training';
+
+      // If rootCauseType is invalid, default to 'training'
+      if (!validRootCauseTypes.includes(rootCauseType)) {
+        console.warn(`[Fix ${idx}] Invalid rootCauseType "${fix.rootCauseType}" - defaulting to "training". Valid values are: ${validRootCauseTypes.join(', ')}`);
+        rootCauseType = 'training';
+      }
+
+      return {
+        id: `enhanced-fix-${idx}`,
+        scenarioId: fix.scenarioId,
+        title: fix.title,
+        fixType: fix.fixType as FixType,
+        rootCauseType: rootCauseType as any,
+        rootCause: fix.rootCause,
+        suggestedSolution: fix.suggestedSolution,
+        whereToImplement: fix.whereToImplement,
+        whatToImplement: fix.whatToImplement,
+        concreteExample: fix.concreteExample,
+        successCriteria: fix.successCriteria,
+        howToTest: fix.howToTest,
+        promptFix: fix.promptFix,
+      };
+    });
   } catch (error) {
     console.error('Error generating enhanced fix suggestions:', error);
     throw error;

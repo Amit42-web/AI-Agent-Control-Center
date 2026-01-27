@@ -148,8 +148,9 @@ export function AggregateResults() {
       // Severity
       bySeverity[scenario.severity]++;
 
-      // Root Cause
-      if (scenario.rootCauseType) {
+      // Root Cause - only count valid root cause types
+      const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
+      if (scenario.rootCauseType && validRootCauseTypes.includes(scenario.rootCauseType)) {
         byRootCause[scenario.rootCauseType] = (byRootCause[scenario.rootCauseType] || 0) + 1;
       }
 
