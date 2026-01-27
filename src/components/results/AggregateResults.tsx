@@ -462,7 +462,7 @@ export function AggregateResults() {
                 </div>
                 <div className="flex gap-2">
                   <span className="text-cyan-400 flex-shrink-0">🔄 Flow:</span>
-                  <span className="text-slate-300">Conversation <strong>script/flow structure</strong> has gaps or errors</span>
+                  <span className="text-slate-300">Conversation <strong>flow structure</strong> has gaps or errors</span>
                 </div>
                 <div className="flex gap-2">
                   <span className="text-yellow-400 flex-shrink-0">📚 Knowledge:</span>
@@ -496,7 +496,7 @@ export function AggregateResults() {
                     {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'prompt'
                       ? ' - Update agent system instructions/prompts. Check the Fixes tab for exact solutions!'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
-                      ? ' - Update conversation scripts/flows. Check the Fixes tab for exact solutions!'
+                      ? ' - Update conversation flows. Check the Fixes tab for exact solutions!'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training'
                       ? ' - AI model needs training data, examples, or fine-tuning (requires ML work, not just config)'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge'
@@ -546,7 +546,7 @@ export function AggregateResults() {
                           <p style={{ color: '#60a5fa', marginBottom: '8px' }}>{data.value} scenarios ({data.percentage}%)</p>
                           <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
                             {rootCauseKey === 'prompt' && '📝 Fix: Update agent\'s system instructions/prompts (configuration change)'}
-                            {rootCauseKey === 'flow' && '🔄 Fix: Update conversation script/flow structure'}
+                            {rootCauseKey === 'flow' && '🔄 Fix: Update conversation flow structure'}
                             {rootCauseKey === 'training' && '🎓 Fix: Add training data, examples, or fine-tune AI model (ML work)'}
                             {rootCauseKey === 'process' && '⚙️ Fix: Revise business workflows & procedures'}
                             {rootCauseKey === 'system' && '💻 Fix: Address technical limitations or system bugs'}
