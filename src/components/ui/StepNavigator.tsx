@@ -12,14 +12,14 @@ const steps = [
 ] as const;
 
 export function StepNavigator() {
-  const { currentStep, goToStep, results, fixes, saveAnalysis, currentAnalysisName } = useAppStore();
+  const { currentStep, goToStep, results, fixes, scenarioResults, saveAnalysis, currentAnalysisName } = useAppStore();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveName, setSaveName] = useState(currentAnalysisName || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const getStepStatus = (stepId: typeof steps[number]['id']) => {
     if (stepId === 'input') return 'accessible';
-    if (stepId === 'results') return results ? 'accessible' : 'locked';
+    if (stepId === 'results') return (results || scenarioResults) ? 'accessible' : 'locked';
     if (stepId === 'fixes') return fixes ? 'accessible' : 'locked';
     return 'locked';
   };
@@ -84,7 +84,7 @@ export function StepNavigator() {
           const isActive = currentStep === step.id;
           const isAccessible = status === 'accessible';
           const isCompleted =
-            (step.id === 'input' && results) ||
+            (step.id === 'input' && (results || scenarioResults)) ||
             (step.id === 'results' && fixes);
 
           return (
