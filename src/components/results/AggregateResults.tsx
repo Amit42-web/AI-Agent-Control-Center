@@ -54,8 +54,7 @@ const DIMENSION_COLORS = [
 ];
 
 const ROOT_CAUSE_COLORS: Record<string, string> = {
-  prompt: '#a855f7',    // purple-500
-  flow: '#06b6d4',      // cyan-500 (Conversation Design)
+  prompt: '#06b6d4',    // cyan-500 (Design/Conversation)
   training: '#10b981',  // green-500 (Model Limitations)
   process: '#f97316',   // orange-500
   system: '#ef4444',    // red-500
@@ -208,7 +207,7 @@ export function AggregateResults() {
     const rootCauseChartData = Object.entries(byRootCause)
       .map(([name, value]) => {
         // Map internal keys to user-friendly display names
-        const displayName = name === 'training' ? 'Model' : name === 'flow' ? 'Design' : name.charAt(0).toUpperCase() + name.slice(1);
+        const displayName = name === 'training' ? 'Model' : name === 'prompt' ? 'Design' : name.charAt(0).toUpperCase() + name.slice(1);
         return {
           name: displayName,
           value,
@@ -457,16 +456,12 @@ export function AggregateResults() {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="flex gap-2">
-                  <span className="text-purple-400 flex-shrink-0">📝 Prompt:</span>
-                  <span className="text-slate-300">Agent's <strong>system instructions</strong> need updates (quick config fix)</span>
+                  <span className="text-cyan-400 flex-shrink-0">🎨 Design:</span>
+                  <span className="text-slate-300">Conversation <strong>design, structure, or instructions</strong> need updates (fix prompts/flow)</span>
                 </div>
                 <div className="flex gap-2">
                   <span className="text-green-400 flex-shrink-0">🤖 Model:</span>
-                  <span className="text-slate-300">AI model's <strong>inherent capabilities/limitations</strong> insufficient (needs better model)</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-cyan-400 flex-shrink-0">🎨 Design:</span>
-                  <span className="text-slate-300">Conversation <strong>design/architecture</strong> has structural gaps or errors</span>
+                  <span className="text-slate-300">AI model has <strong>fundamental capability limitation</strong> (rare - needs model upgrade)</span>
                 </div>
                 <div className="flex gap-2">
                   <span className="text-yellow-400 flex-shrink-0">📚 Knowledge:</span>
@@ -482,7 +477,7 @@ export function AggregateResults() {
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-slate-700/50 text-xs text-slate-400">
-                <strong className="text-purple-300">Key difference:</strong> <span className="text-purple-400">Prompt</span> = change <em>instructions</em> (config) • <span className="text-green-400">Model</span> = AI lacks <em>capability</em> (upgrade model) • <span className="text-cyan-400">Design</span> = <em>conversation structure</em> flawed
+                <strong className="text-cyan-300">Key difference:</strong> <span className="text-cyan-400">Design</span> = fix <em>conversation/prompts</em> (95% of issues) • <span className="text-green-400">Model</span> = AI fundamentally <em>lacks capability</em> (rare, {'<'}5%)
               </div>
             </div>
 
@@ -496,18 +491,14 @@ export function AggregateResults() {
                     <span className="font-bold text-white">
                       {scenarioAggregation.rootCauseChartData[0]?.value || 0} scenarios
                     </span>
-                    {' '}are <span className="font-semibold text-purple-400">{
-                      scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training'
+                    {' '}are <span className="font-semibold text-cyan-400">{
+                      scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'model'
                         ? 'model limitation'
-                        : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
-                        ? 'conversation design'
                         : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase()
                     }</span> issues
-                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'prompt'
-                      ? ' - Update agent system instructions/prompts. Check the Fixes tab for exact solutions!'
-                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'flow'
-                      ? ' - Redesign conversation structure/architecture. Check the Fixes tab for exact solutions!'
-                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'training'
+                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'design'
+                      ? ' - Update conversation design, structure, or instructions. Check the Fixes tab for exact solutions!'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'model'
                       ? ' - AI model lacks capability; consider upgrading to a more capable model'
                       : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge'
                       ? ' - Add missing information to knowledge base or reference materials'
@@ -589,7 +580,7 @@ export function AggregateResults() {
               {scenarioAggregation.rootCauseChartData.map((item, index) => {
                 const rootCauseKey = item.name.toLowerCase();
                 // Map display names back to internal keys for color lookup
-                const colorKey = rootCauseKey === 'model' ? 'training' : rootCauseKey === 'design' ? 'flow' : rootCauseKey;
+                const colorKey = rootCauseKey === 'model' ? 'training' : rootCauseKey === 'design' ? 'prompt' : rootCauseKey;
                 const icons: Record<string, string> = {
                   prompt: '📝', design: '🎨', model: '🤖',
                   process: '⚙️', system: '💻', knowledge: '📚'
@@ -1266,8 +1257,7 @@ function DimensionBreakdownWithAggregation({
   };
 
   const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-    prompt: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '📝' },
-    flow: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
+    prompt: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
     training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
     process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
     system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
@@ -1409,7 +1399,7 @@ function DimensionBreakdownWithAggregation({
                                 </span>
                                 {group.rootCauseType && rootCauseColors[group.rootCauseType] && (
                                   <span className={`px-2 py-0.5 text-xs rounded-full ${rootCauseColors[group.rootCauseType].bg} ${rootCauseColors[group.rootCauseType].text} border ${rootCauseColors[group.rootCauseType].border} font-medium`}>
-                                    {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType === 'training' ? 'model' : group.rootCauseType === 'flow' ? 'design' : group.rootCauseType}
+                                    {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType === 'training' ? 'model' : group.rootCauseType === 'prompt' ? 'design' : group.rootCauseType}
                                   </span>
                                 )}
                               </div>
@@ -1539,8 +1529,7 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
   };
 
   const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-    prompt: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '📝' },
-    flow: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
+    prompt: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
     training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
     process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
     system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
@@ -1587,7 +1576,7 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
                       </span>
                       {group.rootCauseType && rootCauseColors[group.rootCauseType] && (
                         <span className={`px-2.5 py-1 text-xs rounded-full ${rootCauseColors[group.rootCauseType].bg} ${rootCauseColors[group.rootCauseType].text} border ${rootCauseColors[group.rootCauseType].border} font-medium`}>
-                          {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType === 'training' ? 'model' : group.rootCauseType === 'flow' ? 'design' : group.rootCauseType}
+                          {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType === 'training' ? 'model' : group.rootCauseType === 'prompt' ? 'design' : group.rootCauseType}
                         </span>
                       )}
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">

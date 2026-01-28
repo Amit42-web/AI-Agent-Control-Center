@@ -578,21 +578,26 @@ For each scenario, provide a JSON object with:
   * "Knowledge & Accuracy" (E)
   * "Process & Policy Adherence" (F)
   * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
-- rootCauseType: WHY this issue happened. You MUST select EXACTLY ONE of these 6 values (DO NOT use "N/A", "unknown", or any other value):
-  * "prompt" - Agent's SYSTEM INSTRUCTIONS/PROMPTS need updates (FIX: change configuration/settings)
-  * "training" - AI model needs TRAINING DATA/EXAMPLES/FINE-TUNING (FIX: ML work, provide examples, not just config)
-  * "flow" - Conversation SCRIPT/FLOW STRUCTURE has gaps or errors (FIX: update conversation scripts)
+- rootCauseType: WHY this issue happened. You MUST select EXACTLY ONE of these 5 values (DO NOT use "N/A", "unknown", or any other value):
+  * "prompt" - Agent's CONVERSATION DESIGN, SYSTEM INSTRUCTIONS, or PROMPTS need updates (FIX: change configuration, prompts, conversation structure, or flow scripts)
+  * "training" - AI model has FUNDAMENTAL CAPABILITY LIMITATIONS that cannot be fixed with better prompts (FIX: model upgrade, fine-tuning, or specialized training) - USE THIS VERY RARELY
   * "knowledge" - INFORMATION IS MISSING from knowledge base or reference materials (FIX: add to KB/docs)
   * "process" - BUSINESS WORKFLOW/PROCEDURES are flawed (FIX: revise business processes)
   * "system" - TECHNICAL LIMITATIONS, bugs, or system capability issues (FIX: engineering/dev work)
 
-  CRITICAL DISTINCTION - Prompt vs Training:
-  - Use "prompt" when the agent's system instructions, prompts, or configuration need to be changed
-  - Use "training" when the AI model needs training data, examples, or fine-tuning to improve behavior
-  - Example "prompt": Agent's greeting message is wrong → fix the prompt template
-  - Example "training": Agent struggles with a pattern despite correct instructions → needs training examples
+  CRITICAL DISTINCTION - Prompt vs Training (MOST ISSUES ARE PROMPT, NOT TRAINING):
+  - DEFAULT TO "prompt" for 95% of issues - this includes conversation flow, structure, instructions, tone, phrasing, logic, etc.
+  - Use "prompt" when: wrong greeting, missing context handling, poor transitions, unclear instructions, flow gaps, structural issues, tone problems, logic errors
+  - Use "training" ONLY when: AI fundamentally cannot understand a domain despite perfect prompts (e.g., cannot comprehend medical terminology), consistent failures across all prompt variations, or proven model capability gaps
+  - Example "prompt": Agent doesn't ask for order details → fix the conversation flow/prompt
+  - Example "prompt": Agent interrupts customer → adjust prompt instructions for turn-taking
+  - Example "prompt": Agent gives wrong tone → update prompt with tone guidance
+  - Example "training": AI cannot distinguish regional accents despite perfect instructions → model limitation
+  - Example "training": AI cannot understand domain-specific jargon even with definitions → needs fine-tuning
 
-  If uncertain, choose the closest match from these 6 options. Never use any value other than these exact 6 strings.
+  When in doubt between "prompt" and "training", ALWAYS choose "prompt". Training should be <5% of all scenarios.
+
+  If uncertain, choose the closest match from these 5 options. Never use any value other than these exact 5 strings.
 - context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
 - whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
 - impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
@@ -758,7 +763,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
     console.log(`Found ${scenarios.length} scenarios in transcript ${transcript.id}`);
 
     // Valid root cause types
-    const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
+    const validRootCauseTypes = ['prompt', 'training', 'process', 'system', 'knowledge'];
 
     // Convert to Scenario format with IDs
     return scenarios.map((scenario: {
@@ -842,7 +847,7 @@ For each scenario, provide a JSON object with:
 - scenarioId: The ID of the scenario this addresses
 - title: Short descriptive title (e.g., "Add Empathy Steps", "Improve Information Gathering")
 - fixType: one of [script, training, process, system]
-- rootCauseType: one of [prompt, flow, training, process, system, knowledge] - WHY this issue happened
+- rootCauseType: one of [prompt, training, process, system, knowledge] - WHY this issue happened
 - rootCause: Detailed explanation of why this scenario happened (1-2 sentences)
 - suggestedSolution: What to do about it (overview, 2-3 sentences)
 - whereToImplement: Specific location in the flow/process/script where this applies
@@ -851,7 +856,7 @@ For each scenario, provide a JSON object with:
 - successCriteria: How to measure if this fix worked (observable outcomes)
 - howToTest: Specific validation method (e.g., "Review next 10 calls for empathy statements")
 
-**CRITICAL - For PROMPT or FLOW fixes, ALSO provide a "promptFix" object:**
+**CRITICAL - For PROMPT (Design) fixes, ALSO provide a "promptFix" object:**
 {
   "action": "add" | "replace" | "remove",
   "targetSection": "Specific section name (e.g., 'State S0 - Availability Check' or 'System Prompt - Empathy Guidelines')",
@@ -861,8 +866,7 @@ For each scenario, provide a JSON object with:
 }
 
 Examples:
-- If rootCauseType is "prompt": Add promptFix with exact system instruction text to add
-- If rootCauseType is "flow": Add promptFix with exact script dialogue to add/replace
+- If rootCauseType is "prompt": Add promptFix with exact system instruction text, conversation flow, or script dialogue to add/replace
 - If rootCauseType is "training/process/system/knowledge": Do NOT include promptFix (not applicable)
 
 Be practical and actionable. Think like you're creating an implementation plan for a team.
@@ -935,7 +939,7 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
     console.log(`Generated ${fixes.length} enhanced fixes`);
 
     // Valid root cause types
-    const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
+    const validRootCauseTypes = ['prompt', 'training', 'process', 'system', 'knowledge'];
 
     // Convert to EnhancedFix format with IDs
     return fixes.map((fix: {

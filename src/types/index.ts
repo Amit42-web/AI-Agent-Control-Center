@@ -9,7 +9,7 @@ export type CheckType =
 export type FlowType = 'objective' | 'open-ended';
 
 export type FixType = 'script' | 'training' | 'process' | 'system';
-export type RootCauseType = 'prompt' | 'flow' | 'training' | 'process' | 'system' | 'knowledge';
+export type RootCauseType = 'prompt' | 'training' | 'process' | 'system' | 'knowledge';
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -109,7 +109,7 @@ export interface Scenario {
   callId: string;
   title: string; // e.g., "Empathy Gap - Customer Frustration Handling"
   dimension?: string; // Which audit dimension this relates to (e.g., "Conversation Control", "Empathy & Tone")
-  rootCauseType?: RootCauseType; // Why this happened: prompt/flow/training/process/system/knowledge
+  rootCauseType?: RootCauseType; // Why this happened: prompt/training/process/system/knowledge
   context: string; // "Lines 45-67, customer waited 2 weeks for resolution"
   whatHappened: string; // What the agent did/didn't do
   impact: string; // Effect on customer/outcome
@@ -133,7 +133,7 @@ export interface EnhancedFix {
   scenarioId: string;
   title: string; // e.g., "Add Empathy Steps"
   fixType: FixType; // 'script' | 'training' | 'process' | 'system'
-  rootCauseType: RootCauseType; // Why this happened: 'prompt' | 'flow' | 'training' | 'process' | 'system' | 'knowledge'
+  rootCauseType: RootCauseType; // Why this happened: 'prompt' | 'training' | 'process' | 'system' | 'knowledge'
   rootCause: string; // Detailed explanation of why this happened
   suggestedSolution: string; // What to do
   whereToImplement: string; // Where in the flow/process
