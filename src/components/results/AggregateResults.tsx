@@ -72,6 +72,24 @@ const dimensionLabels: Record<string, { short: string; icon: string }> = {
   'Novel & Emerging Issues': { short: 'Novel Issues', icon: '✨' },
 };
 
+// Helper function to find a matching issue for a scenario
+function findMatchingIssue(scenario: { callId: string; lineNumbers: number[] }, issues: DetectedIssue[]): string | null {
+  if (!scenario.lineNumbers || scenario.lineNumbers.length === 0) return null;
+
+  // Find issues in the same call
+  const callIssues = issues.filter(issue => issue.callId === scenario.callId);
+  if (callIssues.length === 0) return null;
+
+  // Try to find an issue with overlapping line numbers
+  const scenarioLines = new Set(scenario.lineNumbers);
+  const matchingIssue = callIssues.find(issue =>
+    issue.lineNumbers && issue.lineNumbers.some(line => scenarioLines.has(line))
+  );
+
+  // Return matching issue ID or the first issue in the call
+  return matchingIssue?.id || callIssues[0].id;
+}
+
 export function AggregateResults() {
   const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedIssueId, setSelectedDimension } = useAppStore();
 
@@ -645,8 +663,11 @@ export function AggregateResults() {
               layout="vertical"
               onClick={(data) => {
                 if (data && data.activeLabel) {
-                  setSelectedCallId(String(data.activeLabel));
-                  setSelectedIssueId(null);
+                  const callId = String(data.activeLabel);
+                  setSelectedCallId(callId);
+                  // Find first issue in this call
+                  const callIssues = results?.issues?.filter(issue => issue.callId === callId) || [];
+                  setSelectedIssueId(callIssues.length > 0 ? callIssues[0].id : null);
                   setResultsViewMode('detailed');
                 }
               }}
@@ -704,6 +725,7 @@ export function AggregateResults() {
         <DimensionBreakdownWithAggregation
           dimensionChartData={scenarioAggregation.dimensionChartData}
           aggregatedScenarios={scenarioAggregation.aggregatedScenarios}
+          issues={results?.issues || []}
         />
       </div>
     );
@@ -1243,10 +1265,12 @@ function ObjectiveIssuesBreakdown({
 // Component to display dimensions with nested aggregated scenarios
 function DimensionBreakdownWithAggregation({
   dimensionChartData,
-  aggregatedScenarios
+  aggregatedScenarios,
+  issues
 }: {
   dimensionChartData: any[];
   aggregatedScenarios: AggregatedScenario[];
+  issues: DetectedIssue[];
 }) {
   const { setSelectedCallId, setSelectedIssueId, setResultsViewMode, setSelectedDimension } = useAppStore();
   const [expandedDimensions, setExpandedDimensions] = React.useState<Set<string>>(new Set());
@@ -1487,7 +1511,7 @@ function DimensionBreakdownWithAggregation({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedCallId(scenario.callId);
-                                      setSelectedIssueId(null);
+                                      setSelectedIssueId(findMatchingIssue(scenario, issues));
                                       setResultsViewMode('detailed');
                                       window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
@@ -1531,7 +1555,7 @@ function DimensionBreakdownWithAggregation({
 }
 
 // Component to display aggregated scenarios with expandable groups
-function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenario[] }) {
+function AggregatedScenariosView({ aggregated, issues }: { aggregated: AggregatedScenario[]; issues: DetectedIssue[] }) {
   const { setSelectedCallId, setSelectedIssueId, setResultsViewMode, setSelectedDimension } = useAppStore();
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
 
@@ -1670,7 +1694,7 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedCallId(scenario.callId);
-                            setSelectedIssueId(null);
+                            setSelectedIssueId(findMatchingIssue(scenario, issues));
                             setResultsViewMode('detailed');
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}

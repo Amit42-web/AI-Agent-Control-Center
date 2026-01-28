@@ -900,18 +900,17 @@ Fix types explained:
 - system: Technical improvements, integrations, automation needs
 
 Root cause types explained:
-- prompt: Agent's system instructions/prompts are inadequate
-- flow: Conversation script/flow structure has gaps
-- training: Agent lacks skills or coaching
-- process: Business workflow is flawed
-- system: Technical limitation or bug
-- knowledge: Information missing from knowledge base
+- knowledge: Information doesn't exist anywhere - bot didn't have the information
+- instruction: Info exists but bot not told how/when to use it - needs clearer instructions
+- execution: Instructions exist but bot didn't follow them - needs reinforcement
+- conversation: Technically correct but experience was poor - awkward or confusing
+- model: Task exceeds model capability despite perfect setup (rare, <5%)
 
 For each scenario, provide a JSON object with:
 - scenarioId: The ID of the scenario this addresses
 - title: Short descriptive title (e.g., "Add Empathy Steps", "Improve Information Gathering")
 - fixType: one of [script, training, process, system]
-- rootCauseType: one of [prompt, training, process, system, knowledge] - WHY this issue happened
+- rootCauseType: one of [knowledge, instruction, execution, conversation, model] - WHY this issue happened
 - rootCause: Detailed explanation of why this scenario happened (1-2 sentences)
 - suggestedSolution: What to do about it (overview, 2-3 sentences)
 - whereToImplement: Specific location in the flow/process/script where this applies
@@ -920,7 +919,7 @@ For each scenario, provide a JSON object with:
 - successCriteria: How to measure if this fix worked (observable outcomes)
 - howToTest: Specific validation method (e.g., "Review next 10 calls for empathy statements")
 
-**CRITICAL - For PROMPT (Design) fixes, ALSO provide a "promptFix" object:**
+**CRITICAL - For INSTRUCTION or KNOWLEDGE fixes, ALSO provide a "promptFix" object:**
 {
   "action": "add" | "replace" | "remove",
   "targetSection": "Specific section name (e.g., 'State S0 - Availability Check' or 'System Prompt - Empathy Guidelines')",
@@ -930,8 +929,8 @@ For each scenario, provide a JSON object with:
 }
 
 Examples:
-- If rootCauseType is "prompt": Add promptFix with exact system instruction text, conversation flow, or script dialogue to add/replace
-- If rootCauseType is "training/process/system/knowledge": Do NOT include promptFix (not applicable)
+- If rootCauseType is "instruction" or "knowledge": Add promptFix with exact system instruction text, conversation flow, or script dialogue to add/replace
+- If rootCauseType is "execution/conversation/model": Do NOT include promptFix (not applicable)
 
 Be practical and actionable. Think like you're creating an implementation plan for a team.
 
