@@ -54,11 +54,11 @@ const DIMENSION_COLORS = [
 ];
 
 const ROOT_CAUSE_COLORS: Record<string, string> = {
-  prompt: '#06b6d4',    // cyan-500 (Design/Conversation)
-  training: '#10b981',  // green-500 (Model Limitations)
-  process: '#f97316',   // orange-500
-  system: '#ef4444',    // red-500
-  knowledge: '#eab308', // yellow-500
+  knowledge: '#eab308',     // yellow-500 (Knowledge Gap)
+  instruction: '#06b6d4',   // cyan-500 (Instruction Gap)
+  execution: '#f97316',     // orange-500 (Execution Failure)
+  conversation: '#8b5cf6',  // purple-500 (Conversation Design)
+  model: '#10b981',         // green-500 (Model Limitation)
 };
 
 // Dimension short labels for cleaner display
@@ -148,7 +148,7 @@ export function AggregateResults() {
       bySeverity[scenario.severity]++;
 
       // Root Cause - only count valid root cause types (strictly enforce to prevent N/A values)
-      const validRootCauseTypes = ['prompt', 'flow', 'training', 'process', 'system', 'knowledge'];
+      const validRootCauseTypes = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];
       const normalizedRootCause = scenario.rootCauseType?.toLowerCase();
       if (normalizedRootCause && validRootCauseTypes.includes(normalizedRootCause)) {
         byRootCause[normalizedRootCause] = (byRootCause[normalizedRootCause] || 0) + 1;
@@ -207,7 +207,14 @@ export function AggregateResults() {
     const rootCauseChartData = Object.entries(byRootCause)
       .map(([name, value]) => {
         // Map internal keys to user-friendly display names
-        const displayName = name === 'training' ? 'Model' : name === 'prompt' ? 'Design' : name.charAt(0).toUpperCase() + name.slice(1);
+        const displayNameMap: Record<string, string> = {
+          'knowledge': 'Knowledge Gap',
+          'instruction': 'Instruction Gap',
+          'execution': 'Execution Failure',
+          'conversation': 'Conversation Design',
+          'model': 'Model Limitation'
+        };
+        const displayName = displayNameMap[name] || name.charAt(0).toUpperCase() + name.slice(1);
         return {
           name: displayName,
           value,
@@ -456,28 +463,28 @@ export function AggregateResults() {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div className="flex gap-2">
-                  <span className="text-cyan-400 flex-shrink-0">🎨 Design:</span>
-                  <span className="text-slate-300">Conversation <strong>design, structure, or instructions</strong> need updates (fix prompts/flow)</span>
+                  <span className="text-yellow-400 flex-shrink-0">📚 Knowledge Gap:</span>
+                  <span className="text-slate-300"><strong>Information doesn't exist</strong> anywhere - bot didn't have the information</span>
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-green-400 flex-shrink-0">🤖 Model:</span>
-                  <span className="text-slate-300">AI model has <strong>fundamental capability limitation</strong> (rare - needs model upgrade)</span>
+                  <span className="text-cyan-400 flex-shrink-0">📋 Instruction Gap:</span>
+                  <span className="text-slate-300">Info exists but bot <strong>not told how/when to use it</strong> - needs clearer instructions</span>
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-yellow-400 flex-shrink-0">📚 Knowledge:</span>
-                  <span className="text-slate-300"><strong>Information missing</strong> from knowledge base or docs</span>
+                  <span className="text-orange-400 flex-shrink-0">⚠️ Execution Failure:</span>
+                  <span className="text-slate-300">Instructions exist but bot <strong>didn't follow them</strong> - needs reinforcement</span>
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-orange-400 flex-shrink-0">⚙️ Process:</span>
-                  <span className="text-slate-300">Business <strong>workflow/procedures</strong> are flawed</span>
+                  <span className="text-purple-400 flex-shrink-0">💬 Conversation Design:</span>
+                  <span className="text-slate-300">Technically correct but <strong>experience was poor</strong> - awkward or confusing</span>
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-red-400 flex-shrink-0">💻 System:</span>
-                  <span className="text-slate-300"><strong>Technical limitations</strong>, bugs, or system capability issues</span>
+                  <span className="text-green-400 flex-shrink-0">🤖 Model Limitation:</span>
+                  <span className="text-slate-300">Task <strong>exceeds model capability</strong> despite perfect setup (rare, {'<'}5%)</span>
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-slate-700/50 text-xs text-slate-400">
-                <strong className="text-cyan-300">Key difference:</strong> <span className="text-cyan-400">Design</span> = fix <em>conversation/prompts</em> (95% of issues) • <span className="text-green-400">Model</span> = AI fundamentally <em>lacks capability</em> (rare, {'<'}5%)
+                <strong className="text-cyan-300">Classification priority:</strong> Knowledge → Instruction → Execution → Conversation → Model. <strong>Always choose the earliest root cause.</strong>
               </div>
             </div>
 
@@ -492,19 +499,17 @@ export function AggregateResults() {
                       {scenarioAggregation.rootCauseChartData[0]?.value || 0} scenarios
                     </span>
                     {' '}are <span className="font-semibold text-cyan-400">{
-                      scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'model'
-                        ? 'model limitation'
-                        : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase()
+                      scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase()
                     }</span> issues
-                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'design'
-                      ? ' - Update conversation design, structure, or instructions. Check the Fixes tab for exact solutions!'
-                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'model'
-                      ? ' - AI model lacks capability; consider upgrading to a more capable model'
-                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge'
+                    {scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'knowledge gap'
                       ? ' - Add missing information to knowledge base or reference materials'
-                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'process'
-                      ? ' - Revise business workflows, procedures, and policies'
-                      : ' - Address technical limitations, bugs, or system capability issues'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'instruction gap'
+                      ? ' - Update system prompts with clearer instructions on how/when to use existing information'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'execution failure'
+                      ? ' - Reinforce prompts with constraints, examples, and guardrails. Check the Fixes tab for solutions!'
+                      : scenarioAggregation.rootCauseChartData[0]?.name.toLowerCase() === 'conversation design'
+                      ? ' - Improve conversation design, tone rules, and phrasing guidance for better user experience'
+                      : ' - AI model lacks fundamental capability; consider upgrading to a more capable model'
                     }
                   </p>
                 </div>
@@ -546,12 +551,11 @@ export function AggregateResults() {
                           <p style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '14px' }}>{data.name} Issues</p>
                           <p style={{ color: '#60a5fa', marginBottom: '8px' }}>{data.value} scenarios ({data.percentage}%)</p>
                           <p style={{ fontSize: '11px', color: '#94a3b8', lineHeight: '1.4' }}>
-                            {rootCauseKey === 'prompt' && '📝 Fix: Update agent\'s system instructions/prompts (configuration change)'}
-                            {rootCauseKey === 'design' && '🎨 Fix: Redesign conversation structure/architecture'}
-                            {rootCauseKey === 'model' && '🤖 Fix: Upgrade to more capable AI model (current model insufficient)'}
-                            {rootCauseKey === 'process' && '⚙️ Fix: Revise business workflows & procedures'}
-                            {rootCauseKey === 'system' && '💻 Fix: Address technical limitations or system bugs'}
-                            {rootCauseKey === 'knowledge' && '📚 Fix: Add missing information to knowledge base'}
+                            {rootCauseKey === 'knowledge gap' && '📚 Fix: Add missing information to knowledge base/documentation'}
+                            {rootCauseKey === 'instruction gap' && '📋 Fix: Update system prompts with clearer how/when instructions'}
+                            {rootCauseKey === 'execution failure' && '⚠️ Fix: Reinforce prompts with constraints, examples, and guardrails'}
+                            {rootCauseKey === 'conversation design' && '💬 Fix: Improve conversation design, tone rules, and phrasing'}
+                            {rootCauseKey === 'model limitation' && '🤖 Fix: Upgrade to more capable AI model (exceeds current model)'}
                           </p>
                         </div>
                       );
@@ -563,7 +567,14 @@ export function AggregateResults() {
                   {scenarioAggregation.rootCauseChartData.map((entry, index) => {
                     const displayKey = entry.name.toLowerCase();
                     // Map display names back to internal keys for color lookup
-                    const colorKey = displayKey === 'model' ? 'training' : displayKey === 'design' ? 'flow' : displayKey;
+                    const colorKeyMap: Record<string, string> = {
+                      'knowledge gap': 'knowledge',
+                      'instruction gap': 'instruction',
+                      'execution failure': 'execution',
+                      'conversation design': 'conversation',
+                      'model limitation': 'model'
+                    };
+                    const colorKey = colorKeyMap[displayKey] || displayKey;
                     return (
                       <Cell
                         key={`cell-${index}`}
@@ -580,10 +591,20 @@ export function AggregateResults() {
               {scenarioAggregation.rootCauseChartData.map((item, index) => {
                 const rootCauseKey = item.name.toLowerCase();
                 // Map display names back to internal keys for color lookup
-                const colorKey = rootCauseKey === 'model' ? 'training' : rootCauseKey === 'design' ? 'prompt' : rootCauseKey;
+                const colorKeyMap: Record<string, string> = {
+                  'knowledge gap': 'knowledge',
+                  'instruction gap': 'instruction',
+                  'execution failure': 'execution',
+                  'conversation design': 'conversation',
+                  'model limitation': 'model'
+                };
+                const colorKey = colorKeyMap[rootCauseKey] || rootCauseKey;
                 const icons: Record<string, string> = {
-                  prompt: '📝', design: '🎨', model: '🤖',
-                  process: '⚙️', system: '💻', knowledge: '📚'
+                  'knowledge gap': '📚',
+                  'instruction gap': '📋',
+                  'execution failure': '⚠️',
+                  'conversation design': '💬',
+                  'model limitation': '🤖'
                 };
                 return (
                   <div
@@ -1259,11 +1280,11 @@ function DimensionBreakdownWithAggregation({
   };
 
   const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-    prompt: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
-    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
-    process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
-    system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
     knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
+    instruction: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '📋' },
+    execution: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️' },
+    conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '💬' },
+    model: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
   };
 
   return (
@@ -1401,7 +1422,7 @@ function DimensionBreakdownWithAggregation({
                                 </span>
                                 {group.rootCauseType && rootCauseColors[group.rootCauseType] && (
                                   <span className={`px-2 py-0.5 text-xs rounded-full ${rootCauseColors[group.rootCauseType].bg} ${rootCauseColors[group.rootCauseType].text} border ${rootCauseColors[group.rootCauseType].border} font-medium`}>
-                                    {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType === 'training' ? 'model' : group.rootCauseType === 'prompt' ? 'design' : group.rootCauseType}
+                                    {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType}
                                   </span>
                                 )}
                               </div>
@@ -1532,11 +1553,11 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
   };
 
   const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-    prompt: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
-    training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
-    process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
-    system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
     knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
+    instruction: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '📋' },
+    execution: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️' },
+    conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '💬' },
+    model: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
   };
 
   return (
@@ -1579,7 +1600,7 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
                       </span>
                       {group.rootCauseType && rootCauseColors[group.rootCauseType] && (
                         <span className={`px-2.5 py-1 text-xs rounded-full ${rootCauseColors[group.rootCauseType].bg} ${rootCauseColors[group.rootCauseType].text} border ${rootCauseColors[group.rootCauseType].border} font-medium`}>
-                          {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType === 'training' ? 'model' : group.rootCauseType === 'prompt' ? 'design' : group.rootCauseType}
+                          {rootCauseColors[group.rootCauseType].icon} {group.rootCauseType}
                         </span>
                       )}
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">

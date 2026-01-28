@@ -578,26 +578,66 @@ For each scenario, provide a JSON object with:
   * "Knowledge & Accuracy" (E)
   * "Process & Policy Adherence" (F)
   * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
-- rootCauseType: WHY this issue happened. You MUST select EXACTLY ONE of these 5 values (DO NOT use "N/A", "unknown", or any other value):
-  * "prompt" - Agent's CONVERSATION DESIGN, SYSTEM INSTRUCTIONS, or PROMPTS need updates (FIX: change configuration, prompts, conversation structure, or flow scripts)
-  * "training" - AI model has FUNDAMENTAL CAPABILITY LIMITATIONS that cannot be fixed with better prompts (FIX: model upgrade, fine-tuning, or specialized training) - USE THIS VERY RARELY
-  * "knowledge" - INFORMATION IS MISSING from knowledge base or reference materials (FIX: add to KB/docs)
-  * "process" - BUSINESS WORKFLOW/PROCEDURES are flawed (FIX: revise business processes)
-  * "system" - TECHNICAL LIMITATIONS, bugs, or system capability issues (FIX: engineering/dev work)
+- rootCauseType: The PRIMARY root cause of the agent failure. You MUST classify into EXACTLY ONE of these 5 categories (DO NOT use "N/A", "unknown", or any other value):
 
-  CRITICAL DISTINCTION - Prompt vs Training (MOST ISSUES ARE PROMPT, NOT TRAINING):
-  - DEFAULT TO "prompt" for 95% of issues - this includes conversation flow, structure, instructions, tone, phrasing, logic, etc.
-  - Use "prompt" when: wrong greeting, missing context handling, poor transitions, unclear instructions, flow gaps, structural issues, tone problems, logic errors
-  - Use "training" ONLY when: AI fundamentally cannot understand a domain despite perfect prompts (e.g., cannot comprehend medical terminology), consistent failures across all prompt variations, or proven model capability gaps
-  - Example "prompt": Agent doesn't ask for order details → fix the conversation flow/prompt
-  - Example "prompt": Agent interrupts customer → adjust prompt instructions for turn-taking
-  - Example "prompt": Agent gives wrong tone → update prompt with tone guidance
-  - Example "training": AI cannot distinguish regional accents despite perfect instructions → model limitation
-  - Example "training": AI cannot understand domain-specific jargon even with definitions → needs fine-tuning
+  1️⃣ "knowledge" - KNOWLEDGE GAP
+  Use this ONLY if required factual or domain information was NOT available to the agent anywhere.
+  Criteria:
+  - The information does not exist in the prompt, knowledge base, tools, or references
+  - Even a perfectly instructed agent could not answer correctly
+  Examples: Missing product pricing/specs/policies, unknown escalation contacts, missing regulatory facts
+  Fix location: Knowledge base / documentation
+  User-friendly meaning: "The bot didn't have the information."
 
-  When in doubt between "prompt" and "training", ALWAYS choose "prompt". Training should be <5% of all scenarios.
+  2️⃣ "instruction" - INSTRUCTION GAP
+  Use this if the information EXISTS, but the agent was NOT instructed on HOW or WHEN to use it.
+  Criteria:
+  - Data or facts are present
+  - But rules, logic, triggers, or flow instructions are missing or unclear
+  - Agent behavior is undefined or underspecified
+  Examples: Refund policy exists but no instruction on when to offer it, bot not told to ask for order number, KB exists but no instruction to consult it
+  Fix location: System prompt / conversation design
+  User-friendly meaning: "The bot wasn't told how to handle this situation."
 
-  If uncertain, choose the closest match from these 5 options. Never use any value other than these exact 5 strings.
+  3️⃣ "execution" - EXECUTION FAILURE
+  Use this if BOTH the information AND the instructions EXIST, but the agent FAILED to apply them.
+  Criteria:
+  - Clear instructions are present
+  - Required knowledge is present
+  - Expected behavior is unambiguous
+  - Agent ignored, skipped, or misapplied the rule
+  Examples: Identity confirmation rule exists but bot skips it, refund logic defined but wrong branch used, instruction to consult KB exists but bot answers from memory
+  Fix location: Prompt reinforcement, constraints, examples, guardrails
+  User-friendly meaning: "The bot knew what to do, but didn't do it."
+
+  4️⃣ "conversation" - CONVERSATION DESIGN ISSUE
+  Use this if the agent technically followed instructions but the experience was poor or unnatural.
+  Criteria:
+  - Steps are correct
+  - Information is correct
+  - But conversation quality is degraded
+  Examples: Interrupting the customer, asking multiple questions at once, robotic phrasing, poor turn-taking or abrupt transitions
+  Fix location: Conversation design, tone rules, phrasing guidance
+  User-friendly meaning: "The conversation felt awkward or confusing."
+
+  5️⃣ "model" - MODEL LIMITATION (USE RARELY, expected <5% of cases)
+  Use this RARELY when all other categories are ruled out.
+  Criteria:
+  - Knowledge is complete
+  - Instructions are clear
+  - Prompt is well-designed
+  - Failure persists due to fundamental model capability limits
+  Examples: Long multi-step reasoning consistently fails, complex judgment beyond model class, persistent memory breakdown across turns
+  Fix location: Model upgrade or architectural change
+  User-friendly meaning: "This task exceeds the model's capability."
+
+  CLASSIFICATION RULES (NON-NEGOTIABLE):
+  - Choose ONLY ONE primary category per issue
+  - If multiple seem applicable, select the EARLIEST root cause: Knowledge > Instruction > Execution > Conversation > Model
+  - NEVER label as Knowledge Gap if the information exists but was unused
+  - NEVER label as Model Limitation unless all other categories are ruled out
+  - DO NOT invent missing information or instructions
+  - When uncertain, choose the closest match from these 5 options. Never use any value other than these exact 5 strings.
 - context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
 - whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
 - impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
@@ -763,7 +803,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
     console.log(`Found ${scenarios.length} scenarios in transcript ${transcript.id}`);
 
     // Valid root cause types
-    const validRootCauseTypes = ['prompt', 'training', 'process', 'system', 'knowledge'];
+    const validRootCauseTypes = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];
 
     // Convert to Scenario format with IDs
     return scenarios.map((scenario: {
@@ -939,7 +979,7 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
     console.log(`Generated ${fixes.length} enhanced fixes`);
 
     // Valid root cause types
-    const validRootCauseTypes = ['prompt', 'training', 'process', 'system', 'knowledge'];
+    const validRootCauseTypes = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];
 
     // Convert to EnhancedFix format with IDs
     return fixes.map((fix: {
@@ -957,12 +997,12 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
       promptFix?: any;
     }, idx: number) => {
       // Validate and normalize rootCauseType
-      let rootCauseType = fix.rootCauseType?.toLowerCase() || 'training';
+      let rootCauseType = fix.rootCauseType?.toLowerCase() || 'model';
 
-      // If rootCauseType is invalid, default to 'training'
+      // If rootCauseType is invalid, default to 'model'
       if (!validRootCauseTypes.includes(rootCauseType)) {
-        console.warn(`[Fix ${idx}] Invalid rootCauseType "${fix.rootCauseType}" - defaulting to "training". Valid values are: ${validRootCauseTypes.join(', ')}`);
-        rootCauseType = 'training';
+        console.warn(`[Fix ${idx}] Invalid rootCauseType "${fix.rootCauseType}" - defaulting to "model". Valid values are: ${validRootCauseTypes.join(', ')}`);
+        rootCauseType = 'model';
       }
 
       return {

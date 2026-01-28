@@ -41,11 +41,11 @@ const fixTypeConfig: Record<FixType, { icon: any; color: string; label: string }
 };
 
 const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  prompt: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '🎨' },
-  training: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
-  process: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚙️' },
-  system: { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30', icon: '💻' },
   knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
+  instruction: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '📋' },
+  execution: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️' },
+  conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '💬' },
+  model: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
 };
 
 export function EnhancedFixesList() {
@@ -264,7 +264,7 @@ export function EnhancedFixesList() {
                   </div>
 
                   {/* Special Design (Prompt) Fix Section - COPY-PASTE READY */}
-                  {fix.promptFix && fix.rootCauseType === 'prompt' && (
+                  {fix.promptFix && (fix.rootCauseType === 'instruction' || fix.rootCauseType === 'execution' || fix.rootCauseType === 'conversation') && (
                     <div className="bg-gradient-to-r from-purple-500/10 to-transparent rounded-lg p-4 border-l-4 border-purple-500">
                       <div className="flex items-center gap-2 mb-3">
                         <Code className="w-5 h-5 text-purple-400" />
