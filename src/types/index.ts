@@ -94,6 +94,7 @@ export interface Fix {
   placementHint: string;
   exampleResponse: string;
   relatedIssueIds: string[];
+  rootCauseType?: RootCauseType; // Why this issue occurred: knowledge/instruction/execution/conversation/model
   action?: 'add' | 'remove' | 'replace'; // Type of change: add new content, remove existing, or replace
   targetContent?: string; // For remove/replace: the content to be removed or replaced
 }

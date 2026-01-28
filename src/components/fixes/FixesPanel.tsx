@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Sparkles, Download, FileText, Loader2 } from 'lucide-react';
+import { BookOpen, Sparkles, Download, FileText, Loader2, Filter } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { FixCard } from './FixCard';
 import { determineFixPlacements } from '@/services/openai';
+import { RootCauseType } from '@/types';
+
+const rootCauseLabels: Record<RootCauseType, string> = {
+  knowledge: '📚 Knowledge Gap',
+  instruction: '📋 Instruction Gap',
+  execution: '⚠️ Execution Failure',
+  conversation: '💬 Conversation Design',
+  model: '🤖 Model Limitation',
+};
 
 interface ScriptSection {
   text: string;
@@ -23,6 +32,7 @@ export function FixesPanel() {
   const [finalScript, setFinalScript] = useState('');
   const [scriptSections, setScriptSections] = useState<ScriptSection[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
 
   // Proper null/undefined checks with fallbacks
   if (!fixes || !fixes.scriptFixes || !fixes.generalFixes) {
@@ -50,9 +60,21 @@ export function FixesPanel() {
     URL.revokeObjectURL(url);
   };
 
+  // Apply RCA filter
+  const filterByRCA = (fixList: typeof fixes.scriptFixes) => {
+    if (rcaFilter === 'all') return fixList;
+    return fixList.filter(fix => fix.rootCauseType === rcaFilter);
+  };
+
+  const filteredScriptFixes = filterByRCA(fixes.scriptFixes || []);
+  const filteredGeneralFixes = filterByRCA(fixes.generalFixes || []);
+
   const hasScriptFixes = (fixes.scriptFixes || []).length > 0;
   const hasGeneralFixes = (fixes.generalFixes || []).length > 0;
+  const hasFilteredScriptFixes = filteredScriptFixes.length > 0;
+  const hasFilteredGeneralFixes = filteredGeneralFixes.length > 0;
   const totalFixes = (fixes.scriptFixes || []).length + (fixes.generalFixes || []).length;
+  const filteredTotalFixes = filteredScriptFixes.length + filteredGeneralFixes.length;
   const allFixes = [...(fixes.scriptFixes || []), ...(fixes.generalFixes || [])];
 
   const toggleFixSelection = (fixId: string) => {
@@ -265,6 +287,39 @@ export function FixesPanel() {
         </div>
       </motion.div>
 
+      {/* Filters */}
+      <motion.div
+        className="glass-card p-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[var(--color-slate-400)]" />
+            <span className="text-sm font-medium text-[var(--color-slate-300)]">Filter by Category:</span>
+          </div>
+          <select
+            className="input-field w-auto"
+            value={rcaFilter}
+            onChange={(e) => setRcaFilter(e.target.value as RootCauseType | 'all')}
+          >
+            <option value="all">All Categories</option>
+            {Object.entries(rootCauseLabels).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-[var(--color-slate-400)]">
+            {rcaFilter === 'all'
+              ? `${totalFixes} total fix${totalFixes !== 1 ? 'es' : ''}`
+              : `${filteredTotalFixes} fix${filteredTotalFixes !== 1 ? 'es' : ''} in this category`
+            }
+          </span>
+        </div>
+      </motion.div>
+
       {/* Script/Prompt Fixes (Reference-aware) */}
       {referenceEnabled && (
         <motion.div
@@ -287,9 +342,9 @@ export function FixesPanel() {
             </div>
           </div>
 
-          {hasScriptFixes ? (
+          {hasFilteredScriptFixes ? (
             <div className="space-y-4">
-              {fixes.scriptFixes.map((fix, index) => (
+              {filteredScriptFixes.map((fix, index) => (
                 <FixCard
                   key={fix.id}
                   fix={fix}
@@ -298,6 +353,12 @@ export function FixesPanel() {
                   onToggleSelect={() => toggleFixSelection(fix.id)}
                 />
               ))}
+            </div>
+          ) : hasScriptFixes && rcaFilter !== 'all' ? (
+            <div className="glass-card p-6 text-center">
+              <p className="text-[var(--color-slate-400)]">
+                No script fixes found for this category. Try a different filter.
+              </p>
             </div>
           ) : (
             <div className="glass-card p-6 text-center">
@@ -330,17 +391,23 @@ export function FixesPanel() {
           </div>
         </div>
 
-        {hasGeneralFixes ? (
+        {hasFilteredGeneralFixes ? (
           <div className="space-y-4">
-            {fixes.generalFixes.map((fix, index) => (
+            {filteredGeneralFixes.map((fix, index) => (
               <FixCard
                 key={fix.id}
                 fix={fix}
-                index={fixes.scriptFixes.length + index}
+                index={filteredScriptFixes.length + index}
                 isSelected={selectedFixIds.has(fix.id)}
                 onToggleSelect={() => toggleFixSelection(fix.id)}
               />
             ))}
+          </div>
+        ) : hasGeneralFixes && rcaFilter !== 'all' ? (
+          <div className="glass-card p-6 text-center">
+            <p className="text-[var(--color-slate-400)]">
+              No general quality fixes found for this category. Try a different filter.
+            </p>
           </div>
         ) : (
           <div className="glass-card p-6 text-center">

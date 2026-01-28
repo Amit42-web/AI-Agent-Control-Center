@@ -15,7 +15,7 @@ import {
   CheckCheck,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { FixType } from '@/types';
+import { FixType, RootCauseType } from '@/types';
 
 const fixTypeConfig: Record<FixType, { icon: any; color: string; label: string }> = {
   script: {
@@ -51,6 +51,7 @@ const rootCauseColors: Record<string, { bg: string; text: string; border: string
 export function EnhancedFixesList() {
   const { enhancedFixes } = useAppStore();
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
+  const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFixes, setExpandedFixes] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export function EnhancedFixesList() {
 
   const filteredFixes = enhancedFixes.fixes.filter((fix) => {
     if (fixTypeFilter !== 'all' && fix.fixType !== fixTypeFilter) return false;
+    if (rcaFilter !== 'all' && fix.rootCauseType !== rcaFilter) return false;
     if (
       searchTerm &&
       !fix.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -126,6 +128,20 @@ export function EnhancedFixesList() {
             {Object.entries(fixTypeConfig).map(([key, config]) => (
               <option key={key} value={key}>
                 {config.label}
+              </option>
+            ))}
+          </select>
+
+          {/* RCA Category Filter */}
+          <select
+            className="input-field w-auto"
+            value={rcaFilter}
+            onChange={(e) => setRcaFilter(e.target.value as RootCauseType | 'all')}
+          >
+            <option value="all">All Categories</option>
+            {Object.entries(rootCauseColors).map(([key, config]) => (
+              <option key={key} value={key}>
+                {config.icon} {key}
               </option>
             ))}
           </select>

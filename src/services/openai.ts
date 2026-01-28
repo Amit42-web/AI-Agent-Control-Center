@@ -334,6 +334,12 @@ LANGUAGE AND FORMAT PRESERVATION:
 For each fix, provide a JSON object with these SEPARATE fields:
 - issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
 - problem: brief description of the problem identified
+- rootCauseType: ONE of ["knowledge", "instruction", "execution", "conversation", "model"] - why this issue occurred
+  * "knowledge": Information/context doesn't exist anywhere
+  * "instruction": Info exists but bot wasn't told how/when to use it
+  * "execution": Instructions exist but bot failed to follow them
+  * "conversation": Technically correct but poor UX/awkward conversation
+  * "model": Fundamental model capability limitation (use rarely, <5%)
 - action: one of ["add", "remove", "replace"] - what type of change to make
   * "add": Insert new content (most common)
   * "remove": Delete existing problematic content
@@ -493,31 +499,49 @@ Think: "suggestion" = Developer instructions in English | "exampleResponse" = Wh
 
     // Add IDs to fixes with validation
     const scriptFixes = Array.isArray(fixesData.scriptFixes)
-      ? fixesData.scriptFixes.map((fix: any, idx: number) => ({
-          id: `script-fix-${idx}`,
-          issueType: fix.issueType || 'quality_issue',
-          problem: fix.problem || 'Issue detected',
-          suggestion: fix.suggestion || '',
-          placementHint: fix.placementHint || 'Add to system prompt',
-          exampleResponse: fix.exampleResponse || '',
-          relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
-          action: fix.action || 'add',
-          targetContent: fix.targetContent || undefined,
-        }))
+      ? fixesData.scriptFixes.map((fix: any, idx: number) => {
+          // Validate and normalize rootCauseType
+          const validRootCauses = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];
+          const rootCauseType = validRootCauses.includes(fix.rootCauseType)
+            ? fix.rootCauseType
+            : 'instruction'; // Default to instruction if missing or invalid
+
+          return {
+            id: `script-fix-${idx}`,
+            issueType: fix.issueType || 'quality_issue',
+            problem: fix.problem || 'Issue detected',
+            suggestion: fix.suggestion || '',
+            placementHint: fix.placementHint || 'Add to system prompt',
+            exampleResponse: fix.exampleResponse || '',
+            relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
+            rootCauseType,
+            action: fix.action || 'add',
+            targetContent: fix.targetContent || undefined,
+          };
+        })
       : [];
 
     const generalFixes = Array.isArray(fixesData.generalFixes)
-      ? fixesData.generalFixes.map((fix: any, idx: number) => ({
-          id: `general-fix-${idx}`,
-          issueType: fix.issueType || 'quality_issue',
-          problem: fix.problem || 'Issue detected',
-          suggestion: fix.suggestion || '',
-          placementHint: fix.placementHint || 'Add to system prompt',
-          exampleResponse: fix.exampleResponse || '',
-          relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
-          action: fix.action || 'add',
-          targetContent: fix.targetContent || undefined,
-        }))
+      ? fixesData.generalFixes.map((fix: any, idx: number) => {
+          // Validate and normalize rootCauseType
+          const validRootCauses = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];
+          const rootCauseType = validRootCauses.includes(fix.rootCauseType)
+            ? fix.rootCauseType
+            : 'instruction'; // Default to instruction if missing or invalid
+
+          return {
+            id: `general-fix-${idx}`,
+            issueType: fix.issueType || 'quality_issue',
+            problem: fix.problem || 'Issue detected',
+            suggestion: fix.suggestion || '',
+            placementHint: fix.placementHint || 'Add to system prompt',
+            exampleResponse: fix.exampleResponse || '',
+            relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
+            rootCauseType,
+            action: fix.action || 'add',
+            targetContent: fix.targetContent || undefined,
+          };
+        })
       : [];
 
     return { scriptFixes, generalFixes };

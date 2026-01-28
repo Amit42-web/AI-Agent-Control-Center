@@ -3,7 +3,15 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Copy, Check, ChevronDown, ChevronUp, Target, MapPin, MessageSquare } from 'lucide-react';
-import { Fix } from '@/types';
+import { Fix, RootCauseType } from '@/types';
+
+const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+  knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
+  instruction: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '📋' },
+  execution: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️' },
+  conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '💬' },
+  model: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
+};
 
 interface FixCardProps {
   fix: Fix;
@@ -55,7 +63,7 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
             {index + 1}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-medium text-white text-sm">{fix.problem}</h4>
               <span className={`text-xs px-2 py-0.5 rounded ${
                 fix.action === 'remove' ? 'bg-red-500/20 text-red-400' :
@@ -64,6 +72,11 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
               }`}>
                 {fix.action === 'remove' ? 'Remove' : fix.action === 'replace' ? 'Replace' : 'Add'}
               </span>
+              {fix.rootCauseType && rootCauseColors[fix.rootCauseType] && (
+                <span className={`px-2 py-0.5 text-xs rounded-full ${rootCauseColors[fix.rootCauseType].bg} ${rootCauseColors[fix.rootCauseType].text} border ${rootCauseColors[fix.rootCauseType].border} font-medium`}>
+                  {rootCauseColors[fix.rootCauseType].icon} {fix.rootCauseType}
+                </span>
+              )}
             </div>
             <p className="text-xs text-[var(--color-slate-400)] mt-0.5">
               {fix.relatedIssueIds.length} related issue{fix.relatedIssueIds.length !== 1 ? 's' : ''}
