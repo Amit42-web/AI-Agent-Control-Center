@@ -362,7 +362,6 @@ export function AggregateResults() {
                       .find(d => d.shortName === data.activeLabel);
                     if (clickedDimension) {
                       setSelectedDimension(clickedDimension.fullName);
-                      setResultsViewMode('detailed');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }
@@ -668,7 +667,6 @@ export function AggregateResults() {
                   // Find first issue in this call
                   const callIssues = results?.issues?.filter(issue => issue.callId === callId) || [];
                   setSelectedIssueId(callIssues.length > 0 ? callIssues[0].id : null);
-                  setResultsViewMode('detailed');
                 }
               }}
             >
@@ -1202,7 +1200,6 @@ function ObjectiveIssuesBreakdown({
                             e.stopPropagation();
                             setSelectedCallId(instance.callId);
                             setSelectedIssueId(instance.id);
-                            setResultsViewMode('detailed');
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                         >
@@ -1512,7 +1509,6 @@ function DimensionBreakdownWithAggregation({
                                       e.stopPropagation();
                                       setSelectedCallId(scenario.callId);
                                       setSelectedIssueId(findMatchingIssue(scenario, issues));
-                                      setResultsViewMode('detailed');
                                       window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
                                   >
@@ -1695,7 +1691,6 @@ function AggregatedScenariosView({ aggregated, issues }: { aggregated: Aggregate
                             e.stopPropagation();
                             setSelectedCallId(scenario.callId);
                             setSelectedIssueId(findMatchingIssue(scenario, issues));
-                            setResultsViewMode('detailed');
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                         >
