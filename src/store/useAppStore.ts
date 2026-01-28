@@ -405,7 +405,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedDimension: (dimension: string | null) => set({ selectedDimension: dimension }),
 
-  goToStep: (step) => set({ currentStep: step }),
+  goToStep: (step) => {
+    // Update the state
+    set({ currentStep: step });
+
+    // Push to browser history so back button works
+    // Only push if running in browser (not SSR)
+    if (typeof window !== 'undefined') {
+      const currentState = window.history.state;
+      // Only push if the step is different from current history state
+      if (!currentState || currentState.step !== step) {
+        window.history.pushState({ step }, '', `#${step}`);
+      }
+    }
+  },
 
   // Analysis management
   getAnalysisState: () => {

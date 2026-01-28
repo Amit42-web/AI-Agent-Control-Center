@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { Header } from '@/components/ui/Header';
@@ -24,7 +25,7 @@ import { AggregateResults } from '@/components/results/AggregateResults';
 import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid } from 'lucide-react';
 
 function RunWizardPage() {
-  const { flowType } = useAppStore();
+  const { flowType, goToStep } = useAppStore();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -49,13 +50,24 @@ function RunWizardPage() {
       animate="show"
       exit={{ opacity: 0, y: -20 }}
     >
-      <motion.div className="mb-8" variants={itemVariants}>
-        <h2 className="text-2xl font-bold text-white mb-2">Run Analysis</h2>
-        <p className="text-[var(--color-slate-400)]">
-          {flowType === 'objective'
-            ? 'Configure your transcript input, reference script, and checks to analyze voice bot calls.'
-            : 'Configure your transcript input and comprehensive audit instructions for holistic evaluation.'}
-        </p>
+      <motion.div className="mb-8 flex items-center justify-between" variants={itemVariants}>
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">Run Analysis</h2>
+          <p className="text-[var(--color-slate-400)]">
+            {flowType === 'objective'
+              ? 'Configure your transcript input, reference script, and checks to analyze voice bot calls.'
+              : 'Configure your transcript input and comprehensive audit instructions for holistic evaluation.'}
+          </p>
+        </div>
+        <motion.button
+          className="btn-secondary flex items-center gap-2"
+          onClick={() => goToStep('analyses')}
+          whileHover={{ scale: 1.05, x: -5 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Analyses
+        </motion.button>
       </motion.div>
 
       <motion.div variants={itemVariants}><OpenAIConfig /></motion.div>
@@ -427,7 +439,25 @@ function FixesPage() {
 }
 
 export default function Home() {
-  const { currentStep } = useAppStore();
+  const { currentStep, goToStep } = useAppStore();
+
+  // Handle browser back/forward buttons
+  React.useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.step) {
+        // Use set directly to avoid pushing duplicate history
+        useAppStore.setState({ currentStep: event.state.step });
+      }
+    };
+
+    // Initialize history with current step
+    if (typeof window !== 'undefined' && currentStep) {
+      window.history.replaceState({ step: currentStep }, '', `#${currentStep}`);
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
