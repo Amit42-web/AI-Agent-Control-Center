@@ -23,7 +23,7 @@ const severityClasses: Record<Severity, string> = {
 };
 
 export function IssueTable() {
-  const { results, setSelectedCallId, checks } = useAppStore();
+  const { results, setSelectedCallId, setSelectedIssueId, checks } = useAppStore();
 
   // Dynamic label lookup that handles custom checks
   const getIssueTypeLabel = (type: IssueType): string => {
@@ -262,7 +262,10 @@ export function IssueTable() {
                         <button
                           key={callId}
                           className="px-2 py-1 bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] rounded text-xs font-mono text-[var(--color-slate-200)] transition-colors"
-                          onClick={() => setSelectedCallId(callId)}
+                          onClick={() => {
+                            setSelectedCallId(callId);
+                            setSelectedIssueId(null);
+                          }}
                         >
                           {callId}
                         </button>
@@ -349,7 +352,10 @@ export function IssueTable() {
                   <td>
                     <button
                       className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors text-sm"
-                      onClick={() => setSelectedCallId(issue.callId)}
+                      onClick={() => {
+                        setSelectedCallId(issue.callId);
+                        setSelectedIssueId(issue.id);
+                      }}
                     >
                       <ExternalLink className="w-4 h-4" />
                       View

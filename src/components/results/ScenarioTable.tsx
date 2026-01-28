@@ -23,7 +23,7 @@ const rootCauseColors: Record<string, { bg: string; text: string; border: string
 };
 
 export function ScenarioTable() {
-  const { scenarioResults, transcripts, setSelectedCallId, selectedDimension, setSelectedDimension } = useAppStore();
+  const { scenarioResults, transcripts, setSelectedCallId, setSelectedIssueId, selectedDimension, setSelectedDimension } = useAppStore();
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedScenarios, setExpandedScenarios] = useState<Set<string>>(new Set());
@@ -166,7 +166,10 @@ export function ScenarioTable() {
                   </span>
                   <button
                     className="px-2.5 py-1 text-xs bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] rounded font-mono text-[var(--color-slate-200)] transition-colors"
-                    onClick={() => setSelectedCallId(scenario.callId)}
+                    onClick={() => {
+                      setSelectedCallId(scenario.callId);
+                      setSelectedIssueId(null);
+                    }}
                   >
                     {scenario.callId}
                   </button>

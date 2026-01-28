@@ -236,6 +236,7 @@ export interface AppState {
   enhancedFixes: EnhancedFixSuggestions | null;
 
   selectedCallId: string | null;
+  selectedIssueId: string | null; // For highlighting specific issue in CallViewer
   selectedDimension: string | null; // For filtering scenarios by dimension
 
   // Actions
@@ -259,6 +260,7 @@ export interface AppState {
   runAnalysis: () => Promise<void>;
   generateFixes: () => void;
   setSelectedCallId: (id: string | null) => void;
+  setSelectedIssueId: (id: string | null) => void;
   goToStep: (step: 'analyses' | 'input' | 'running' | 'results' | 'fixes') => void;
 
   // Analysis management

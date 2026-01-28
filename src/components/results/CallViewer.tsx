@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Lightbulb, MessageSquare } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -21,13 +22,21 @@ const severityClasses: Record<Severity, string> = {
 };
 
 export function CallViewer() {
-  const { selectedCallId, setSelectedCallId, results, transcripts } = useAppStore();
+  const { selectedCallId, selectedIssueId, setSelectedCallId, setSelectedIssueId, results, transcripts } = useAppStore();
+  const selectedIssueRef = useRef<HTMLDivElement>(null);
 
   // Early returns AFTER all hooks have been called
   const isVisible = selectedCallId && results;
   const transcript = isVisible ? transcripts.find((t) => t.id === selectedCallId) : null;
   const callIssues = isVisible && results ? results.issues.filter((i) => i.callId === selectedCallId) : [];
   const hasValidTranscript = transcript && transcript.lines && Array.isArray(transcript.lines);
+
+  // Scroll to selected issue when it becomes visible
+  useEffect(() => {
+    if (selectedIssueId && selectedIssueRef.current) {
+      selectedIssueRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedIssueId]);
 
   // Return null AFTER all hooks
   if (!isVisible || !hasValidTranscript) return null;
@@ -39,7 +48,10 @@ export function CallViewer() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={() => setSelectedCallId(null)}
+        onClick={() => {
+          setSelectedCallId(null);
+          setSelectedIssueId(null);
+        }}
       >
         <motion.div
           className="glass-card w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
@@ -64,7 +76,10 @@ export function CallViewer() {
             </div>
             <button
               className="p-2 hover:bg-[var(--color-navy-700)] rounded-lg transition-colors"
-              onClick={() => setSelectedCallId(null)}
+              onClick={() => {
+          setSelectedCallId(null);
+          setSelectedIssueId(null);
+        }}
             >
               <X className="w-5 h-5 text-[var(--color-slate-400)]" />
             </button>
@@ -121,10 +136,15 @@ export function CallViewer() {
                         .join(', ')
                     : null;
 
+                  const isSelected = selectedIssueId === issue.id;
+
                   return (
                     <motion.div
                       key={issue.id}
-                      className="glass-card-subtle p-4 space-y-3"
+                      ref={isSelected ? selectedIssueRef : null}
+                      className={`glass-card-subtle p-4 space-y-3 transition-all ${
+                        isSelected ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20' : ''
+                      }`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}

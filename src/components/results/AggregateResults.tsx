@@ -73,7 +73,7 @@ const dimensionLabels: Record<string, { short: string; icon: string }> = {
 };
 
 export function AggregateResults() {
-  const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedDimension } = useAppStore();
+  const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedIssueId, setSelectedDimension } = useAppStore();
 
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
@@ -625,6 +625,7 @@ export function AggregateResults() {
               onClick={(data) => {
                 if (data && data.activeLabel) {
                   setSelectedCallId(String(data.activeLabel));
+                  setSelectedIssueId(null);
                   setResultsViewMode('detailed');
                 }
               }}
@@ -1025,7 +1026,7 @@ function ObjectiveIssuesBreakdown({
   subtitle: string;
   customStyle?: boolean;
 }) {
-  const { setSelectedCallId, setResultsViewMode } = useAppStore();
+  const { setSelectedCallId, setSelectedIssueId, setResultsViewMode } = useAppStore();
   const [expandedIssues, setExpandedIssues] = React.useState<Set<string>>(new Set());
 
   const toggleIssue = (issueId: string) => {
@@ -1157,6 +1158,7 @@ function ObjectiveIssuesBreakdown({
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedCallId(instance.callId);
+                            setSelectedIssueId(instance.id);
                             setResultsViewMode('detailed');
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
@@ -1225,7 +1227,7 @@ function DimensionBreakdownWithAggregation({
   dimensionChartData: any[];
   aggregatedScenarios: AggregatedScenario[];
 }) {
-  const { setSelectedCallId, setResultsViewMode, setSelectedDimension } = useAppStore();
+  const { setSelectedCallId, setSelectedIssueId, setResultsViewMode, setSelectedDimension } = useAppStore();
   const [expandedDimensions, setExpandedDimensions] = React.useState<Set<string>>(new Set());
   const [expandedScenarios, setExpandedScenarios] = React.useState<Set<string>>(new Set());
 
@@ -1464,6 +1466,7 @@ function DimensionBreakdownWithAggregation({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedCallId(scenario.callId);
+                                      setSelectedIssueId(null);
                                       setResultsViewMode('detailed');
                                       window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
@@ -1508,7 +1511,7 @@ function DimensionBreakdownWithAggregation({
 
 // Component to display aggregated scenarios with expandable groups
 function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenario[] }) {
-  const { setSelectedCallId, setResultsViewMode, setSelectedDimension } = useAppStore();
+  const { setSelectedCallId, setSelectedIssueId, setResultsViewMode, setSelectedDimension } = useAppStore();
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
 
   const toggleGroup = (groupKey: string) => {
@@ -1646,6 +1649,7 @@ function AggregatedScenariosView({ aggregated }: { aggregated: AggregatedScenari
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedCallId(scenario.callId);
+                            setSelectedIssueId(null);
                             setResultsViewMode('detailed');
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
