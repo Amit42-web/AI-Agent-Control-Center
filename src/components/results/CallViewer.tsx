@@ -22,13 +22,14 @@ const severityClasses: Record<Severity, string> = {
 };
 
 export function CallViewer() {
-  const { selectedCallId, selectedIssueId, setSelectedCallId, setSelectedIssueId, results, transcripts } = useAppStore();
+  const { selectedCallId, selectedIssueId, setSelectedCallId, setSelectedIssueId, results, scenarioResults, flowType, transcripts } = useAppStore();
   const selectedIssueRef = useRef<HTMLDivElement>(null);
 
   // Early returns AFTER all hooks have been called
-  const isVisible = selectedCallId && results;
+  const isVisible = selectedCallId && (results || scenarioResults);
   const transcript = isVisible ? transcripts.find((t) => t.id === selectedCallId) : null;
   const callIssues = isVisible && results ? results.issues.filter((i) => i.callId === selectedCallId) : [];
+  const callScenarios = isVisible && scenarioResults ? scenarioResults.scenarios.filter((s) => s.callId === selectedCallId) : [];
   const hasValidTranscript = transcript && transcript.lines && Array.isArray(transcript.lines);
 
   // Scroll to selected issue when it becomes visible
@@ -69,7 +70,10 @@ export function CallViewer() {
               <div>
                 <h3 className="font-semibold text-white">Call: {selectedCallId}</h3>
                 <p className="text-xs text-[var(--color-slate-400)]">
-                  {callIssues.length} issue{callIssues.length !== 1 ? 's' : ''} detected
+                  {flowType === 'objective'
+                    ? `${callIssues.length} issue${callIssues.length !== 1 ? 's' : ''} detected`
+                    : `${callScenarios.length} scenario${callScenarios.length !== 1 ? 's' : ''} identified`
+                  }
                   {transcript.metadata?.duration && ` • ${transcript.metadata.duration}`}
                 </p>
               </div>
@@ -119,12 +123,12 @@ export function CallViewer() {
                 </div>
               </div>
 
-              {/* Issues Panel */}
+              {/* Issues/Scenarios Panel */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-[var(--color-slate-300)]">
-                  Issues in this call
+                  {flowType === 'objective' ? 'Issues in this call' : 'Scenarios in this call'}
                 </h4>
-                {callIssues.map((issue, index) => {
+                {flowType === 'objective' ? callIssues.map((issue, index) => {
                   // Get timestamps for the issue based on line numbers
                   const issueTimestamps = issue.lineNumbers && Array.isArray(issue.lineNumbers)
                     ? issue.lineNumbers
@@ -177,11 +181,73 @@ export function CallViewer() {
                       )}
                     </motion.div>
                   );
+                }) : callScenarios.map((scenario, index) => {
+                  // Get timestamps for the scenario based on line numbers
+                  const scenarioTimestamps = scenario.lineNumbers && Array.isArray(scenario.lineNumbers)
+                    ? scenario.lineNumbers
+                        .map((lineNum) => {
+                          const line = transcript.lines[lineNum - 1];
+                          return line?.timestamp;
+                        })
+                        .filter(Boolean)
+                        .join(', ')
+                    : null;
+
+                  const isSelected = selectedIssueId === scenario.id;
+
+                  return (
+                    <motion.div
+                      key={scenario.id}
+                      ref={isSelected ? selectedIssueRef : null}
+                      className={`glass-card-subtle p-4 space-y-3 transition-all ${
+                        isSelected ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20' : ''
+                      }`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h5 className="text-sm font-medium text-white mb-1">
+                            {scenario.title}
+                          </h5>
+                          {scenario.dimension && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                              {scenario.dimension}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`badge ${severityClasses[scenario.severity] || 'badge-medium'}`}>
+                          {scenario.severity}
+                        </span>
+                      </div>
+                      {scenarioTimestamps && (
+                        <div className="text-xs text-[var(--color-slate-500)]">
+                          <span className="font-medium">Lines: </span>
+                          {scenario.lineNumbers[0]}-{scenario.lineNumbers[scenario.lineNumbers.length - 1]}
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-medium text-[var(--color-slate-400)] mb-1">What Happened:</p>
+                          <p className="text-xs text-[var(--color-slate-300)]">
+                            {scenario.whatHappened}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-[var(--color-slate-400)] mb-1">Impact:</p>
+                          <p className="text-xs text-[var(--color-slate-300)]">
+                            {scenario.impact}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
                 })}
 
-                {callIssues.length === 0 && (
+                {(flowType === 'objective' ? callIssues.length : callScenarios.length) === 0 && (
                   <div className="p-4 text-center text-[var(--color-slate-400)] text-sm">
-                    No issues detected in this call.
+                    {flowType === 'objective' ? 'No issues detected in this call.' : 'No scenarios identified in this call.'}
                   </div>
                 )}
               </div>
