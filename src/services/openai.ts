@@ -334,35 +334,39 @@ LANGUAGE AND FORMAT PRESERVATION:
 For each fix, provide a JSON object with these SEPARATE fields:
 - issueType: type of issue this addresses (flow_deviation, repetition_loop, language_mismatch, mid_call_restart, quality_issue)
 - problem: brief description of the problem identified
-- rootCauseType: ONE of ["knowledge", "instruction", "execution", "conversation", "model"] - why this issue occurred
+- rootCauseType: ONE of ["knowledge", "instruction", "execution", "conversation", "model"] - classify based on ROOT CAUSE of the underlying issue
   * "knowledge": Information/context doesn't exist anywhere
   * "instruction": Info exists but bot wasn't told how/when to use it
-  * "execution": Instructions exist but bot failed to follow them
+  * "execution": Instructions exist but bot failed to follow them (tag as "execution" even if fix requires instruction changes)
   * "conversation": Technically correct but poor UX/awkward conversation
   * "model": Fundamental model capability limitation (use rarely, <5%)
+  ⚠️ CRITICAL: rootCauseType must match the ROOT CAUSE of the issue, NOT the solution type
+     Example: If bot failed to follow existing instructions → "execution" (even if fix adds clearer instructions)
+     Example: If bot lacks any instruction on topic → "instruction"
 - action: one of ["add", "remove", "replace"] - what type of change to make
   * "add": Insert new content (most common)
   * "remove": Delete existing problematic content
   * "replace": Replace existing content with improved version
-- suggestion: MUST BE IN ENGLISH - This is instruction/guidance for developers - DO NOT write in Hindi/Hinglish - MUST USE SAME SCRIPT/ALPHABET AS REFERENCE (English/Latin characters)
+- suggestion: The EXACT prompt text/instruction to add - write the literal text that should be added to the prompt, not a description
 - targetContent: (ONLY for "remove" or "replace") The exact text from the script to remove/replace
 - placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2")
 - exampleResponse: (OPTIONAL) What the bot should actually say to customers (this CAN be in native language/Hinglish)
 - relatedIssueIds: array of issue IDs this addresses
 
 🎯 LANGUAGE RULES FOR SUGGESTION FIELD:
-- suggestion field = INSTRUCTIONS for developers in ENGLISH
-- Write like you're instructing a developer: "Always check availability in one complete sentence..."
+- suggestion field = EXACT prompt text to add in ENGLISH (must be copy-paste ready)
+- DO NOT write meta-descriptions like "Add explicit guidance to..." or "Instruct the bot to..."
+- Write the LITERAL instruction text: "When customer interrupts, acknowledge immediately and redirect..."
 - DO NOT write in romanized Hindi/Hinglish like "Availability check ko hamesha..."
-- Keep it professional, clear, and in English
 - exampleResponse field = What bot SAYS to customers (can be Hindi/Hinglish/native language)
 
 🚨 CRITICAL - SUGGESTION FIELD RULES:
-- "suggestion" = The actual instruction/guidance ONLY
+- "suggestion" = The EXACT text to add to the prompt (copy-paste ready)
+- DO NOT write descriptions like "Add explicit guidance to politely acknowledge..."
+- DO write the actual instruction: "When a customer interrupts during plan explanation, politely acknowledge immediately: 'I understand. Let me finish explaining this key benefit, then I'll address your question.' Then continue with the plan details."
 - DO NOT start with "In State X" or "Add to..." or any location phrases
 - DO NOT include where to add it - that goes in "placementHint"
-- Start directly with the instruction: "First clearly check availability..." NOT "In State S0, first clearly check..."
-- Examples in suggestion field are OPTIONAL - only include if truly helpful to show bot's response format
+- The suggestion should be EXACTLY what gets added to the prompt, word-for-word
 
 CRITICAL SEPARATION:
 - "suggestion" field = WHAT to add/replace (the actual prompt/instruction text ONLY)
@@ -371,28 +375,37 @@ CRITICAL SEPARATION:
 
 Example for LATIN/ROMAN script reference (CORRECT - DO THIS):
 Reference script format: "State S0 - Availability & Readiness Check / Confirm customer availability"
+Scenario: Bot failed to follow instruction to ask availability clearly (rootCauseType: "execution")
 {
   "action": "add",
-  "suggestion": "Always check availability in one complete, clear sentence. Do not fragment the question or pause mid-sentence. Ask in a single flow without breaking into pieces. The question should feel natural and complete.",
+  "rootCauseType": "execution",
+  "suggestion": "Ask the availability question in one complete, uninterrupted sentence. Do not break it into fragments or pause mid-sentence. Example: 'Namaste, kya abhi aap baat karna aapke liye theek rahega? Yeh call sirf 2 minute ka hai.' The question must flow naturally as a single unit.",
   "exampleResponse": "Namaste, kya abhi aap baat karna aapke liye theek rahega? Yeh call sirf 2 minute ka hai.",
-  "placementHint": "Add under State S0 - Availability & Readiness Check as explicit phrasing guidance for the first question"
+  "placementHint": "Add under State S0 - Availability & Readiness Check as explicit phrasing guidance"
 }
 
-WRONG Example 1 (DO NOT DO THIS - includes location in suggestion):
+WRONG Example 1 (DO NOT DO THIS - meta-description instead of exact text):
+{
+  "action": "add",
+  "suggestion": "Add explicit guidance to politely acknowledge interruptions and redirect...",  ← WRONG - describes what to add, not the actual text
+  "placementHint": "Add to State S4"
+}
+
+WRONG Example 2 (DO NOT DO THIS - includes location in suggestion):
 {
   "action": "add",
   "suggestion": "In State S0 - Availability & Readiness Check, use a clear sentence...",  ← WRONG - has "In State S0"
   "placementHint": "Add to State S0"
 }
 
-WRONG Example 2 (DO NOT DO THIS - suggestion in Hindi/Hinglish):
+WRONG Example 3 (DO NOT DO THIS - suggestion in Hindi/Hinglish):
 {
   "action": "add",
-  "suggestion": "Availability check ko hamesha ek hi poori saaf sentence mein bolo, beech mein ruk kar tukde-tukde mein mat bolo.",  ← WRONG - uses Hinglish
+  "suggestion": "Availability check ko hamesha ek hi poori saaf sentence mein bolo...",  ← WRONG - uses Hinglish
   "placementHint": "Add to State S0"
 }
 
-WRONG Example 3 (DO NOT DO THIS - uses Devanagari script):
+WRONG Example 4 (DO NOT DO THIS - uses Devanagari script):
 {
   "action": "add",
   "suggestion": "अगर ग्राहक ने कॉल उठाया हो तो कहें: नमस्ते",  ← WRONG - uses Devanagari script
@@ -421,11 +434,13 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
   }Generate PROMPT-ONLY fix suggestions. Each suggestion must be a specific prompt instruction that can be added to the bot's system prompt, reference script, or knowledge base.
 
 ⚠️ CRITICAL REMINDERS:
-1. LANGUAGE: Write "suggestion" field in ENGLISH only (instructions for developers). Write "exampleResponse" field in the native language the bot speaks to customers.
+1. LANGUAGE: Write "suggestion" field with EXACT prompt text in ENGLISH (copy-paste ready). Write "exampleResponse" field in the native language the bot speaks to customers.
 2. FORMAT: Match the reference script's formatting style (State S0, bullet points, etc.)
 3. LOCATION: DO NOT include location/placement info in "suggestion" - that goes in "placementHint"
+4. RCA ALIGNMENT: Set rootCauseType based on the ROOT CAUSE of the issue, not the solution type (execution failure fix should be tagged "execution" even if solution adds instructions)
+5. EXACT TEXT: Write the literal instruction to add, NOT a description like "Add guidance to..." - it must be copy-paste ready
 
-Think: "suggestion" = Developer instructions in English | "exampleResponse" = What bot says to customers`;
+Think: "suggestion" = Exact prompt text to add | "exampleResponse" = What bot says to customers`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
