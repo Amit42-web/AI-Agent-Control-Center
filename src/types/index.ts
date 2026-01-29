@@ -117,6 +117,8 @@ export interface Scenario {
   severity: Severity;
   confidence: number;
   lineNumbers: number[];
+  // For execution failures - reference to script/KB instruction not followed
+  instructionReference?: InstructionReference;
   // evidenceSnippet removed - we'll show actual transcript lines in UI instead
 }
 
@@ -127,6 +129,16 @@ export interface PromptFix {
   exactContent: string; // The exact text to add or use as replacement
   beforeText?: string; // For "replace" action - what to replace
   visualDiff?: string; // Optional formatted diff for display
+}
+
+// Reference to script/KB instructions that weren't followed (for execution failures)
+export interface InstructionReference {
+  source: 'script' | 'kb' | 'policy' | 'guideline';
+  documentName?: string; // e.g., "Sales Call Script v2.1", "Pricing KB Article"
+  section: string; // e.g., "Section 2.3", "Pricing Objections", "line 23-25"
+  expectedBehavior: string; // What the instruction says to do
+  actualBehavior: string; // What the agent actually did
+  confidence?: number; // How confident we are about this reference (0-100)
 }
 
 export interface EnhancedFix {
@@ -142,6 +154,9 @@ export interface EnhancedFix {
   concreteExample: string; // Before/after or example
   successCriteria: string; // How to know it's fixed
   howToTest: string; // Validation method
+
+  // For execution failures - track which script/KB instruction wasn't followed
+  instructionReference?: InstructionReference;
 
   // For prompt/flow fixes - exact implementation details
   promptFix?: PromptFix;

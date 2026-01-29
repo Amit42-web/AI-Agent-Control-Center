@@ -683,6 +683,15 @@ For each scenario, provide a JSON object with:
 - severity: one of [low, medium, high, critical] - based on actual impact to customer and business
 - confidence: number between 0-100 - how confident you are this is a genuine issue worth addressing
 - lineNumbers: array of line numbers where this scenario occurs (e.g., [19, 20, 21, 22] for lines 19-22)
+- instructionReference (REQUIRED for rootCauseType="execution", optional otherwise): {
+    source: "script" | "kb" | "policy" | "guideline",
+    documentName: optional string (e.g., "Sales Call Script v2.1"),
+    section: string (e.g., "Section 2.3: Pricing Objections", "Lines 15-20", "Payment Confirmation Step"),
+    expectedBehavior: string (what the instruction says the agent should do),
+    actualBehavior: string (what the agent actually did instead),
+    confidence: optional number 0-100 (how confident you are about this specific instruction reference)
+  }
+  NOTE: When classifying as "execution", you MUST identify which specific script/KB/policy instruction was not followed. If you cannot identify a specific instruction, reconsider whether this is truly an execution failure or an instruction gap.
 
 IMPORTANT GUIDELINES:
 - Do NOT include evidence snippets or transcript excerpts in the JSON - just provide line numbers

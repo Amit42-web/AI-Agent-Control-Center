@@ -72,6 +72,15 @@ const dimensionLabels: Record<string, { short: string; icon: string }> = {
   'Novel & Emerging Issues': { short: 'Novel Issues', icon: '✨' },
 };
 
+// RCA Category labels for breakdown view
+const rcaCategoryLabels: Record<string, { short: string; full: string; icon: string; color: string }> = {
+  'knowledge': { short: 'Knowledge Gap', full: 'Knowledge Gap', icon: '📚', color: '#eab308' },
+  'instruction': { short: 'Instruction Gap', full: 'Instruction Gap', icon: '📋', color: '#06b6d4' },
+  'execution': { short: 'Execution Failure', full: 'Execution Failure', icon: '⚠️', color: '#f97316' },
+  'conversation': { short: 'Conversation Design', full: 'Conversation Design', icon: '💬', color: '#8b5cf6' },
+  'model': { short: 'Model Limitation', full: 'Model Limitation', icon: '🤖', color: '#10b981' },
+};
+
 // Helper function to find a matching issue for a scenario
 function findMatchingIssue(scenario: { callId: string; lineNumbers: number[] }, issues: DetectedIssue[]): string | null {
   if (!scenario.lineNumbers || scenario.lineNumbers.length === 0) return null;
@@ -147,6 +156,7 @@ export function AggregateResults() {
     const byDimensionCalls: Record<string, Set<string>> = {}; // Track unique calls per dimension
     const bySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
     const byRootCause: Record<string, number> = {};
+    const byRootCauseCalls: Record<string, Set<string>> = {}; // Track unique calls per RCA category
     const byCall: Record<string, number> = {};
     let totalConfidence = 0;
 
@@ -170,6 +180,12 @@ export function AggregateResults() {
       const normalizedRootCause = scenario.rootCauseType?.toLowerCase();
       if (normalizedRootCause && validRootCauseTypes.includes(normalizedRootCause)) {
         byRootCause[normalizedRootCause] = (byRootCause[normalizedRootCause] || 0) + 1;
+
+        // Track unique calls per RCA category
+        if (!byRootCauseCalls[normalizedRootCause]) {
+          byRootCauseCalls[normalizedRootCause] = new Set();
+        }
+        byRootCauseCalls[normalizedRootCause].add(scenario.callId);
       }
 
       // Call
@@ -208,6 +224,32 @@ export function AggregateResults() {
       });
 
     console.log('[AggregateResults] dimensionChartData:', dimensionChartData);
+
+    // Prepare RCA category chart data - include ALL RCA categories, even those with 0 scenarios
+    const allRCACategories = Object.keys(rcaCategoryLabels);
+    const rcaCategoryChartData = allRCACategories
+      .map(category => {
+        const value = byRootCause[category] || 0;
+        return {
+          name: category,
+          fullName: rcaCategoryLabels[category].full,
+          shortName: rcaCategoryLabels[category].short,
+          icon: rcaCategoryLabels[category].icon,
+          color: rcaCategoryLabels[category].color,
+          value,
+          uniqueCalls: byRootCauseCalls[category]?.size || 0,
+          percentage: scenarios.length > 0 ? Math.round((value / scenarios.length) * 100) : 0,
+          hasIssues: value > 0
+        };
+      })
+      .sort((a, b) => {
+        // Sort: categories with issues first (by count desc), then categories without issues
+        if (a.hasIssues && !b.hasIssues) return -1;
+        if (!a.hasIssues && b.hasIssues) return 1;
+        return b.value - a.value;
+      });
+
+    console.log('[AggregateResults] rcaCategoryChartData:', rcaCategoryChartData);
 
     const severityChartData = Object.entries(bySeverity)
       .filter(([_, value]) => value > 0)
@@ -249,6 +291,7 @@ export function AggregateResults() {
       criticalCount: bySeverity.critical,
       highCount: bySeverity.high,
       dimensionChartData,
+      rcaCategoryChartData,
       severityChartData,
       rootCauseChartData,
       callDistributionData,
@@ -719,9 +762,9 @@ export function AggregateResults() {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Dimension Breakdown with Nested Aggregated Scenarios */}
+        {/* RCA Category Breakdown with Nested Aggregated Scenarios */}
         <DimensionBreakdownWithAggregation
-          dimensionChartData={scenarioAggregation.dimensionChartData}
+          dimensionChartData={scenarioAggregation.rcaCategoryChartData}
           aggregatedScenarios={scenarioAggregation.aggregatedScenarios}
           issues={results?.issues || []}
         />
@@ -1316,9 +1359,9 @@ function DimensionBreakdownWithAggregation({
       transition={{ delay: 0.8 }}
     >
       <div className="p-4 border-b border-[var(--color-navy-700)]">
-        <h3 className="text-lg font-semibold text-white">Audit Dimension Breakdown</h3>
+        <h3 className="text-lg font-semibold text-white">RCA Category Breakdown</h3>
         <p className="text-sm text-[var(--color-slate-400)] mt-1">
-          Click any dimension to expand and view aggregated scenarios
+          Click any category to expand and view aggregated scenarios
         </p>
       </div>
 
@@ -1326,9 +1369,9 @@ function DimensionBreakdownWithAggregation({
         {dimensionChartData.map((dimension, dimensionIndex) => {
           const isDimensionExpanded = expandedDimensions.has(dimension.fullName);
           const hasIssues = dimension.value > 0;
-          // Filter aggregated scenarios for this dimension
+          // Filter aggregated scenarios for this RCA category
           const dimensionAggregatedScenarios = aggregatedScenarios.filter(
-            agg => agg.dimension === dimension.fullName
+            agg => agg.rootCauseType === dimension.name
           );
 
           return (
@@ -1357,7 +1400,7 @@ function DimensionBreakdownWithAggregation({
                       className="w-3 h-3 rounded-full flex-shrink-0 group-hover:scale-125 transition-transform"
                       style={{
                         backgroundColor: hasIssues
-                          ? DIMENSION_COLORS[dimensionIndex % DIMENSION_COLORS.length]
+                          ? dimension.color || DIMENSION_COLORS[dimensionIndex % DIMENSION_COLORS.length]
                           : 'rgba(34, 197, 94, 0.3)' // green with opacity
                       }}
                     />
@@ -1458,6 +1501,41 @@ function DimensionBreakdownWithAggregation({
                                 {group.pattern}
                               </p>
 
+                              {/* Script/KB Reference for Execution Failures */}
+                              {group.rootCauseType === 'execution' && group.scenarios.some(s => s.instructionReference) && (
+                                <div className="mt-3 mb-2 p-2 rounded bg-orange-500/10 border border-orange-500/20">
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-orange-400 text-xs mt-0.5">📋</span>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-semibold text-orange-300 mb-1">Script/KB Reference Not Followed</p>
+                                      {group.scenarios.filter(s => s.instructionReference).slice(0, 1).map(scenario => {
+                                        const ref = scenario.instructionReference!;
+                                        return (
+                                          <div key={scenario.id} className="space-y-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 font-medium uppercase">
+                                                {ref.source}
+                                              </span>
+                                              {ref.documentName && (
+                                                <span className="text-[10px] text-[var(--color-slate-400)]">{ref.documentName}</span>
+                                              )}
+                                              <span className="text-[10px] text-[var(--color-slate-500)]">•</span>
+                                              <span className="text-[10px] text-[var(--color-slate-400)]">{ref.section}</span>
+                                            </div>
+                                            <p className="text-[11px] text-[var(--color-slate-300)]">
+                                              <span className="text-orange-300 font-medium">Expected:</span> {ref.expectedBehavior}
+                                            </p>
+                                            <p className="text-[11px] text-[var(--color-slate-300)]">
+                                              <span className="text-orange-300 font-medium">Actual:</span> {ref.actualBehavior}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Stats */}
                               <div className="flex items-center gap-4 text-xs flex-wrap">
                                 <div>
@@ -1528,6 +1606,12 @@ function DimensionBreakdownWithAggregation({
                                         <p className="text-xs text-[var(--color-slate-300)] truncate">
                                           {scenario.whatHappened}
                                         </p>
+                                        {/* Show instruction reference if available */}
+                                        {scenario.instructionReference && (
+                                          <div className="mt-1.5 text-[10px] text-orange-300">
+                                            <span className="font-medium">{scenario.instructionReference.source.toUpperCase()}:</span> {scenario.instructionReference.section}
+                                          </div>
+                                        )}
                                       </div>
                                       <ArrowRight className="w-3 h-3 text-[var(--color-slate-500)] flex-shrink-0 mt-0.5" />
                                     </div>
