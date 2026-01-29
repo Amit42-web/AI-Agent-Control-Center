@@ -864,6 +864,14 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
       severity: string;
       confidence: number;
       lineNumbers: number[];
+      instructionReference?: {
+        source: 'script' | 'kb' | 'policy' | 'guideline';
+        documentName?: string;
+        section: string;
+        expectedBehavior: string;
+        actualBehavior: string;
+        confidence?: number;
+      };
     }, idx: number) => {
       // Validate and normalize rootCauseType
       let rootCauseType = scenario.rootCauseType?.toLowerCase();
@@ -886,6 +894,7 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
         severity: scenario.severity as Severity,
         confidence: scenario.confidence,
         lineNumbers: scenario.lineNumbers || [],
+        instructionReference: scenario.instructionReference,
       };
     });
   } catch (error) {
