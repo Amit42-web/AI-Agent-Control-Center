@@ -22,7 +22,17 @@ import { FixesPanel } from '@/components/fixes/FixesPanel';
 import { EnhancedFixesList } from '@/components/fixes/EnhancedFixesList';
 import { AnalysisManager } from '@/components/analyses/AnalysisManager';
 import { AggregateResults } from '@/components/results/AggregateResults';
-import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid } from 'lucide-react';
+import { aggregateScenarios } from '@/utils/aggregateScenarios';
+import {
+  exportScenariosToCSV,
+  exportAggregatedScenariosToCSV,
+  exportScenariosToExcel,
+  exportAggregatedScenariosToExcel,
+  downloadCSV,
+  downloadExcel,
+  generateExportFilename
+} from '@/utils/exportUtils';
+import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid, Download, ChevronDown } from 'lucide-react';
 
 function RunWizardPage() {
   const { flowType, goToStep } = useAppStore();
@@ -234,10 +244,58 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType, resultsViewMode, setResultsViewMode } = useAppStore();
+  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType, resultsViewMode, setResultsViewMode, scenarioResults } = useAppStore();
+  const [showExportMenu, setShowExportMenu] = React.useState(false);
+  const exportMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Close export menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showExportMenu]);
 
   const handleGenerateFixes = () => {
     generateFixes();
+  };
+
+  const handleExport = (format: 'csv' | 'excel') => {
+    if (!scenarioResults || !scenarioResults.scenarios) return;
+
+    const scenarios = scenarioResults.scenarios;
+
+    if (resultsViewMode === 'detailed') {
+      // Export detailed scenarios
+      if (format === 'csv') {
+        const csvContent = exportScenariosToCSV(scenarios);
+        downloadCSV(csvContent, generateExportFilename('scenarios_detailed', 'csv'));
+      } else {
+        const excelContent = exportScenariosToExcel(scenarios);
+        downloadExcel(excelContent, generateExportFilename('scenarios_detailed', 'xls'));
+      }
+    } else {
+      // Export aggregated scenarios
+      const aggregated = aggregateScenarios(scenarios);
+      if (format === 'csv') {
+        const csvContent = exportAggregatedScenariosToCSV(aggregated);
+        downloadCSV(csvContent, generateExportFilename('scenarios_aggregated', 'csv'));
+      } else {
+        const excelContent = exportAggregatedScenariosToExcel(aggregated);
+        downloadExcel(excelContent, generateExportFilename('scenarios_aggregated', 'xls'));
+      }
+    }
+
+    setShowExportMenu(false);
   };
 
   const containerVariants = {
@@ -327,6 +385,49 @@ function ResultsPage() {
             <ArrowLeft className="w-4 h-4" />
             Back to Input
           </motion.button>
+
+          {/* Export Button with Dropdown */}
+          {flowType === 'open-ended' && scenarioResults && (
+            <div className="relative" ref={exportMenuRef}>
+              <motion.button
+                className="btn-secondary flex items-center gap-2"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Download className="w-4 h-4" />
+                Export Report
+                <ChevronDown className="w-3 h-3" />
+              </motion.button>
+
+              {showExportMenu && (
+                <motion.div
+                  className="absolute top-full mt-2 right-0 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg shadow-xl z-50 min-w-[180px]"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <div className="py-2">
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[var(--color-navy-700)] transition-colors flex items-center gap-2"
+                      onClick={() => handleExport('csv')}
+                    >
+                      <Download className="w-4 h-4" />
+                      Download CSV
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[var(--color-navy-700)] transition-colors flex items-center gap-2"
+                      onClick={() => handleExport('excel')}
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Excel
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+
           <motion.button
             className="btn-primary flex items-center gap-2"
             onClick={handleGenerateFixes}
