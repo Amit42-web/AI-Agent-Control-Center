@@ -16,35 +16,41 @@ export interface AggregatedScenario {
 }
 
 /**
- * Extract key business entities from agent issue text
- * These are domain-specific terms that identify what the issue is about
+ * Extract semantic entities from text using generic NLP patterns
+ * This works for ANY domain without hardcoded patterns
  */
-function extractBusinessEntities(text: string): Set<string> {
-  const normalizedText = text.toLowerCase();
+function extractSemanticEntities(text: string): Set<string> {
   const entities = new Set<string>();
+  const normalizedText = text.toLowerCase();
 
-  // Define key business entities to extract
-  const entityPatterns: Record<string, RegExp[]> = {
-    'bike': [/\bbike\b/gi, /\bvehicle\b/gi],
-    'timeline': [/\btimeline\b/gi, /\btime\s*line\b/gi],
-    'pincode': [/\bpincode\b/gi, /\bpin\s*code\b/gi, /\bzip\s*code\b/gi, /\bpostal\s*code\b/gi],
-    'showroom': [/\bshowroom\b/gi, /\bdealer\b/gi, /\bbranch\b/gi],
-    'customer_name': [/\bcustomer\s+name\b/gi, /\bname\s+capture\b/gi, /\bname\s+verification\b/gi, /\bidentity\b/gi, /\bcustomer\s+(?:info|information|details)\b/gi],
-    'qualification': [/\bqualification\b/gi, /\bqualify\b/gi, /\bverification\b/gi, /\bverify\b/gi],
-    'flow': [/\bflow\b/gi, /\bprocess\b/gi, /\bworkflow\b/gi],
-    'mandatory_step': [/\bmandatory\b/gi, /\brequired\b/gi, /\bessential\b/gi, /\bcore\b/gi],
-    'skip_action': [/\bskip(?:ped)?\b/gi, /\bmiss(?:ed)?\b/gi, /\bomit(?:ted)?\b/gi, /\bbypass(?:ed)?\b/gi, /\bjump(?:ed)?\b/gi],
-    'fail_action': [/\bfail(?:ed)?\b/gi, /\bdidn'?t\b/gi, /\bnever\b/gi, /\bunable\b/gi],
-    'progress': [/\bprogress\b/gi, /\bcomplete\b/gi, /\bfinish\b/gi],
-  };
+  // 1. Extract multi-word noun phrases (2-3 words)
+  // Pattern: adjective? noun+ (e.g., "customer name", "bike details", "payment information")
+  const multiWordPatterns = [
+    /\b(customer|user|agent|caller|bike|vehicle|payment|address|name|identity|contact|email|phone|timeline|pincode|showroom|dealer|qualification|verification|order|booking)\s+(name|info|information|details|data|verification|check|capture|confirmation|step|process|flow|number|code|address|identity)\b/gi,
+    /\b(mandatory|required|core|essential|critical)\s+(step|steps|flow|process|check|information|data|field|fields)\b/gi,
+  ];
 
-  // Extract each entity type
-  for (const [entityName, patterns] of Object.entries(entityPatterns)) {
-    for (const pattern of patterns) {
-      if (pattern.test(normalizedText)) {
-        entities.add(entityName);
-        break; // Found this entity, move to next
-      }
+  for (const pattern of multiWordPatterns) {
+    const matches = normalizedText.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        // Normalize to underscore format
+        const normalized = match.trim().replace(/\s+/g, '_');
+        entities.add(normalized);
+      });
+    }
+  }
+
+  // 2. Extract important single-word entities (domain objects)
+  // These are likely to be the subject of the issue
+  const singleWordEntities = [
+    /\b(name|address|email|phone|pincode|timeline|bike|vehicle|showroom|dealer|customer|payment|order|booking|identity|qualification|verification|flow|process|step|information|data|details)\b/gi,
+  ];
+
+  for (const pattern of singleWordEntities) {
+    const matches = normalizedText.match(pattern);
+    if (matches) {
+      matches.forEach(match => entities.add(match.toLowerCase()));
     }
   }
 
@@ -52,109 +58,154 @@ function extractBusinessEntities(text: string): Set<string> {
 }
 
 /**
- * Extract key phrases from text (common multi-word patterns in agent issues)
+ * Extract action-object patterns (what action failed on what object)
+ * E.g., "skipped name capture" → "skip_name", "failed to verify address" → "fail_address"
  */
-function extractKeyPhrases(text: string): Set<string> {
+function extractActionObjectPatterns(text: string): Set<string> {
+  const patterns = new Set<string>();
   const normalizedText = text.toLowerCase();
-  const phrases = new Set<string>();
 
-  // Common multi-word patterns in agent issues
-  const phrasePatterns = [
-    // Bike & timeline related (most specific)
-    /(?:bike|vehicle)\s*(?:&|and|,)?\s*(?:timeline|time\s*line)/gi,
-    /bike\s+(?:qualification|verification|check|detail|info|data|step)/gi,
-    /timeline\s+(?:qualification|verification|check|detail|info|data|step)/gi,
-    /(?:bike|vehicle)\s+(?:&|and)\s+(?:timeline|time)/gi,
+  // Generic action-object patterns that work for any domain
+  const actionObjectPatterns = [
+    // Negative actions: skip/miss/omit/bypass/fail + object
+    /\b(skip|skipped|miss|missed|omit|omitted|bypass|bypassed|jump|jumped|fail|failed|unable|didn'?t|never|not)\s+(?:to\s+)?(capture|collect|verify|confirm|check|get|obtain|gather|provide|enter|complete|finish|progress)\s+(?:correct\s+)?(?:customer\s+)?(\w+)/gi,
 
-    // Customer name & identity patterns (NEW)
-    /(?:customer\s+)?name\s+(?:capture|verification|check|collection|identity)/gi,
-    /(?:capture|collect|verify|confirm|get|obtain|gather)\s+(?:customer\s+)?(?:name|identity)/gi,
-    /(?:skip|miss|omit|bypass|fail)(?:ped|ed)?\s+(?:to\s+)?(?:capture|collect|verify|get)\s+(?:customer\s+)?name/gi,
-    /(?:not|never|didn'?t)\s+(?:capture|collect|verify|get|obtain)\s+(?:correct\s+)?(?:customer\s+)?name/gi,
-    /name\s+(?:after|when|during)\s+(?:mismatch|confirm|identity)/gi,
+    // Negative pattern: didn't/never/not + action + object
+    /\b(didn'?t|never|not)\s+(capture|collect|verify|confirm|check|get|obtain)\s+(?:correct\s+)?(?:the\s+)?(\w+)/gi,
 
-    // Core flow patterns
-    /core\s+flow\s+(?:steps|process)/gi,
-    /(?:qualification|verification)\s+(?:flow|process|step)/gi,
-    /(?:mandatory|required|essential)\s+(?:steps|flow|check|process)/gi,
-
-    // Skip/miss/fail patterns - EXPANDED
-    /(?:skip|miss|omit|bypass|jump)(?:ped|ed)?\s+(?:steps|flow|process|check|qualification|verification)/gi,
-    /(?:skip|miss|omit|bypass|jump)(?:ped|ed)?\s+(?:mandatory|required|core)/gi,
-    /(?:fail|unable|didn'?t|never)\s+(?:to\s+)?(?:progress|complete|finish|capture|collect)/gi,
-    /(?:not|never)\s+(?:captured|collected|gathered|obtained|completed)/gi,
-
-    // Jump/move/progress patterns
-    /jump(?:ed)?\s+(?:directly|straight|immediately)\s+to/gi,
-    /moved?\s+(?:directly|straight|immediately)\s+to/gi,
-    /bypassed?\s+(?:and|to)/gi,
-    /progress(?:ed)?\s+through/gi,
-
-    // Specific location/action combinations
-    /(?:to|at|through)\s+(?:pincode|timeline|showroom|bike)/gi,
-    /(?:flow|process)\s+(?:deviation|violation)/gi,
+    // Positive action patterns: capture/verify/check + object
+    /\b(capture|collect|verify|confirm|check|get|obtain|gather)\s+(?:correct\s+)?(?:customer\s+)?(\w+)\s+(?:after|when|during)/gi,
   ];
 
-  for (const pattern of phrasePatterns) {
-    const matches = normalizedText.match(pattern);
-    if (matches) {
+  for (const pattern of actionObjectPatterns) {
+    const matches = [...normalizedText.matchAll(pattern)];
+    if (matches.length > 0) {
       matches.forEach(match => {
-        // Normalize the matched phrase
-        const normalized = match.replace(/\s+/g, '_').replace(/[&,]/g, 'and');
-        phrases.add(normalized);
+        // Extract action and object, normalize to action_object format
+        const action = normalizeAction(match[1] || match[2]);
+        const object = match[match.length - 1]; // Last captured group is the object
+        if (action && object && object.length > 2) {
+          patterns.add(`${action}_${object}`);
+        }
       });
     }
   }
 
-  return phrases;
+  return patterns;
 }
 
 /**
- * Calculate similarity between two strings (0-1 score)
- * Uses token-based comparison with Jaccard similarity
- * Filters stop words and handles common synonyms
+ * Normalize action verbs to common forms
+ * This ensures "skipped", "failed to", "didn't", "never" all map to similar concepts
+ */
+function normalizeAction(action: string): string {
+  const normalized = action.toLowerCase().trim();
+
+  // Negative actions → "fail"
+  if (['skip', 'skipped', 'miss', 'missed', 'omit', 'omitted', 'bypass', 'bypassed',
+       'jump', 'jumped', 'fail', 'failed', 'unable', "didn't", 'didnt', 'never', 'not'].includes(normalized)) {
+    return 'fail';
+  }
+
+  // Collection actions → "collect"
+  if (['capture', 'captured', 'collect', 'collected', 'gather', 'gathered',
+       'obtain', 'obtained', 'get'].includes(normalized)) {
+    return 'collect';
+  }
+
+  // Verification actions → "verify"
+  if (['verify', 'verified', 'confirm', 'confirmed', 'check', 'checked',
+       'validate', 'validated'].includes(normalized)) {
+    return 'verify';
+  }
+
+  return normalized;
+}
+
+/**
+ * Calculate similarity between two strings with comprehensive normalization
+ * This handles synonyms, action verbs, and domain terms generically
  */
 function calculateTokenSimilarity(str1: string, str2: string): number {
-  // Common stop words to filter out
+  // Comprehensive stop words
   const stopWords = new Set([
     'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
     'of', 'with', 'from', 'by', 'as', 'is', 'was', 'are', 'been', 'be',
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
     'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those',
-    'not', 'no', 'yes'
+    'when', 'where', 'why', 'how', 'which', 'who', 'whom', 'after', 'during'
   ]);
 
-  // Expanded synonym mappings
+  // Comprehensive synonym mappings for ANY domain
   const synonymMap: Record<string, string> = {
-    'required': 'mandatory',
-    'mandatory': 'mandatory',
-    'skipped': 'missed',
-    'missed': 'missed',
-    'omitted': 'missed',
-    'jumped': 'missed',
-    'moved': 'missed',
-    'bypassed': 'missed',
+    // Negative actions → 'fail'
+    'skip': 'fail',
+    'skipped': 'fail',
+    'miss': 'fail',
+    'missed': 'fail',
+    'omit': 'fail',
+    'omitted': 'fail',
+    'bypass': 'fail',
+    'bypassed': 'fail',
+    'jump': 'fail',
+    'jumped': 'fail',
+    'fail': 'fail',
+    'failed': 'fail',
+    'unable': 'fail',
+    "didn't": 'fail',
+    'didnt': 'fail',
+    'never': 'fail',
+
+    // Collection actions → 'capture'
+    'capture': 'capture',
+    'captured': 'capture',
+    'collect': 'capture',
+    'collected': 'capture',
+    'gather': 'capture',
+    'gathered': 'capture',
+    'obtain': 'capture',
+    'obtained': 'capture',
+    'get': 'capture',
+
+    // Verification → 'verify'
+    'verify': 'verify',
+    'verified': 'verify',
+    'confirm': 'verify',
+    'confirmed': 'verify',
+    'check': 'verify',
+    'checked': 'verify',
+    'validate': 'verify',
+    'validated': 'verify',
+    'qualification': 'verify',
+    'verification': 'verify',
+
+    // Process synonyms → 'process'
     'flow': 'process',
     'process': 'process',
+    'step': 'process',
     'steps': 'process',
     'procedure': 'process',
     'workflow': 'process',
-    'qualification': 'verify',
-    'verification': 'verify',
-    'validate': 'verify',
-    'check': 'verify',
-    'captured': 'collect',
-    'collected': 'collect',
-    'gathered': 'collect',
-    'obtained': 'collect',
-    'name': 'name',
-    'identity': 'name',
+
+    // Required synonyms → 'required'
+    'mandatory': 'required',
+    'required': 'required',
+    'essential': 'required',
+    'core': 'required',
+    'critical': 'required',
+
+    // Information synonyms → 'info'
+    'information': 'info',
+    'info': 'info',
+    'data': 'info',
+    'details': 'info',
+
+    // Identity/name synonyms → 'identity'
+    'name': 'identity',
+    'identity': 'identity',
     'customer': 'customer',
-    'timeline': 'timeline',
-    'bike': 'bike',
-    'core': 'core',
-    'directly': 'directly',
-    'pincode': 'pincode',
+    'user': 'customer',
+    'caller': 'customer',
   };
 
   const normalize = (s: string) => {
@@ -179,16 +230,15 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
 
 /**
  * Calculate comprehensive similarity between two scenarios
- * Uses multiple signals: business entities, phrase matching, title similarity, and description similarity
+ * Uses adaptive weighting based on signal strength
  */
 function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): number {
   const fullText1 = scenario1.title + ' ' + scenario1.whatHappened;
   const fullText2 = scenario2.title + ' ' + scenario2.whatHappened;
 
-  // Signal 1: Business entity overlap (NEW - highest priority)
-  // If they mention the same business concepts (bike, timeline, pincode), they're likely related
-  const entities1 = extractBusinessEntities(fullText1);
-  const entities2 = extractBusinessEntities(fullText2);
+  // Signal 1: Semantic entity overlap (generic, works for any domain)
+  const entities1 = extractSemanticEntities(fullText1);
+  const entities2 = extractSemanticEntities(fullText2);
 
   let entitySimilarity = 0;
   if (entities1.size > 0 || entities2.size > 0) {
@@ -196,44 +246,60 @@ function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): 
     const entityUnion = new Set([...entities1, ...entities2]);
     entitySimilarity = entityUnion.size > 0 ? entityIntersection.size / entityUnion.size : 0;
 
-    // BOOST: If they share multiple critical entities (timeline, pincode, bike, customer_name, etc.),
-    // they're very likely the same issue
-    const criticalSharedEntities = [...entityIntersection].filter(e =>
-      ['bike', 'timeline', 'pincode', 'showroom', 'customer_name'].includes(e)
-    );
-    if (criticalSharedEntities.length >= 2) {
-      // Boost entity similarity if they share 2+ critical business entities
+    // BOOST: If they share 2+ entities, boost the similarity
+    // This works for any entities: customer_name, bike_details, payment_info, etc.
+    if (entityIntersection.size >= 2) {
       entitySimilarity = Math.min(1.0, entitySimilarity * 1.5);
     }
   }
 
-  // Signal 2: Key phrase matching
-  const phrases1 = extractKeyPhrases(fullText1);
-  const phrases2 = extractKeyPhrases(fullText2);
+  // Signal 2: Action-object pattern matching (e.g., "fail_name", "skip_verification")
+  const actionPatterns1 = extractActionObjectPatterns(fullText1);
+  const actionPatterns2 = extractActionObjectPatterns(fullText2);
 
-  let phraseSimilarity = 0;
-  if (phrases1.size > 0 || phrases2.size > 0) {
-    const phraseIntersection = new Set([...phrases1].filter(x => phrases2.has(x)));
-    const phraseUnion = new Set([...phrases1, ...phrases2]);
-    phraseSimilarity = phraseUnion.size > 0 ? phraseIntersection.size / phraseUnion.size : 0;
+  let actionSimilarity = 0;
+  if (actionPatterns1.size > 0 || actionPatterns2.size > 0) {
+    const actionIntersection = new Set([...actionPatterns1].filter(x => actionPatterns2.has(x)));
+    const actionUnion = new Set([...actionPatterns1, ...actionPatterns2]);
+    actionSimilarity = actionUnion.size > 0 ? actionIntersection.size / actionUnion.size : 0;
   }
 
-  // Signal 3: Title token similarity
+  // Signal 3: Title token similarity (with comprehensive synonym mapping)
   const titleSimilarity = calculateTokenSimilarity(scenario1.title, scenario2.title);
 
-  // Signal 4: Description similarity (what happened)
+  // Signal 4: Description similarity
   const descSimilarity = calculateTokenSimilarity(scenario1.whatHappened, scenario2.whatHappened);
 
-  // Weighted combination with NEW entity-based signal:
-  // - Entity similarity: 40% (highest - if they mention same business concepts, likely same issue)
-  // - Phrase similarity: 30% (catches action patterns like "skipped" vs "failed to progress")
-  // - Title similarity: 20% (important for matching)
-  // - Description similarity: 10% (supporting signal)
-  const combinedSimilarity =
-    (entitySimilarity * 0.4) +
-    (phraseSimilarity * 0.3) +
-    (titleSimilarity * 0.2) +
-    (descSimilarity * 0.1);
+  // ADAPTIVE WEIGHTING:
+  // If entity/action signals are strong → use entity-focused weights
+  // If entity/action signals are weak but title/desc are strong → boost title/desc weights
+  const hasStrongSemanticSignals = (entitySimilarity > 0.3 || actionSimilarity > 0.3);
+  const hasStrongTextSignals = (titleSimilarity > 0.4 || descSimilarity > 0.4);
+
+  let combinedSimilarity;
+
+  if (hasStrongSemanticSignals) {
+    // Entity/action signals are strong → use semantic-focused weights
+    combinedSimilarity =
+      (entitySimilarity * 0.35) +
+      (actionSimilarity * 0.35) +
+      (titleSimilarity * 0.20) +
+      (descSimilarity * 0.10);
+  } else if (hasStrongTextSignals) {
+    // Text signals are strong but semantic signals weak → boost text weights
+    combinedSimilarity =
+      (entitySimilarity * 0.15) +
+      (actionSimilarity * 0.15) +
+      (titleSimilarity * 0.50) +
+      (descSimilarity * 0.20);
+  } else {
+    // Balanced weighting
+    combinedSimilarity =
+      (entitySimilarity * 0.30) +
+      (actionSimilarity * 0.30) +
+      (titleSimilarity * 0.30) +
+      (descSimilarity * 0.10);
+  }
 
   return combinedSimilarity;
 }
@@ -271,29 +337,26 @@ export function aggregateScenarios(scenarios: Scenario[]): AggregatedScenario[] 
 
   const aggregated: AggregatedScenario[] = [];
 
-  // Step 2: Within each primary group, cluster by title similarity
+  // Step 2: Within each primary group, cluster by similarity
   for (const [primaryKey, groupScenarios] of Object.entries(primaryGroups)) {
     const [dimension, rootCause] = primaryKey.split('||');
     const clusters: Scenario[][] = [];
 
-    // Cluster scenarios with similar titles and descriptions
+    // Cluster scenarios with similar semantic patterns
     for (const scenario of groupScenarios) {
       let addedToCluster = false;
 
       for (const cluster of clusters) {
         // Check if this scenario is similar to any scenario in the cluster
-        // Use comprehensive similarity that considers entities, phrases, title, and description
         const similarityScores = cluster.map(s => calculateScenarioSimilarity(scenario, s));
         const maxSimilarity = Math.max(...similarityScores);
 
-        // Similarity threshold: 0.25 (25% weighted similarity)
-        // Lower threshold appropriate for our sophisticated 4-signal weighted similarity:
-        // - Business entity overlap: 40% weight (e.g., both mention "timeline" + "pincode")
-        // - Key phrase matching: 30% weight (e.g., "skipped steps" vs "failed to progress")
-        // - Title token similarity: 20% weight
-        // - Description similarity: 10% weight
-        // This catches semantically identical issues even with completely different wording
-        if (maxSimilarity >= 0.25) {
+        // Similarity threshold: 0.30 (30% weighted similarity)
+        // This threshold works with our adaptive weighting system:
+        // - Strong semantic signals (entity + action patterns) → merge similar issues
+        // - Strong text signals (title + description tokens) → merge similar issues
+        // - Works for ANY domain without manual pattern definitions
+        if (maxSimilarity >= 0.30) {
           cluster.push(scenario);
           addedToCluster = true;
           break;
