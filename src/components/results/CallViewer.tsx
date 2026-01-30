@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Lightbulb, MessageSquare } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { IssueType, Severity } from '@/types';
+import { formatWhatHappenedText, parseFormattedText } from '@/utils/textFormatting';
 
 const issueTypeLabels: Record<IssueType, string> = {
   flow_deviation: 'Flow Deviation',
@@ -230,9 +231,29 @@ export function CallViewer() {
                       <div className="space-y-2">
                         <div>
                           <p className="text-xs font-medium text-[var(--color-slate-400)] mb-1">What Happened:</p>
-                          <p className="text-xs text-[var(--color-slate-300)]">
-                            {scenario.whatHappened}
-                          </p>
+                          <div className="text-xs text-[var(--color-slate-300)]">
+                            {(() => {
+                              const formatted = formatWhatHappenedText(scenario.whatHappened);
+                              const segments = parseFormattedText(formatted);
+
+                              return segments.map((segment, idx) => {
+                                if (segment.type === 'bullet') {
+                                  return (
+                                    <div key={idx} className="flex gap-2 ml-2 mt-1">
+                                      <span className="text-orange-400 flex-shrink-0">•</span>
+                                      <span>{segment.content}</span>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <p key={idx} className={idx > 0 ? 'mt-1' : ''}>
+                                      {segment.content}
+                                    </p>
+                                  );
+                                }
+                              });
+                            })()}
+                          </div>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-[var(--color-slate-400)] mb-1">Impact:</p>

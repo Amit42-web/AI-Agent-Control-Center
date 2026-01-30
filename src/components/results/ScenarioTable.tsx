@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Search, AlertTriangle, Info } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { Severity } from '@/types';
+import { formatWhatHappenedText, parseFormattedText } from '@/utils/textFormatting';
 
 const severityClasses: Record<Severity, string> = {
   critical: 'badge-critical',
@@ -232,9 +233,29 @@ export function ScenarioTable() {
                         <AlertTriangle className="w-4 h-4 text-orange-400" />
                         <p className="text-sm font-bold text-orange-400">What Happened</p>
                       </div>
-                      <p className="text-sm text-[var(--color-slate-200)] leading-relaxed">
-                        {scenario.whatHappened}
-                      </p>
+                      <div className="text-sm text-[var(--color-slate-200)] leading-relaxed">
+                        {(() => {
+                          const formatted = formatWhatHappenedText(scenario.whatHappened);
+                          const segments = parseFormattedText(formatted);
+
+                          return segments.map((segment, idx) => {
+                            if (segment.type === 'bullet') {
+                              return (
+                                <div key={idx} className="flex gap-2 ml-2 mt-2">
+                                  <span className="text-orange-400 flex-shrink-0">•</span>
+                                  <span>{segment.content}</span>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <p key={idx} className={idx > 0 ? 'mt-2' : ''}>
+                                  {segment.content}
+                                </p>
+                              );
+                            }
+                          });
+                        })()}
+                      </div>
                     </div>
 
                     {/* Impact - Business & Customer Effect */}
