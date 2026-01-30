@@ -16,6 +16,41 @@ export interface AggregatedScenario {
 }
 
 /**
+ * Extract key business entities from agent issue text
+ * These are domain-specific terms that identify what the issue is about
+ */
+function extractBusinessEntities(text: string): Set<string> {
+  const normalizedText = text.toLowerCase();
+  const entities = new Set<string>();
+
+  // Define key business entities to extract
+  const entityPatterns: Record<string, RegExp[]> = {
+    'bike': [/\bbike\b/gi, /\bvehicle\b/gi],
+    'timeline': [/\btimeline\b/gi, /\btime\s*line\b/gi],
+    'pincode': [/\bpincode\b/gi, /\bpin\s*code\b/gi, /\bzip\s*code\b/gi, /\bpostal\s*code\b/gi],
+    'showroom': [/\bshowroom\b/gi, /\bdealer\b/gi, /\bbranch\b/gi],
+    'qualification': [/\bqualification\b/gi, /\bqualify\b/gi, /\bverification\b/gi, /\bverify\b/gi],
+    'flow': [/\bflow\b/gi, /\bprocess\b/gi, /\bworkflow\b/gi],
+    'mandatory_step': [/\bmandatory\b/gi, /\brequired\b/gi, /\bessential\b/gi, /\bcore\b/gi],
+    'skip_action': [/\bskip(?:ped)?\b/gi, /\bmiss(?:ed)?\b/gi, /\bomit(?:ted)?\b/gi, /\bbypass(?:ed)?\b/gi, /\bjump(?:ed)?\b/gi],
+    'fail_action': [/\bfail(?:ed)?\b/gi, /\bdidn'?t\b/gi, /\bnever\b/gi, /\bunable\b/gi],
+    'progress': [/\bprogress\b/gi, /\bcomplete\b/gi, /\bfinish\b/gi],
+  };
+
+  // Extract each entity type
+  for (const [entityName, patterns] of Object.entries(entityPatterns)) {
+    for (const pattern of patterns) {
+      if (pattern.test(normalizedText)) {
+        entities.add(entityName);
+        break; // Found this entity, move to next
+      }
+    }
+  }
+
+  return entities;
+}
+
+/**
  * Extract key phrases from text (common multi-word patterns in agent issues)
  */
 function extractKeyPhrases(text: string): Set<string> {
@@ -35,18 +70,20 @@ function extractKeyPhrases(text: string): Set<string> {
     /(?:qualification|verification)\s+(?:flow|process|step)/gi,
     /(?:mandatory|required|essential)\s+(?:steps|flow|check|process)/gi,
 
-    // Skip/miss patterns
+    // Skip/miss/fail patterns - EXPANDED
     /(?:skip|miss|omit|bypass|jump)(?:ped|ed)?\s+(?:steps|flow|process|check|qualification|verification)/gi,
     /(?:skip|miss|omit|bypass|jump)(?:ped|ed)?\s+(?:mandatory|required|core)/gi,
-    /(?:not|never)\s+(?:captured|collected|gathered|obtained)/gi,
+    /(?:fail|unable|didn'?t|never)\s+(?:to\s+)?(?:progress|complete|finish|capture|collect)/gi,
+    /(?:not|never)\s+(?:captured|collected|gathered|obtained|completed)/gi,
 
-    // Jump/move patterns
+    // Jump/move/progress patterns
     /jump(?:ed)?\s+(?:directly|straight|immediately)\s+to/gi,
     /moved?\s+(?:directly|straight|immediately)\s+to/gi,
     /bypassed?\s+(?:and|to)/gi,
+    /progress(?:ed)?\s+through/gi,
 
     // Specific location/action combinations
-    /(?:to|at)\s+pincode/gi,
+    /(?:to|at|through)\s+(?:pincode|timeline|showroom|bike)/gi,
     /(?:flow|process)\s+(?:deviation|violation)/gi,
   ];
 
@@ -55,7 +92,7 @@ function extractKeyPhrases(text: string): Set<string> {
     if (matches) {
       matches.forEach(match => {
         // Normalize the matched phrase
-        const normalized = match.replace(/\s+/g, '_').replace(/[&]/g, 'and');
+        const normalized = match.replace(/\s+/g, '_').replace(/[&,]/g, 'and');
         phrases.add(normalized);
       });
     }
@@ -131,12 +168,37 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
 
 /**
  * Calculate comprehensive similarity between two scenarios
- * Uses multiple signals: title similarity, phrase matching, and description similarity
+ * Uses multiple signals: business entities, phrase matching, title similarity, and description similarity
  */
 function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): number {
-  // Signal 1: Key phrase matching (highest weight - if they share key phrases, likely same issue)
-  const phrases1 = extractKeyPhrases(scenario1.title + ' ' + scenario1.whatHappened);
-  const phrases2 = extractKeyPhrases(scenario2.title + ' ' + scenario2.whatHappened);
+  const fullText1 = scenario1.title + ' ' + scenario1.whatHappened;
+  const fullText2 = scenario2.title + ' ' + scenario2.whatHappened;
+
+  // Signal 1: Business entity overlap (NEW - highest priority)
+  // If they mention the same business concepts (bike, timeline, pincode), they're likely related
+  const entities1 = extractBusinessEntities(fullText1);
+  const entities2 = extractBusinessEntities(fullText2);
+
+  let entitySimilarity = 0;
+  if (entities1.size > 0 || entities2.size > 0) {
+    const entityIntersection = new Set([...entities1].filter(x => entities2.has(x)));
+    const entityUnion = new Set([...entities1, ...entities2]);
+    entitySimilarity = entityUnion.size > 0 ? entityIntersection.size / entityUnion.size : 0;
+
+    // BOOST: If they share multiple critical entities (timeline, pincode, bike, etc.),
+    // they're very likely the same issue
+    const criticalSharedEntities = [...entityIntersection].filter(e =>
+      ['bike', 'timeline', 'pincode', 'showroom'].includes(e)
+    );
+    if (criticalSharedEntities.length >= 2) {
+      // Boost entity similarity if they share 2+ critical business entities
+      entitySimilarity = Math.min(1.0, entitySimilarity * 1.5);
+    }
+  }
+
+  // Signal 2: Key phrase matching
+  const phrases1 = extractKeyPhrases(fullText1);
+  const phrases2 = extractKeyPhrases(fullText2);
 
   let phraseSimilarity = 0;
   if (phrases1.size > 0 || phrases2.size > 0) {
@@ -145,20 +207,22 @@ function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): 
     phraseSimilarity = phraseUnion.size > 0 ? phraseIntersection.size / phraseUnion.size : 0;
   }
 
-  // Signal 2: Title token similarity
+  // Signal 3: Title token similarity
   const titleSimilarity = calculateTokenSimilarity(scenario1.title, scenario2.title);
 
-  // Signal 3: Description similarity (what happened)
+  // Signal 4: Description similarity (what happened)
   const descSimilarity = calculateTokenSimilarity(scenario1.whatHappened, scenario2.whatHappened);
 
-  // Weighted combination:
-  // - Phrase similarity: 50% (most important - catches semantic meaning)
-  // - Title similarity: 35% (important for matching)
-  // - Description similarity: 15% (supporting signal)
+  // Weighted combination with NEW entity-based signal:
+  // - Entity similarity: 40% (highest - if they mention same business concepts, likely same issue)
+  // - Phrase similarity: 30% (catches action patterns like "skipped" vs "failed to progress")
+  // - Title similarity: 20% (important for matching)
+  // - Description similarity: 10% (supporting signal)
   const combinedSimilarity =
-    (phraseSimilarity * 0.5) +
-    (titleSimilarity * 0.35) +
-    (descSimilarity * 0.15);
+    (entitySimilarity * 0.4) +
+    (phraseSimilarity * 0.3) +
+    (titleSimilarity * 0.2) +
+    (descSimilarity * 0.1);
 
   return combinedSimilarity;
 }
@@ -207,17 +271,18 @@ export function aggregateScenarios(scenarios: Scenario[]): AggregatedScenario[] 
 
       for (const cluster of clusters) {
         // Check if this scenario is similar to any scenario in the cluster
-        // Use comprehensive similarity that considers title, phrases, and description
+        // Use comprehensive similarity that considers entities, phrases, title, and description
         const similarityScores = cluster.map(s => calculateScenarioSimilarity(scenario, s));
         const maxSimilarity = Math.max(...similarityScores);
 
-        // Similarity threshold: 0.3 (30% weighted similarity)
-        // Lower threshold because we now use multi-signal weighted similarity:
-        // - Key phrase matching (50% weight)
-        // - Title similarity (35% weight)
-        // - Description similarity (15% weight)
-        // This catches semantically similar issues even with very different wording
-        if (maxSimilarity >= 0.3) {
+        // Similarity threshold: 0.25 (25% weighted similarity)
+        // Lower threshold appropriate for our sophisticated 4-signal weighted similarity:
+        // - Business entity overlap: 40% weight (e.g., both mention "timeline" + "pincode")
+        // - Key phrase matching: 30% weight (e.g., "skipped steps" vs "failed to progress")
+        // - Title token similarity: 20% weight
+        // - Description similarity: 10% weight
+        // This catches semantically identical issues even with completely different wording
+        if (maxSimilarity >= 0.25) {
           cluster.push(scenario);
           addedToCluster = true;
           break;
