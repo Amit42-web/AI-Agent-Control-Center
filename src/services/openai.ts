@@ -32,6 +32,59 @@ export async function callOpenAI(
   return data.choices[0]?.message?.content || '';
 }
 
+/**
+ * Get embeddings for text using OpenAI's embedding model
+ * Used for semantic similarity calculations
+ */
+export async function getEmbedding(
+  apiKey: string,
+  text: string,
+  model: string = 'text-embedding-3-small'
+): Promise<number[]> {
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      input: text,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
+    throw new Error(error.error?.message || `OpenAI Embeddings API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.data[0]?.embedding || [];
+}
+
+/**
+ * Calculate cosine similarity between two embedding vectors
+ * Returns a value between -1 and 1 (typically 0-1 for normalized embeddings)
+ */
+export function cosineSimilarity(embedding1: number[], embedding2: number[]): number {
+  if (embedding1.length !== embedding2.length || embedding1.length === 0) {
+    return 0;
+  }
+
+  let dotProduct = 0;
+  let norm1 = 0;
+  let norm2 = 0;
+
+  for (let i = 0; i < embedding1.length; i++) {
+    dotProduct += embedding1[i] * embedding2[i];
+    norm1 += embedding1[i] * embedding1[i];
+    norm2 += embedding2[i] * embedding2[i];
+  }
+
+  const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2);
+  return magnitude === 0 ? 0 : dotProduct / magnitude;
+}
+
 export async function analyzeTranscript(
   apiKey: string,
   model: string,

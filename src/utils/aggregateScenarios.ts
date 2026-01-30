@@ -231,8 +231,20 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
 /**
  * Calculate comprehensive similarity between two scenarios
  * Uses adaptive weighting based on signal strength
+ *
+ * @param scenario1 First scenario
+ * @param scenario2 Second scenario
+ * @param embedding1 Optional pre-computed embedding for scenario1 (for semantic similarity)
+ * @param embedding2 Optional pre-computed embedding for scenario2 (for semantic similarity)
+ * @param useSemanticSimilarity Whether to include semantic similarity in the calculation
  */
-function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): number {
+function calculateScenarioSimilarity(
+  scenario1: Scenario,
+  scenario2: Scenario,
+  embedding1?: number[],
+  embedding2?: number[],
+  useSemanticSimilarity: boolean = false
+): number {
   const fullText1 = scenario1.title + ' ' + scenario1.whatHappened;
   const fullText2 = scenario2.title + ' ' + scenario2.whatHappened;
 
@@ -270,38 +282,101 @@ function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): 
   // Signal 4: Description similarity
   const descSimilarity = calculateTokenSimilarity(scenario1.whatHappened, scenario2.whatHappened);
 
+  // Signal 5: Semantic embedding similarity (captures paraphrasing and semantic equivalence)
+  let embeddingSimilarity = 0;
+  if (useSemanticSimilarity && embedding1 && embedding2 && embedding1.length > 0 && embedding2.length > 0) {
+    // Import cosine similarity dynamically to avoid circular dependencies
+    embeddingSimilarity = calculateCosineSimilarity(embedding1, embedding2);
+  }
+
   // ADAPTIVE WEIGHTING:
+  // If semantic embeddings available → include as a strong signal
   // If entity/action signals are strong → use entity-focused weights
   // If entity/action signals are weak but title/desc are strong → boost title/desc weights
+  const hasEmbeddings = useSemanticSimilarity && embeddingSimilarity > 0;
   const hasStrongSemanticSignals = (entitySimilarity > 0.3 || actionSimilarity > 0.3);
   const hasStrongTextSignals = (titleSimilarity > 0.4 || descSimilarity > 0.4);
+  const hasStrongEmbeddingSimilarity = (embeddingSimilarity > 0.7); // High embedding similarity indicates semantic equivalence
 
   let combinedSimilarity;
 
-  if (hasStrongSemanticSignals) {
-    // Entity/action signals are strong → use semantic-focused weights
-    combinedSimilarity =
-      (entitySimilarity * 0.35) +
-      (actionSimilarity * 0.35) +
-      (titleSimilarity * 0.20) +
-      (descSimilarity * 0.10);
-  } else if (hasStrongTextSignals) {
-    // Text signals are strong but semantic signals weak → boost text weights
-    combinedSimilarity =
-      (entitySimilarity * 0.15) +
-      (actionSimilarity * 0.15) +
-      (titleSimilarity * 0.50) +
-      (descSimilarity * 0.20);
+  if (hasEmbeddings) {
+    // Embeddings available - use 5-signal weighting
+    if (hasStrongEmbeddingSimilarity) {
+      // Very similar semantically → trust embeddings more
+      combinedSimilarity =
+        (embeddingSimilarity * 0.40) +
+        (entitySimilarity * 0.20) +
+        (actionSimilarity * 0.20) +
+        (titleSimilarity * 0.15) +
+        (descSimilarity * 0.05);
+    } else if (hasStrongSemanticSignals) {
+      // Entity/action signals are strong → balanced semantic+lexical
+      combinedSimilarity =
+        (embeddingSimilarity * 0.25) +
+        (entitySimilarity * 0.25) +
+        (actionSimilarity * 0.25) +
+        (titleSimilarity * 0.15) +
+        (descSimilarity * 0.10);
+    } else {
+      // Balanced weighting with embeddings
+      combinedSimilarity =
+        (embeddingSimilarity * 0.30) +
+        (entitySimilarity * 0.20) +
+        (actionSimilarity * 0.20) +
+        (titleSimilarity * 0.20) +
+        (descSimilarity * 0.10);
+    }
   } else {
-    // Balanced weighting
-    combinedSimilarity =
-      (entitySimilarity * 0.30) +
-      (actionSimilarity * 0.30) +
-      (titleSimilarity * 0.30) +
-      (descSimilarity * 0.10);
+    // No embeddings - use original 4-signal weighting
+    if (hasStrongSemanticSignals) {
+      // Entity/action signals are strong → use semantic-focused weights
+      combinedSimilarity =
+        (entitySimilarity * 0.35) +
+        (actionSimilarity * 0.35) +
+        (titleSimilarity * 0.20) +
+        (descSimilarity * 0.10);
+    } else if (hasStrongTextSignals) {
+      // Text signals are strong but semantic signals weak → boost text weights
+      combinedSimilarity =
+        (entitySimilarity * 0.15) +
+        (actionSimilarity * 0.15) +
+        (titleSimilarity * 0.50) +
+        (descSimilarity * 0.20);
+    } else {
+      // Balanced weighting
+      combinedSimilarity =
+        (entitySimilarity * 0.30) +
+        (actionSimilarity * 0.30) +
+        (titleSimilarity * 0.30) +
+        (descSimilarity * 0.10);
+    }
   }
 
   return combinedSimilarity;
+}
+
+/**
+ * Calculate cosine similarity between two embedding vectors
+ * (Inline version to avoid import issues)
+ */
+function calculateCosineSimilarity(embedding1: number[], embedding2: number[]): number {
+  if (embedding1.length !== embedding2.length || embedding1.length === 0) {
+    return 0;
+  }
+
+  let dotProduct = 0;
+  let norm1 = 0;
+  let norm2 = 0;
+
+  for (let i = 0; i < embedding1.length; i++) {
+    dotProduct += embedding1[i] * embedding2[i];
+    norm1 += embedding1[i] * embedding1[i];
+    norm2 += embedding2[i] * embedding2[i];
+  }
+
+  const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2);
+  return magnitude === 0 ? 0 : dotProduct / magnitude;
 }
 
 /**
@@ -317,8 +392,20 @@ function getHighestSeverity(severities: Severity[]): Severity {
 /**
  * Aggregate scenarios by dimension, root cause, and title similarity
  */
-export function aggregateScenarios(scenarios: Scenario[]): AggregatedScenario[] {
+/**
+ * Aggregate scenarios with optional semantic similarity via embeddings
+ *
+ * @param scenarios The scenarios to aggregate
+ * @param scenarioEmbeddings Optional map of scenario ID to embedding vector
+ * @returns Aggregated scenarios
+ */
+export function aggregateScenarios(
+  scenarios: Scenario[],
+  scenarioEmbeddings?: Map<string, number[]>
+): AggregatedScenario[] {
   if (scenarios.length === 0) return [];
+
+  const useSemanticSimilarity = scenarioEmbeddings && scenarioEmbeddings.size > 0;
 
   // Step 1: Group by dimension and root cause
   const primaryGroups = scenarios.reduce((acc, scenario) => {
@@ -346,13 +433,25 @@ export function aggregateScenarios(scenarios: Scenario[]): AggregatedScenario[] 
     for (const scenario of groupScenarios) {
       let addedToCluster = false;
 
+      const scenarioEmbedding = useSemanticSimilarity ? scenarioEmbeddings?.get(scenario.id) : undefined;
+
       for (const cluster of clusters) {
         // Check if this scenario is similar to any scenario in the cluster
-        const similarityScores = cluster.map(s => calculateScenarioSimilarity(scenario, s));
+        const similarityScores = cluster.map(s => {
+          const clusterScenarioEmbedding = useSemanticSimilarity ? scenarioEmbeddings?.get(s.id) : undefined;
+          return calculateScenarioSimilarity(
+            scenario,
+            s,
+            scenarioEmbedding,
+            clusterScenarioEmbedding,
+            useSemanticSimilarity
+          );
+        });
         const maxSimilarity = Math.max(...similarityScores);
 
         // Similarity threshold: 0.30 (30% weighted similarity)
         // This threshold works with our adaptive weighting system:
+        // - Strong semantic embedding signals (paraphrasing detection) → merge similar issues
         // - Strong semantic signals (entity + action patterns) → merge similar issues
         // - Strong text signals (title + description tokens) → merge similar issues
         // - Works for ANY domain without manual pattern definitions
@@ -449,4 +548,100 @@ export function getAggregationSummary(aggregated: AggregatedScenario[]) {
     avgScenariosPerGroup,
     totalCalls: allCallIds.size
   };
+}
+
+/**
+ * Pre-compute embeddings for all scenarios to enable semantic similarity
+ * This is called before aggregateScenarios() when semantic deduplication is enabled
+ *
+ * ## Why Semantic Similarity?
+ *
+ * Traditional lexical similarity (word overlap) struggles with paraphrasing:
+ * - "incorrect finance percentages were communicated"
+ * - "incorrect states 95% finance as a definite outcome"
+ *
+ * These describe the SAME issue but have different wording. Semantic similarity
+ * using embeddings detects that they have the same meaning and should be deduplicated.
+ *
+ * ## Usage Example:
+ *
+ * ```typescript
+ * // Step 1: Compute embeddings for all scenarios
+ * const embeddings = await computeScenarioEmbeddings(
+ *   scenarios,
+ *   apiKey,
+ *   'text-embedding-3-small'
+ * );
+ *
+ * // Step 2: Aggregate with semantic similarity enabled
+ * const aggregated = aggregateScenarios(scenarios, embeddings);
+ * ```
+ *
+ * ## How It Works:
+ *
+ * 1. Each scenario's title + description is converted to a vector embedding
+ * 2. Cosine similarity between embeddings measures semantic closeness (0-1)
+ * 3. High embedding similarity (>0.7) indicates paraphrasing or semantic equivalence
+ * 4. The similarity is combined with lexical signals in adaptive weighting:
+ *    - Strong embedding similarity → 40% weight (trusted more)
+ *    - Balanced mode → 30% weight (equal with other signals)
+ * 5. The 30% overall threshold still applies for clustering
+ *
+ * ## Performance:
+ *
+ * - Batch processing with 50 scenarios per batch
+ * - Rate limit protection with 100ms delays
+ * - OpenAI text-embedding-3-small: ~$0.02 per 1M tokens (~500 scenarios)
+ *
+ * @param scenarios The scenarios to compute embeddings for
+ * @param apiKey OpenAI API key
+ * @param model Embedding model to use (default: text-embedding-3-small)
+ * @returns Map of scenario ID to embedding vector
+ */
+export async function computeScenarioEmbeddings(
+  scenarios: Scenario[],
+  apiKey: string,
+  model: string = 'text-embedding-3-small'
+): Promise<Map<string, number[]>> {
+  // Dynamically import to avoid issues with server/client imports
+  const { getEmbedding } = await import('@/services/openai');
+
+  const embeddingsMap = new Map<string, number[]>();
+
+  // Batch process embeddings to avoid rate limits
+  // OpenAI allows ~3000 requests/min for embeddings, but we'll be conservative
+  const batchSize = 50;
+
+  for (let i = 0; i < scenarios.length; i += batchSize) {
+    const batch = scenarios.slice(i, i + batchSize);
+
+    const promises = batch.map(async (scenario) => {
+      try {
+        // Combine title and whatHappened for semantic context
+        const text = scenario.title + ' ' + scenario.whatHappened;
+        const embedding = await getEmbedding(apiKey, text, model);
+        return { id: scenario.id, embedding };
+      } catch (error) {
+        console.error(`Failed to get embedding for scenario ${scenario.id}:`, error);
+        return { id: scenario.id, embedding: [] };
+      }
+    });
+
+    const results = await Promise.all(promises);
+
+    results.forEach(({ id, embedding }) => {
+      if (embedding.length > 0) {
+        embeddingsMap.set(id, embedding);
+      }
+    });
+
+    // Small delay between batches to respect rate limits
+    if (i + batchSize < scenarios.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  console.log(`Computed ${embeddingsMap.size} embeddings out of ${scenarios.length} scenarios`);
+
+  return embeddingsMap;
 }
