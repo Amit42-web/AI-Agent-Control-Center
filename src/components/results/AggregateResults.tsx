@@ -300,7 +300,7 @@ export function AggregateResults() {
     };
   }, [scenarioResults]);
 
-  // Calculate Burning Issues - unified view of top priority issues across all types
+  // Calculate Impact Zone - unified view of top priority issues across all types
   const burningIssues = useMemo(() => {
     if (flowType !== 'open-ended' || !scenarioAggregation) return [];
 
@@ -733,7 +733,7 @@ export function AggregateResults() {
           </motion.div>
         )}
 
-        {/* Burning Issues - Top Priority Issues */}
+        {/* Impact Zone - Top Priority Issues */}
         <motion.div
           className="relative glass-card p-6 overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
@@ -749,7 +749,7 @@ export function AggregateResults() {
               <AlertTriangle className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white">🔥 Burning Issues</h3>
+              <h3 className="text-xl font-bold text-white">🎯 Impact Zone</h3>
               <p className="text-sm text-[var(--color-slate-400)]">Top 10 priorities • Click to investigate</p>
             </div>
             <div className="ml-auto px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
@@ -761,7 +761,7 @@ export function AggregateResults() {
             {burningIssues.length === 0 ? (
               <div className="text-center py-12 text-[var(--color-slate-400)]">
                 <CheckCircle className="w-16 h-16 mx-auto mb-3 text-green-400" />
-                <p className="text-lg font-medium">No burning issues found</p>
+                <p className="text-lg font-medium">No high-impact issues found</p>
                 <p className="text-sm">Your analysis is looking great!</p>
               </div>
             ) : (
@@ -799,6 +799,37 @@ export function AggregateResults() {
                 };
                 const style = severityStyles[issue.severity];
 
+                // Calculate priority level based on multi-factor score
+                const getPriorityLevel = (priority: number): 'High' | 'Medium' | 'Low' => {
+                  if (priority >= 1000) return 'High';
+                  if (priority >= 100) return 'Medium';
+                  return 'Low';
+                };
+                const priorityLevel = getPriorityLevel(issue.priority);
+
+                // Priority badge styling
+                const priorityStyles = {
+                  High: {
+                    bg: 'bg-red-600',
+                    text: 'text-white',
+                    border: 'border-red-400',
+                    icon: '🔴'
+                  },
+                  Medium: {
+                    bg: 'bg-yellow-600',
+                    text: 'text-white',
+                    border: 'border-yellow-400',
+                    icon: '🟡'
+                  },
+                  Low: {
+                    bg: 'bg-blue-600',
+                    text: 'text-white',
+                    border: 'border-blue-400',
+                    icon: '🔵'
+                  }
+                };
+                const priorityStyle = priorityStyles[priorityLevel];
+
                 return (
                   <motion.div
                     key={issue.id}
@@ -827,12 +858,17 @@ export function AggregateResults() {
                     </div>
 
                     <div className="pl-20 pr-6 py-5">
-                      {/* Issue Title and Severity */}
+                      {/* Issue Title, Priority, and Severity */}
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <h4 className="text-white font-semibold text-base leading-tight flex-grow group-hover:text-white transition-colors">
                           {issue.title}
                         </h4>
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* Priority Badge */}
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${priorityStyle.bg} ${priorityStyle.text} shadow-lg border ${priorityStyle.border}`}>
+                            {priorityLevel} Priority
+                          </span>
+                          {/* Severity Badge */}
                           <span className="text-xl">{style.icon}</span>
                           <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-gradient-to-r ${style.gradient} text-white shadow-lg`}>
                             {issue.severity}
