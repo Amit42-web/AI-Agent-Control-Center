@@ -29,6 +29,7 @@ function extractBusinessEntities(text: string): Set<string> {
     'timeline': [/\btimeline\b/gi, /\btime\s*line\b/gi],
     'pincode': [/\bpincode\b/gi, /\bpin\s*code\b/gi, /\bzip\s*code\b/gi, /\bpostal\s*code\b/gi],
     'showroom': [/\bshowroom\b/gi, /\bdealer\b/gi, /\bbranch\b/gi],
+    'customer_name': [/\bcustomer\s+name\b/gi, /\bname\s+capture\b/gi, /\bname\s+verification\b/gi, /\bidentity\b/gi, /\bcustomer\s+(?:info|information|details)\b/gi],
     'qualification': [/\bqualification\b/gi, /\bqualify\b/gi, /\bverification\b/gi, /\bverify\b/gi],
     'flow': [/\bflow\b/gi, /\bprocess\b/gi, /\bworkflow\b/gi],
     'mandatory_step': [/\bmandatory\b/gi, /\brequired\b/gi, /\bessential\b/gi, /\bcore\b/gi],
@@ -64,6 +65,13 @@ function extractKeyPhrases(text: string): Set<string> {
     /bike\s+(?:qualification|verification|check|detail|info|data|step)/gi,
     /timeline\s+(?:qualification|verification|check|detail|info|data|step)/gi,
     /(?:bike|vehicle)\s+(?:&|and)\s+(?:timeline|time)/gi,
+
+    // Customer name & identity patterns (NEW)
+    /(?:customer\s+)?name\s+(?:capture|verification|check|collection|identity)/gi,
+    /(?:capture|collect|verify|confirm|get|obtain|gather)\s+(?:customer\s+)?(?:name|identity)/gi,
+    /(?:skip|miss|omit|bypass|fail)(?:ped|ed)?\s+(?:to\s+)?(?:capture|collect|verify|get)\s+(?:customer\s+)?name/gi,
+    /(?:not|never|didn'?t)\s+(?:capture|collect|verify|get|obtain)\s+(?:correct\s+)?(?:customer\s+)?name/gi,
+    /name\s+(?:after|when|during)\s+(?:mismatch|confirm|identity)/gi,
 
     // Core flow patterns
     /core\s+flow\s+(?:steps|process)/gi,
@@ -139,6 +147,9 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
     'collected': 'collect',
     'gathered': 'collect',
     'obtained': 'collect',
+    'name': 'name',
+    'identity': 'name',
+    'customer': 'customer',
     'timeline': 'timeline',
     'bike': 'bike',
     'core': 'core',
@@ -185,10 +196,10 @@ function calculateScenarioSimilarity(scenario1: Scenario, scenario2: Scenario): 
     const entityUnion = new Set([...entities1, ...entities2]);
     entitySimilarity = entityUnion.size > 0 ? entityIntersection.size / entityUnion.size : 0;
 
-    // BOOST: If they share multiple critical entities (timeline, pincode, bike, etc.),
+    // BOOST: If they share multiple critical entities (timeline, pincode, bike, customer_name, etc.),
     // they're very likely the same issue
     const criticalSharedEntities = [...entityIntersection].filter(e =>
-      ['bike', 'timeline', 'pincode', 'showroom'].includes(e)
+      ['bike', 'timeline', 'pincode', 'showroom', 'customer_name'].includes(e)
     );
     if (criticalSharedEntities.length >= 2) {
       // Boost entity similarity if they share 2+ critical business entities
