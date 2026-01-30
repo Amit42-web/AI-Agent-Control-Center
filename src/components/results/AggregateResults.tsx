@@ -300,6 +300,54 @@ export function AggregateResults() {
     };
   }, [scenarioResults]);
 
+  // Calculate Burning Issues - unified view of top priority issues across all types
+  const burningIssues = useMemo(() => {
+    if (flowType !== 'open-ended' || !scenarioAggregation) return [];
+
+    interface BurningIssue {
+      id: string;
+      title: string;
+      type: 'scenario' | 'standard' | 'custom';
+      severity: Severity;
+      occurrences: number;
+      affectedCalls: number;
+      priority: number;
+      dimension?: string;
+      rootCause?: string;
+      callIds: string[];
+    }
+
+    const issues: BurningIssue[] = [];
+
+    // Add aggregated scenarios
+    scenarioAggregation.aggregatedScenarios.forEach(scenario => {
+      const severityWeight = {
+        critical: 1000,
+        high: 100,
+        medium: 10,
+        low: 1
+      }[scenario.severity];
+
+      const priority = severityWeight + (scenario.occurrences * 10) + (scenario.uniqueCalls * 5);
+
+      issues.push({
+        id: scenario.id,
+        title: scenario.title,
+        type: 'scenario',
+        severity: scenario.severity,
+        occurrences: scenario.occurrences,
+        affectedCalls: scenario.uniqueCalls,
+        priority,
+        dimension: scenario.dimension,
+        rootCause: scenario.rootCauseType,
+        callIds: scenario.affectedCallIds
+      });
+    });
+
+    // Sort by priority and take top 10
+    return issues.sort((a, b) => b.priority - a.priority).slice(0, 10);
+  }, [flowType, scenarioAggregation]);
+
   // Early return if no data
   if (!results && !scenarioResults) return null;
 
@@ -685,7 +733,7 @@ export function AggregateResults() {
           </motion.div>
         )}
 
-        {/* Call Distribution Chart */}
+        {/* Burning Issues - Top Priority Issues */}
         <motion.div
           className="glass-card p-6"
           initial={{ opacity: 0, y: 20 }}
@@ -693,73 +741,81 @@ export function AggregateResults() {
           transition={{ delay: 0.7 }}
         >
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">Scenarios per Call (Top 10)</h3>
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <h3 className="text-lg font-semibold text-white">Burning Issues (Top 10)</h3>
             <span className="ml-auto text-sm text-[var(--color-slate-400)]">
-              {scenarioAggregation.affectedCalls} calls with scenarios • Click bar to view call details
+              Issues to focus on • Click to view details
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsBarChart
-              data={scenarioAggregation.callDistributionData}
-              layout="vertical"
-              onClick={(data) => {
-                if (data && data.activeLabel) {
-                  const callId = String(data.activeLabel);
-                  setSelectedCallId(callId);
-                  // Find first issue in this call
-                  const callIssues = results?.issues?.filter(issue => issue.callId === callId) || [];
-                  setSelectedIssueId(callIssues.length > 0 ? callIssues[0].id : null);
-                }
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-              <XAxis
-                type="number"
-                stroke="#94a3b8"
-                style={{ fontSize: '12px' }}
-              />
-              <YAxis
-                type="category"
-                dataKey="callId"
-                stroke="#94a3b8"
-                style={{ fontSize: '11px' }}
-                width={100}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
-                  borderRadius: '8px',
-                  color: '#fff'
-                }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div style={{
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        color: '#fff'
-                      }}>
-                        <p style={{ marginBottom: '4px', fontWeight: 'bold' }}>{payload[0].payload.callId}</p>
-                        <p style={{ color: '#60a5fa' }}>{payload[0].value} scenarios</p>
-                        <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Click to view call details</p>
+          <div className="space-y-3">
+            {burningIssues.length === 0 ? (
+              <div className="text-center py-8 text-[var(--color-slate-400)]">
+                No issues found
+              </div>
+            ) : (
+              burningIssues.map((issue, index) => (
+                <motion.div
+                  key={issue.id}
+                  className="glass-card-hover p-4 cursor-pointer transition-all hover:bg-white/5"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  onClick={() => {
+                    // Set the first call from this issue as selected
+                    if (issue.callIds && issue.callIds.length > 0) {
+                      setSelectedCallId(issue.callIds[0]);
+                      // Find first scenario in this aggregated group
+                      const aggregatedScenario = scenarioAggregation.aggregatedScenarios.find(
+                        s => s.id === issue.id
+                      );
+                      if (aggregatedScenario && aggregatedScenario.scenarios.length > 0) {
+                        const firstScenario = aggregatedScenario.scenarios[0];
+                        const matchingIssueId = findMatchingIssue(firstScenario, results?.issues || []);
+                        setSelectedIssueId(matchingIssueId);
+                      }
+                    }
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--color-slate-700)] flex items-center justify-center text-sm font-bold text-white">
+                      {index + 1}
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-white font-medium truncate">{issue.title}</h4>
+                        <span className={`badge ${severityClasses[issue.severity]} text-xs px-2 py-0.5 rounded`}>
+                          {issue.severity}
+                        </span>
                       </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Bar
-                dataKey="scenarios"
-                fill="#3b82f6"
-                radius={[0, 8, 8, 0]}
-                cursor="pointer"
-              />
-            </RechartsBarChart>
-          </ResponsiveContainer>
+                      <div className="flex items-center gap-4 text-xs text-[var(--color-slate-400)]">
+                        {issue.dimension && (
+                          <span className="flex items-center gap-1">
+                            <span>{dimensionLabels[issue.dimension]?.icon || '📊'}</span>
+                            <span>{dimensionLabels[issue.dimension]?.short || issue.dimension}</span>
+                          </span>
+                        )}
+                        {issue.rootCause && (
+                          <span className="flex items-center gap-1">
+                            <span>{rcaCategoryLabels[issue.rootCause]?.icon || '🔍'}</span>
+                            <span>{rcaCategoryLabels[issue.rootCause]?.short || issue.rootCause}</span>
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <BarChart3 className="w-3 h-3" />
+                          <span>{issue.occurrences} occurrence{issue.occurrences !== 1 ? 's' : ''}</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          <span>{issue.affectedCalls} call{issue.affectedCalls !== 1 ? 's' : ''}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-[var(--color-slate-500)] flex-shrink-0 mt-1" />
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
         </motion.div>
 
         {/* RCA Category Breakdown with Nested Aggregated Scenarios */}
