@@ -735,85 +735,158 @@ export function AggregateResults() {
 
         {/* Burning Issues - Top Priority Issues */}
         <motion.div
-          className="glass-card p-6"
+          className="relative glass-card p-6 overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(220, 38, 38, 0.02) 100%)',
+            borderLeft: '3px solid rgba(239, 68, 68, 0.5)'
+          }}
         >
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
-            <h3 className="text-lg font-semibold text-white">Burning Issues (Top 10)</h3>
-            <span className="ml-auto text-sm text-[var(--color-slate-400)]">
-              Issues to focus on • Click to view details
-            </span>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-lg shadow-red-500/30">
+              <AlertTriangle className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">🔥 Burning Issues</h3>
+              <p className="text-sm text-[var(--color-slate-400)]">Top 10 priorities • Click to investigate</p>
+            </div>
+            <div className="ml-auto px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+              <p className="text-2xl font-bold text-red-400">{burningIssues.length}</p>
+              <p className="text-xs text-[var(--color-slate-400)]">Issues</p>
+            </div>
           </div>
           <div className="space-y-3">
             {burningIssues.length === 0 ? (
-              <div className="text-center py-8 text-[var(--color-slate-400)]">
-                No issues found
+              <div className="text-center py-12 text-[var(--color-slate-400)]">
+                <CheckCircle className="w-16 h-16 mx-auto mb-3 text-green-400" />
+                <p className="text-lg font-medium">No burning issues found</p>
+                <p className="text-sm">Your analysis is looking great!</p>
               </div>
             ) : (
-              burningIssues.map((issue, index) => (
-                <motion.div
-                  key={issue.id}
-                  className="glass-card-hover p-4 cursor-pointer transition-all hover:bg-white/5"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  onClick={() => {
-                    // Set the first call from this issue as selected
-                    if (issue.callIds && issue.callIds.length > 0) {
-                      setSelectedCallId(issue.callIds[0]);
-                      // Find first scenario in this aggregated group
-                      const aggregatedScenario = scenarioAggregation.aggregatedScenarios.find(
-                        s => s.id === issue.id
-                      );
-                      if (aggregatedScenario && aggregatedScenario.scenarios.length > 0) {
-                        const firstScenario = aggregatedScenario.scenarios[0];
-                        const matchingIssueId = findMatchingIssue(firstScenario, results?.issues || []);
-                        setSelectedIssueId(matchingIssueId);
+              burningIssues.map((issue, index) => {
+                // Get severity styling
+                const severityStyles = {
+                  critical: {
+                    gradient: 'from-red-600 to-red-700',
+                    glow: 'shadow-red-500/50',
+                    border: 'border-red-500/30',
+                    bg: 'bg-red-500/10',
+                    icon: '🔴'
+                  },
+                  high: {
+                    gradient: 'from-orange-500 to-orange-600',
+                    glow: 'shadow-orange-500/40',
+                    border: 'border-orange-500/30',
+                    bg: 'bg-orange-500/10',
+                    icon: '🟠'
+                  },
+                  medium: {
+                    gradient: 'from-yellow-500 to-yellow-600',
+                    glow: 'shadow-yellow-500/30',
+                    border: 'border-yellow-500/30',
+                    bg: 'bg-yellow-500/10',
+                    icon: '🟡'
+                  },
+                  low: {
+                    gradient: 'from-green-500 to-green-600',
+                    glow: 'shadow-green-500/20',
+                    border: 'border-green-500/30',
+                    bg: 'bg-green-500/10',
+                    icon: '🟢'
+                  }
+                };
+                const style = severityStyles[issue.severity];
+
+                return (
+                  <motion.div
+                    key={issue.id}
+                    className={`relative group cursor-pointer rounded-xl border ${style.border} ${style.bg} backdrop-blur-sm overflow-hidden transition-all duration-300 hover:shadow-xl ${style.glow} hover:scale-[1.02] hover:border-opacity-60`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 * index, type: 'spring', stiffness: 100 }}
+                    onClick={() => {
+                      if (issue.callIds && issue.callIds.length > 0) {
+                        setSelectedCallId(issue.callIds[0]);
+                        const aggregatedScenario = scenarioAggregation.aggregatedScenarios.find(
+                          s => s.id === issue.id
+                        );
+                        if (aggregatedScenario && aggregatedScenario.scenarios.length > 0) {
+                          const firstScenario = aggregatedScenario.scenarios[0];
+                          const matchingIssueId = findMatchingIssue(firstScenario, results?.issues || []);
+                          setSelectedIssueId(matchingIssueId);
+                        }
                       }
-                    }
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--color-slate-700)] flex items-center justify-center text-sm font-bold text-white">
-                      {index + 1}
+                    }}
+                  >
+                    {/* Rank badge with gradient */}
+                    <div className={`absolute top-0 left-0 w-16 h-16 bg-gradient-to-br ${style.gradient} flex items-center justify-center`}>
+                      <span className="text-2xl font-black text-white drop-shadow-lg">#{index + 1}</span>
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
                     </div>
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-white font-medium truncate">{issue.title}</h4>
-                        <span className={`badge ${severityClasses[issue.severity]} text-xs px-2 py-0.5 rounded`}>
-                          {issue.severity}
-                        </span>
+
+                    <div className="pl-20 pr-6 py-5">
+                      {/* Issue Title and Severity */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <h4 className="text-white font-semibold text-base leading-tight flex-grow group-hover:text-white transition-colors">
+                          {issue.title}
+                        </h4>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xl">{style.icon}</span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-gradient-to-r ${style.gradient} text-white shadow-lg`}>
+                            {issue.severity}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-[var(--color-slate-400)]">
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                            <BarChart3 className="w-4 h-4 text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-white font-semibold">{issue.occurrences}</p>
+                            <p className="text-xs text-[var(--color-slate-400)]">Occurrence{issue.occurrences !== 1 ? 's' : ''}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-purple-400" />
+                          </div>
+                          <div>
+                            <p className="text-white font-semibold">{issue.affectedCalls}</p>
+                            <p className="text-xs text-[var(--color-slate-400)]">Call{issue.affectedCalls !== 1 ? 's' : ''} Affected</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         {issue.dimension && (
-                          <span className="flex items-center gap-1">
+                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-[var(--color-slate-300)] border border-white/10 flex items-center gap-1.5">
                             <span>{dimensionLabels[issue.dimension]?.icon || '📊'}</span>
                             <span>{dimensionLabels[issue.dimension]?.short || issue.dimension}</span>
                           </span>
                         )}
                         {issue.rootCause && (
-                          <span className="flex items-center gap-1">
+                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-[var(--color-slate-300)] border border-white/10 flex items-center gap-1.5">
                             <span>{rcaCategoryLabels[issue.rootCause]?.icon || '🔍'}</span>
                             <span>{rcaCategoryLabels[issue.rootCause]?.short || issue.rootCause}</span>
                           </span>
                         )}
-                        <span className="flex items-center gap-1">
-                          <BarChart3 className="w-3 h-3" />
-                          <span>{issue.occurrences} occurrence{issue.occurrences !== 1 ? 's' : ''}</span>
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" />
-                          <span>{issue.affectedCalls} call{issue.affectedCalls !== 1 ? 's' : ''}</span>
+                        <span className="ml-auto text-[var(--color-slate-500)] group-hover:text-white transition-colors">
+                          <ArrowRight className="w-5 h-5" />
                         </span>
                       </div>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-[var(--color-slate-500)] flex-shrink-0 mt-1" />
-                  </div>
-                </motion.div>
-              ))
+
+                    {/* Hover gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                  </motion.div>
+                );
+              })
             )}
           </div>
         </motion.div>
