@@ -102,6 +102,10 @@ function findMatchingIssue(scenario: { callId: string; lineNumbers: number[] }, 
 export function AggregateResults() {
   const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedIssueId, setSelectedDimension } = useAppStore();
 
+  // State for auto-expanding scenarios when clicking from Impact Zone
+  const [autoExpandTarget, setAutoExpandTarget] = React.useState<{ scenarioId: string; timestamp: number } | null>(null);
+  const rcaBreakdownRef = React.useRef<HTMLDivElement>(null);
+
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
       return issueTypeLabels[type];
@@ -838,16 +842,21 @@ export function AggregateResults() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.05 * index, type: 'spring', stiffness: 100 }}
                     onClick={() => {
-                      if (issue.callIds && issue.callIds.length > 0) {
-                        setSelectedCallId(issue.callIds[0]);
-                        const aggregatedScenario = scenarioAggregation.aggregatedScenarios.find(
-                          s => s.id === issue.id
-                        );
-                        if (aggregatedScenario && aggregatedScenario.scenarios.length > 0) {
-                          const firstScenario = aggregatedScenario.scenarios[0];
-                          const matchingIssueId = findMatchingIssue(firstScenario, results?.issues || []);
-                          setSelectedIssueId(matchingIssueId);
-                        }
+                      // Instead of navigating to a single call, expand the aggregated view
+                      const aggregatedScenario = scenarioAggregation.aggregatedScenarios.find(
+                        s => s.id === issue.id
+                      );
+                      if (aggregatedScenario) {
+                        // Set target for auto-expansion with timestamp to trigger re-render
+                        setAutoExpandTarget({ scenarioId: issue.id, timestamp: Date.now() });
+
+                        // Scroll to the RCA breakdown section after a short delay
+                        setTimeout(() => {
+                          rcaBreakdownRef.current?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                          });
+                        }, 100);
                       }
                     }}
                   >
@@ -928,11 +937,14 @@ export function AggregateResults() {
         </motion.div>
 
         {/* RCA Category Breakdown with Nested Aggregated Scenarios */}
-        <DimensionBreakdownWithAggregation
-          dimensionChartData={scenarioAggregation.rcaCategoryChartData}
-          aggregatedScenarios={scenarioAggregation.aggregatedScenarios}
-          issues={results?.issues || []}
-        />
+        <div ref={rcaBreakdownRef}>
+          <DimensionBreakdownWithAggregation
+            dimensionChartData={scenarioAggregation.rcaCategoryChartData}
+            aggregatedScenarios={scenarioAggregation.aggregatedScenarios}
+            issues={results?.issues || []}
+            autoExpandTarget={autoExpandTarget}
+          />
+        </div>
       </div>
     );
   }
@@ -1471,15 +1483,33 @@ function ObjectiveIssuesBreakdown({
 function DimensionBreakdownWithAggregation({
   dimensionChartData,
   aggregatedScenarios,
-  issues
+  issues,
+  autoExpandTarget
 }: {
   dimensionChartData: any[];
   aggregatedScenarios: AggregatedScenario[];
   issues: DetectedIssue[];
+  autoExpandTarget?: { scenarioId: string; timestamp: number } | null;
 }) {
   const { setSelectedCallId, setSelectedIssueId, setResultsViewMode, setSelectedDimension } = useAppStore();
   const [expandedDimensions, setExpandedDimensions] = React.useState<Set<string>>(new Set());
   const [expandedScenarios, setExpandedScenarios] = React.useState<Set<string>>(new Set());
+
+  // Auto-expand when clicking from Impact Zone
+  React.useEffect(() => {
+    if (autoExpandTarget) {
+      const targetScenario = aggregatedScenarios.find(s => s.id === autoExpandTarget.scenarioId);
+      if (targetScenario) {
+        // Find the dimension (RCA category) for this scenario
+        const dimensionData = dimensionChartData.find(d => d.name === targetScenario.rootCauseType);
+        if (dimensionData) {
+          // Expand both dimension and scenario
+          setExpandedDimensions(prev => new Set(prev).add(dimensionData.fullName));
+          setExpandedScenarios(prev => new Set(prev).add(targetScenario.groupKey));
+        }
+      }
+    }
+  }, [autoExpandTarget, aggregatedScenarios, dimensionChartData]);
 
   const toggleDimension = (dimensionName: string) => {
     const newExpanded = new Set(expandedDimensions);
