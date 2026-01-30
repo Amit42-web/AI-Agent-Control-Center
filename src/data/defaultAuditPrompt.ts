@@ -73,5 +73,6 @@ When categorizing as NOVEL:
 - **Constructive Tone**: Be specific and actionable, not just critical
 - **Subtle Issues**: Catch the "technically correct but unhelpful" responses that humans often miss
 - **Novel Detection**: Stay alert for issue types that don't fit existing dimensions
+- **Avoid Duplicates**: If you identify multiple instances of the SAME underlying issue (e.g., "skipped bike verification" vs "missed mandatory bike check"), consolidate them into ONE scenario with consistent wording. Use precise, standardized titles to prevent duplicate categorization.
 
-Quality over quantity - each scenario should be meaningful, clearly categorized, and actionable.`;
+Quality over quantity - each scenario should be meaningful, clearly categorized, and actionable. Use consistent terminology in titles to avoid creating duplicate issues.`;

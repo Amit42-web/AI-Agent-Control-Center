@@ -18,12 +18,42 @@ export interface AggregatedScenario {
 /**
  * Calculate similarity between two strings (0-1 score)
  * Uses token-based comparison with Jaccard similarity
+ * Filters stop words and handles common synonyms
  */
 function calculateSimilarity(str1: string, str2: string): number {
-  const normalize = (s: string) => s.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter(Boolean);
+  // Common stop words to filter out
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'from', 'by', 'as', 'is', 'was', 'are', 'been', 'be',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+    'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those'
+  ]);
+
+  // Synonym mappings for common words in agent issues
+  const synonymMap: Record<string, string> = {
+    'required': 'mandatory',
+    'mandatory': 'mandatory',
+    'skipped': 'missed',
+    'missed': 'missed',
+    'jumped': 'moved',
+    'moved': 'moved',
+    'flow': 'process',
+    'process': 'process',
+    'steps': 'process',
+    'procedure': 'process',
+    'qualification': 'verify',
+    'verification': 'verify',
+    'validate': 'verify',
+  };
+
+  const normalize = (s: string) => {
+    return s.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !stopWords.has(word))
+      .map(word => synonymMap[word] || word)
+      .filter(Boolean);
+  };
 
   const tokens1 = new Set(normalize(str1));
   const tokens2 = new Set(normalize(str2));
@@ -83,8 +113,9 @@ export function aggregateScenarios(scenarios: Scenario[]): AggregatedScenario[] 
         const similarityScores = cluster.map(s => calculateSimilarity(scenario.title, s.title));
         const maxSimilarity = Math.max(...similarityScores);
 
-        // Similarity threshold: 0.6 (60% similar)
-        if (maxSimilarity >= 0.6) {
+        // Similarity threshold: 0.4 (40% similar after stop word filtering and synonym mapping)
+        // Lowered from 0.6 to better catch semantically similar issues with different wording
+        if (maxSimilarity >= 0.4) {
           cluster.push(scenario);
           addedToCluster = true;
           break;
