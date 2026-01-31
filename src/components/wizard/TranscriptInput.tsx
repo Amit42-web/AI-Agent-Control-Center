@@ -218,8 +218,22 @@ export function TranscriptInput() {
             continue;
           }
 
+          // Check format: SPEAKER_NAME timestamp (message on next line)
+          // e.g., "Tara   00:00:00" followed by message text on next line(s)
+          // or "+918250082114   00:00:07" followed by message text on next line(s)
+          const speakerTimestampOnlyMatch = trimmedLine.match(/^(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})$/);
+          if (speakerTimestampOnlyMatch) {
+            const speakerName = speakerTimestampOnlyMatch[1];
+            const speakerStr = speakerName.toLowerCase();
+            const isMobileNumber = /^\+?\d{10,}$/.test(speakerName);
+            speaker = (speakerStr === 'customer' || isMobileNumber ? 'customer' : 'agent') as 'agent' | 'customer';
+            timestamp = speakerTimestampOnlyMatch[2];
+            console.log(`Found ${speaker} (${speakerName}) at ${timestamp}, reading message from next line(s)`);
+            // Message will be read from following lines below
+          }
+
           // Check if line starts with "setup user" (bot/agent)
-          if (trimmedLine.toLowerCase().startsWith('setup user')) {
+          if (!speaker && trimmedLine.toLowerCase().startsWith('setup user')) {
             speaker = 'agent';
             // Extract timestamp: "setup user  00:00:01" or "Setup User   00:00:01"
             const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
@@ -445,8 +459,22 @@ export function TranscriptInput() {
             continue;
           }
 
+          // Check format: SPEAKER_NAME timestamp (message on next line)
+          // e.g., "Tara   00:00:00" followed by message text on next line(s)
+          // or "+918250082114   00:00:07" followed by message text on next line(s)
+          const speakerTimestampOnlyMatch = trimmedLine.match(/^(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})$/);
+          if (speakerTimestampOnlyMatch) {
+            const speakerName = speakerTimestampOnlyMatch[1];
+            const speakerStr = speakerName.toLowerCase();
+            const isMobileNumber = /^\+?\d{10,}$/.test(speakerName);
+            speaker = (speakerStr === 'customer' || isMobileNumber ? 'customer' : 'agent') as 'agent' | 'customer';
+            timestamp = speakerTimestampOnlyMatch[2];
+            console.log(`Found ${speaker} (${speakerName}) at ${timestamp}, reading message from next line(s)`);
+            // Message will be read from following lines below
+          }
+
           // Check if line starts with "setup user" (bot/agent)
-          if (trimmedLine.toLowerCase().startsWith('setup user')) {
+          if (!speaker && trimmedLine.toLowerCase().startsWith('setup user')) {
             speaker = 'agent';
             const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
             if (match) {
@@ -454,7 +482,7 @@ export function TranscriptInput() {
             }
           }
           // Check if line starts with phone number (customer) - with optional + prefix
-          else if (/^\+?\d{10,}/.test(trimmedLine)) {
+          else if (!speaker && /^\+?\d{10,}/.test(trimmedLine)) {
             speaker = 'customer';
             const match = trimmedLine.match(/^\+?(\d+)\s+(\d{2}:\d{2}:\d{2})/);
             if (match) {
