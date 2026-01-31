@@ -153,11 +153,13 @@ export function TranscriptInput() {
 
           // Check format: SPEAKER_NAME timestamp text (e.g., "Tara 00:00:22 text" or "CUSTOMER 00:00:37 text")
           // This handles cases where speaker name/label comes before the timestamp
-          const speakerTimestampMatch = trimmedLine.match(/^([A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+          // Also handles mobile numbers as speaker names (e.g., "919820203664 00:00:05 text")
+          const speakerTimestampMatch = trimmedLine.match(/^(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
           if (speakerTimestampMatch) {
             const speakerStr = speakerTimestampMatch[1].toLowerCase();
-            // If speaker is explicitly "customer", map to customer; otherwise treat as agent
-            speaker = (speakerStr === 'customer' ? 'customer' : 'agent') as 'agent' | 'customer';
+            // If speaker is "customer" (case-insensitive) OR a mobile number → customer; otherwise → agent
+            const isMobileNumber = /^\+?\d{10,}$/.test(speakerTimestampMatch[1]);
+            speaker = (speakerStr === 'customer' || isMobileNumber ? 'customer' : 'agent') as 'agent' | 'customer';
             timestamp = speakerTimestampMatch[2];
             parsedLines.push({
               speaker,
@@ -331,11 +333,13 @@ export function TranscriptInput() {
 
           // Check format: SPEAKER_NAME timestamp text (e.g., "Tara 00:00:22 text" or "CUSTOMER 00:00:37 text")
           // This handles cases where speaker name/label comes before the timestamp
-          const speakerTimestampMatch = trimmedLine.match(/^([A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+          // Also handles mobile numbers as speaker names (e.g., "919820203664 00:00:05 text")
+          const speakerTimestampMatch = trimmedLine.match(/^(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
           if (speakerTimestampMatch) {
             const speakerStr = speakerTimestampMatch[1].toLowerCase();
-            // If speaker is explicitly "customer", map to customer; otherwise treat as agent
-            speaker = (speakerStr === 'customer' ? 'customer' : 'agent') as 'agent' | 'customer';
+            // If speaker is "customer" (case-insensitive) OR a mobile number → customer; otherwise → agent
+            const isMobileNumber = /^\+?\d{10,}$/.test(speakerTimestampMatch[1]);
+            speaker = (speakerStr === 'customer' || isMobileNumber ? 'customer' : 'agent') as 'agent' | 'customer';
             timestamp = speakerTimestampMatch[2];
             parsedLines.push({
               speaker,
