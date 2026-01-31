@@ -151,6 +151,24 @@ export function TranscriptInput() {
             continue;
           }
 
+          // Check format: SPEAKER_NAME timestamp text (e.g., "Tara 00:00:22 text" or "CUSTOMER 00:00:37 text")
+          // This handles cases where speaker name/label comes before the timestamp
+          const speakerTimestampMatch = trimmedLine.match(/^([A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+          if (speakerTimestampMatch) {
+            const speakerStr = speakerTimestampMatch[1].toLowerCase();
+            // If speaker is explicitly "customer", map to customer; otherwise treat as agent
+            speaker = (speakerStr === 'customer' ? 'customer' : 'agent') as 'agent' | 'customer';
+            timestamp = speakerTimestampMatch[2];
+            parsedLines.push({
+              speaker,
+              text: speakerTimestampMatch[3].trim(),
+              timestamp,
+            });
+            console.log(`Parsed ${speaker} (${speakerTimestampMatch[1]}) at ${timestamp}:`, speakerTimestampMatch[3].substring(0, 50));
+            i++;
+            continue;
+          }
+
           // Check if line starts with "setup user" (bot/agent)
           if (trimmedLine.toLowerCase().startsWith('setup user')) {
             speaker = 'agent';
@@ -307,6 +325,24 @@ export function TranscriptInput() {
               timestamp,
             });
             console.log(`Parsed ${speaker} at ${timestamp}:`, timestampSpeakerMatch[3].substring(0, 50));
+            i++;
+            continue;
+          }
+
+          // Check format: SPEAKER_NAME timestamp text (e.g., "Tara 00:00:22 text" or "CUSTOMER 00:00:37 text")
+          // This handles cases where speaker name/label comes before the timestamp
+          const speakerTimestampMatch = trimmedLine.match(/^([A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+          if (speakerTimestampMatch) {
+            const speakerStr = speakerTimestampMatch[1].toLowerCase();
+            // If speaker is explicitly "customer", map to customer; otherwise treat as agent
+            speaker = (speakerStr === 'customer' ? 'customer' : 'agent') as 'agent' | 'customer';
+            timestamp = speakerTimestampMatch[2];
+            parsedLines.push({
+              speaker,
+              text: speakerTimestampMatch[3].trim(),
+              timestamp,
+            });
+            console.log(`Parsed ${speaker} (${speakerTimestampMatch[1]}) at ${timestamp}:`, speakerTimestampMatch[3].substring(0, 50));
             i++;
             continue;
           }
@@ -558,7 +594,9 @@ export function TranscriptInput() {
                     <li>One row = one complete call (multi-line transcripts in ONE cell)</li>
                     <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">setup user 00:00:00 Message</code> for agent</li>
                     <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">00:00:00 AGENT Message</code> for agent (alternate)</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05 Message</code> for customer</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">AgentName 00:00:00 Message</code> for agent (name-first)</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">CUSTOMER 00:00:05 Message</code> for customer</li>
+                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05 Message</code> for customer (phone)</li>
                     <li>First row should be header: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Transcript</code></li>
                   </ul>
                 </div>
@@ -569,7 +607,7 @@ export function TranscriptInput() {
                   <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
                     <li>One .txt file = one complete call transcript</li>
                     <li>You can upload multiple .txt files at once</li>
-                    <li>Each file uses the same format as CSV cells (setup user / phone number)</li>
+                    <li>Each file uses the same formats as CSV (speaker name/label, timestamp, message)</li>
                     <li>Multi-line content is supported within each file</li>
                   </ul>
                 </div>
