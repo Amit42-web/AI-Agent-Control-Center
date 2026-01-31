@@ -27,6 +27,50 @@ import {
 
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
+/**
+ * Process items in parallel with concurrency control
+ * @param items - Array of items to process
+ * @param processFn - Async function to process each item
+ * @param concurrency - Maximum number of concurrent operations (default: 10)
+ * @param onProgress - Optional callback for progress updates (completed, total)
+ */
+async function processInParallel<T, R>(
+  items: T[],
+  processFn: (item: T, index: number) => Promise<R>,
+  concurrency: number = 10,
+  onProgress?: (completed: number, total: number) => void
+): Promise<R[]> {
+  const results: R[] = [];
+  let completed = 0;
+
+  // Process items in batches with concurrency limit
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchPromises = batch.map((item, batchIndex) =>
+      processFn(item, i + batchIndex)
+    );
+
+    const batchResults = await Promise.allSettled(batchPromises);
+
+    // Extract successful results and log errors
+    batchResults.forEach((result, batchIndex) => {
+      completed++;
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        console.error(`Error processing item ${i + batchIndex}:`, result.reason);
+      }
+
+      // Update progress after each item completes
+      if (onProgress) {
+        onProgress(completed, items.length);
+      }
+    });
+  }
+
+  return results;
+}
+
 const initialState = {
   flowType: 'objective' as const,
   resultsViewMode: 'detailed' as const,
@@ -172,17 +216,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       if (flowType === 'objective') {
         // Objective Flow: Issue-based analysis
-        const allIssues: DetectedIssue[] = [];
         const totalTranscripts = transcripts.length;
 
-        // Analyze each transcript
-        for (let i = 0; i < totalTranscripts; i++) {
-          const transcript = transcripts[i];
-          const progress = Math.floor(((i + 1) / totalTranscripts) * 90); // Reserve last 10% for aggregation
-          set({ runProgress: progress });
+        console.log(`Starting parallel analysis of ${totalTranscripts} transcripts with concurrency limit of 10`);
 
-          try {
-            console.log(`Starting analysis of transcript ${transcript.id} (${i + 1}/${totalTranscripts})`);
+        // Analyze transcripts in parallel with concurrency control
+        const allIssuesArrays = await processInParallel(
+          transcripts,
+          async (transcript, index) => {
+            console.log(`Starting analysis of transcript ${transcript.id} (${index + 1}/${totalTranscripts})`);
             const issues = await analyzeTranscript(
               apiKey,
               openaiConfig.model,
@@ -192,13 +234,18 @@ export const useAppStore = create<AppState>((set, get) => ({
               knowledgeBaseEnabled ? knowledgeBase : null
             );
             console.log(`Completed analysis of transcript ${transcript.id}, found ${issues.length} issues`);
-            allIssues.push(...issues);
-          } catch (error) {
-            console.error(`Error analyzing transcript ${transcript.id}:`, error);
-            alert(`Error analyzing transcript ${transcript.id}: ${error instanceof Error ? error.message : String(error)}`);
-            // Continue with other transcripts
+            return issues;
+          },
+          10, // Concurrency limit: process 10 transcripts at a time
+          (completed, total) => {
+            // Update progress: reserve last 10% for aggregation
+            const progress = Math.floor((completed / total) * 90);
+            set({ runProgress: progress });
           }
-        }
+        );
+
+        // Flatten all issues into a single array
+        const allIssues = allIssuesArrays.flat();
 
         set({ runProgress: 95 });
 
@@ -254,17 +301,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       } else {
         // Open-Ended Flow: Scenario-based analysis
-        const allScenarios: Scenario[] = [];
         const totalTranscripts = transcripts.length;
 
-        // Analyze each transcript for scenarios
-        for (let i = 0; i < totalTranscripts; i++) {
-          const transcript = transcripts[i];
-          const progress = Math.floor(((i + 1) / totalTranscripts) * 90);
-          set({ runProgress: progress });
+        console.log(`Starting parallel scenario analysis of ${totalTranscripts} transcripts with concurrency limit of 10`);
 
-          try {
-            console.log(`Starting scenario analysis of transcript ${transcript.id} (${i + 1}/${totalTranscripts})`);
+        // Analyze transcripts for scenarios in parallel with concurrency control
+        const allScenariosArrays = await processInParallel(
+          transcripts,
+          async (transcript, index) => {
+            console.log(`Starting scenario analysis of transcript ${transcript.id} (${index + 1}/${totalTranscripts})`);
             const scenarios = await analyzeTranscriptScenarios(
               apiKey,
               openaiConfig.model,
@@ -274,13 +319,18 @@ export const useAppStore = create<AppState>((set, get) => ({
               knowledgeBaseEnabled ? knowledgeBase : null
             );
             console.log(`Completed scenario analysis of transcript ${transcript.id}, found ${scenarios.length} scenarios`);
-            allScenarios.push(...scenarios);
-          } catch (error) {
-            console.error(`Error analyzing transcript ${transcript.id}:`, error);
-            alert(`Error analyzing transcript ${transcript.id}: ${error instanceof Error ? error.message : String(error)}`);
-            // Continue with other transcripts
+            return scenarios;
+          },
+          10, // Concurrency limit: process 10 transcripts at a time
+          (completed, total) => {
+            // Update progress: reserve last 10% for aggregation
+            const progress = Math.floor((completed / total) * 90);
+            set({ runProgress: progress });
           }
-        }
+        );
+
+        // Flatten all scenarios into a single array
+        const allScenarios = allScenariosArrays.flat();
 
         set({ runProgress: 95 });
 
