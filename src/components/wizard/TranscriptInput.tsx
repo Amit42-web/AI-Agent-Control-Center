@@ -112,13 +112,12 @@ export function TranscriptInput() {
         console.log(`\nParsing transcript ${index + 1}:`);
         console.log('First 200 chars:', transcriptText.substring(0, 200));
 
-        // Simple parsing: HH:MM:SS SPEAKER message format
-        // The transcript already has proper speakers and timestamps
+        // Multi-format parser supporting various transcript formats
         const lines = transcriptText.split('\n');
         const parsedLines = [];
 
-        for (const line of lines) {
-          const trimmedLine = line.trim();
+        for (let i = 0; i < lines.length; i++) {
+          const trimmedLine = lines[i].trim();
 
           // Skip empty lines and header lines
           if (!trimmedLine ||
@@ -127,33 +126,113 @@ export function TranscriptInput() {
             continue;
           }
 
-          // Match format: HH:MM:SS SPEAKER message
-          // Where SPEAKER can be AGENT, CUSTOMER, BOT, etc.
-          const match = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(AGENT|CUSTOMER|BOT|agent|customer|bot)\s+(.+)$/i);
+          let speaker: 'agent' | 'customer' | null = null;
+          let timestamp: string | undefined;
+          let messageText = '';
 
-          if (match) {
-            const timestamp = match[1];
-            const speakerStr = match[2].toLowerCase();
-            const speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
-            let messageText = match[3].trim();
+          // FORMAT 1: HH:MM:SS SPEAKER message (new simple format)
+          const format1 = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(AGENT|CUSTOMER|BOT|agent|customer|bot)\s+(.+)$/i);
+          if (format1) {
+            timestamp = format1[1];
+            const speakerStr = format1[2].toLowerCase();
+            speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
+            messageText = format1[3].trim();
 
-            // Clean up embedded speaker+timestamp patterns (like "Tara 00:00:15")
-            // Remove patterns like "Name HH:MM:SS" or "Number HH:MM:SS" from within the message
+            // Clean up embedded speaker+timestamp patterns
             messageText = messageText.replace(/\b([A-Za-z]+|\+?\d+)\s+\d{2}:\d{2}:\d{2}\b/g, '').trim();
-            // Clean up extra spaces that might result from removal
             messageText = messageText.replace(/\s+/g, ' ').trim();
 
             if (messageText) {
-              parsedLines.push({
-                speaker,
-                text: messageText,
-                timestamp,
-              });
-              console.log(`Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 1] Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
             }
-          } else {
-            console.warn('Line did not match HH:MM:SS SPEAKER format:', trimmedLine.substring(0, 100));
+            continue;
           }
+
+          // FORMAT 2: setup user HH:MM:SS (agent, message on next line)
+          const format2 = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
+          if (format2) {
+            speaker = 'agent';
+            timestamp = format2[1];
+            // Read message from next line(s)
+            i++;
+            const messageLines: string[] = [];
+            while (i < lines.length) {
+              const nextLine = lines[i].trim();
+              if (!nextLine) {
+                i++;
+                continue;
+              }
+              // Check if this is another speaker line
+              if (nextLine.match(/setup\s+user\s+\d{2}:\d{2}:\d{2}/i) ||
+                  nextLine.match(/^\+?\d{10,}\s+\d{2}:\d{2}:\d{2}/) ||
+                  nextLine.match(/^\d{2}:\d{2}:\d{2}\s+(AGENT|CUSTOMER|BOT)/i)) {
+                i--;
+                break;
+              }
+              messageLines.push(nextLine);
+              i++;
+              // Only take one line for message (can be adjusted if multi-line needed)
+              break;
+            }
+            messageText = messageLines.join(' ').trim();
+            if (messageText) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 2] Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // FORMAT 3: phone number HH:MM:SS (customer, message on next line)
+          const format3 = trimmedLine.match(/^\+?(\d{10,})\s+(\d{2}:\d{2}:\d{2})/);
+          if (format3) {
+            speaker = 'customer';
+            timestamp = format3[2];
+            // Read message from next line(s)
+            i++;
+            const messageLines: string[] = [];
+            while (i < lines.length) {
+              const nextLine = lines[i].trim();
+              if (!nextLine) {
+                i++;
+                continue;
+              }
+              // Check if this is another speaker line
+              if (nextLine.match(/setup\s+user\s+\d{2}:\d{2}:\d{2}/i) ||
+                  nextLine.match(/^\+?\d{10,}\s+\d{2}:\d{2}:\d{2}/) ||
+                  nextLine.match(/^\d{2}:\d{2}:\d{2}\s+(AGENT|CUSTOMER|BOT)/i)) {
+                i--;
+                break;
+              }
+              messageLines.push(nextLine);
+              i++;
+              // Only take one line for message
+              break;
+            }
+            messageText = messageLines.join(' ').trim();
+            if (messageText) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 3] Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // FORMAT 4: [SPEAKER]: message or SPEAKER: message
+          const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s+(.+)$/i);
+          if (format4) {
+            const speakerStr = format4[1].toLowerCase();
+            speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
+            messageText = format4[2].trim();
+            timestamp = undefined; // No timestamp in this format
+            if (messageText) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 4] Parsed ${speaker}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // No format matched
+          console.warn('Line did not match any supported format:', trimmedLine.substring(0, 100));
         }
 
         if (parsedLines.length === 0) {
@@ -196,13 +275,12 @@ export function TranscriptInput() {
         console.log(`\nProcessing text file: ${file.name}`);
         console.log('First 200 chars:', transcriptText.substring(0, 200));
 
-        // Simple parsing: HH:MM:SS SPEAKER message format
-        // The transcript already has proper speakers and timestamps
+        // Multi-format parser supporting various transcript formats
         const lines = transcriptText.split('\n');
         const parsedLines = [];
 
-        for (const line of lines) {
-          const trimmedLine = line.trim();
+        for (let i = 0; i < lines.length; i++) {
+          const trimmedLine = lines[i].trim();
 
           // Skip empty lines and header lines
           if (!trimmedLine ||
@@ -211,33 +289,113 @@ export function TranscriptInput() {
             continue;
           }
 
-          // Match format: HH:MM:SS SPEAKER message
-          // Where SPEAKER can be AGENT, CUSTOMER, BOT, etc.
-          const match = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(AGENT|CUSTOMER|BOT|agent|customer|bot)\s+(.+)$/i);
+          let speaker: 'agent' | 'customer' | null = null;
+          let timestamp: string | undefined;
+          let messageText = '';
 
-          if (match) {
-            const timestamp = match[1];
-            const speakerStr = match[2].toLowerCase();
-            const speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
-            let messageText = match[3].trim();
+          // FORMAT 1: HH:MM:SS SPEAKER message (new simple format)
+          const format1 = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(AGENT|CUSTOMER|BOT|agent|customer|bot)\s+(.+)$/i);
+          if (format1) {
+            timestamp = format1[1];
+            const speakerStr = format1[2].toLowerCase();
+            speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
+            messageText = format1[3].trim();
 
-            // Clean up embedded speaker+timestamp patterns (like "Tara 00:00:15")
-            // Remove patterns like "Name HH:MM:SS" or "Number HH:MM:SS" from within the message
+            // Clean up embedded speaker+timestamp patterns
             messageText = messageText.replace(/\b([A-Za-z]+|\+?\d+)\s+\d{2}:\d{2}:\d{2}\b/g, '').trim();
-            // Clean up extra spaces that might result from removal
             messageText = messageText.replace(/\s+/g, ' ').trim();
 
             if (messageText) {
-              parsedLines.push({
-                speaker,
-                text: messageText,
-                timestamp,
-              });
-              console.log(`Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 1] Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
             }
-          } else {
-            console.warn('Line did not match HH:MM:SS SPEAKER format:', trimmedLine.substring(0, 100));
+            continue;
           }
+
+          // FORMAT 2: setup user HH:MM:SS (agent, message on next line)
+          const format2 = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
+          if (format2) {
+            speaker = 'agent';
+            timestamp = format2[1];
+            // Read message from next line(s)
+            i++;
+            const messageLines: string[] = [];
+            while (i < lines.length) {
+              const nextLine = lines[i].trim();
+              if (!nextLine) {
+                i++;
+                continue;
+              }
+              // Check if this is another speaker line
+              if (nextLine.match(/setup\s+user\s+\d{2}:\d{2}:\d{2}/i) ||
+                  nextLine.match(/^\+?\d{10,}\s+\d{2}:\d{2}:\d{2}/) ||
+                  nextLine.match(/^\d{2}:\d{2}:\d{2}\s+(AGENT|CUSTOMER|BOT)/i)) {
+                i--;
+                break;
+              }
+              messageLines.push(nextLine);
+              i++;
+              // Only take one line for message (can be adjusted if multi-line needed)
+              break;
+            }
+            messageText = messageLines.join(' ').trim();
+            if (messageText) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 2] Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // FORMAT 3: phone number HH:MM:SS (customer, message on next line)
+          const format3 = trimmedLine.match(/^\+?(\d{10,})\s+(\d{2}:\d{2}:\d{2})/);
+          if (format3) {
+            speaker = 'customer';
+            timestamp = format3[2];
+            // Read message from next line(s)
+            i++;
+            const messageLines: string[] = [];
+            while (i < lines.length) {
+              const nextLine = lines[i].trim();
+              if (!nextLine) {
+                i++;
+                continue;
+              }
+              // Check if this is another speaker line
+              if (nextLine.match(/setup\s+user\s+\d{2}:\d{2}:\d{2}/i) ||
+                  nextLine.match(/^\+?\d{10,}\s+\d{2}:\d{2}:\d{2}/) ||
+                  nextLine.match(/^\d{2}:\d{2}:\d{2}\s+(AGENT|CUSTOMER|BOT)/i)) {
+                i--;
+                break;
+              }
+              messageLines.push(nextLine);
+              i++;
+              // Only take one line for message
+              break;
+            }
+            messageText = messageLines.join(' ').trim();
+            if (messageText) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 3] Parsed ${speaker} at ${timestamp}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // FORMAT 4: [SPEAKER]: message or SPEAKER: message
+          const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s+(.+)$/i);
+          if (format4) {
+            const speakerStr = format4[1].toLowerCase();
+            speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
+            messageText = format4[2].trim();
+            timestamp = undefined; // No timestamp in this format
+            if (messageText) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 4] Parsed ${speaker}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // No format matched
+          console.warn('Line did not match any supported format:', trimmedLine.substring(0, 100));
         }
 
         if (parsedLines.length > 0) {
@@ -411,12 +569,10 @@ export function TranscriptInput() {
                   </p>
                   <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
                     <li>One row = one complete call (multi-line transcripts in ONE cell)</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">setup user 00:00:00 Message</code> for agent</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">00:00:00 AGENT Message</code> for agent (alternate)</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">AgentName 00:00:00 Message</code> for agent (name-first)</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">CUSTOMER 00:00:05 Message</code> for customer</li>
-                    <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05 Message</code> for customer (phone)</li>
-                    <li>Supports embedded patterns: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Tara 00:00:05 text Tara 00:00:10 more text</code> (auto-splits)</li>
+                    <li>Format 1: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">00:00:00 AGENT Message</code> for agent</li>
+                    <li>Format 2: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">setup user 00:00:00</code> (message on next line)</li>
+                    <li>Format 3: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05</code> for customer (message on next line)</li>
+                    <li>Format 4: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">[AGENT]: Message</code> or <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">CUSTOMER: Message</code></li>
                     <li>First row should be header: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Transcript</code></li>
                   </ul>
                 </div>
@@ -427,7 +583,7 @@ export function TranscriptInput() {
                   <ul className="text-xs text-[var(--color-slate-400)] space-y-1 ml-4 list-disc">
                     <li>One .txt file = one complete call transcript</li>
                     <li>You can upload multiple .txt files at once</li>
-                    <li>Each file uses the same formats as CSV (speaker name/label, timestamp, message)</li>
+                    <li>Each file uses the same 4 formats listed above</li>
                     <li>Multi-line content is supported within each file</li>
                   </ul>
                 </div>
