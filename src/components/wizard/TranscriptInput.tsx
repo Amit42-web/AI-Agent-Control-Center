@@ -115,10 +115,51 @@ export function TranscriptInput() {
         // Parse transcript based on speaker indicators
         // Format: speaker and timestamp on one line, message on next line(s)
         // "setup user" = bot, phone number pattern = customer
-        const lines = transcriptText.split('\n');
+
+        // Preprocessing: Split lines that contain multiple embedded "SPEAKER HH:MM:SS" patterns
+        // This handles formats like: "हां. Tara 00:00:09 text1 Tara 00:00:11 text2"
+        let preprocessedText = transcriptText;
+        const embeddedSpeakerPattern = /(\+?\d{10,}|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})/g;
+
+        // For each line, check if it contains multiple speaker+timestamp patterns
+        const rawLines = transcriptText.split('\n');
+        const processedLines: string[] = [];
+
+        for (const rawLine of rawLines) {
+          const matches = Array.from(rawLine.matchAll(embeddedSpeakerPattern));
+
+          if (matches.length > 1) {
+            // Multiple speaker+timestamp patterns in one line - split them
+            console.log(`Found ${matches.length} embedded speaker patterns in line:`, rawLine.substring(0, 100));
+
+            for (let i = 0; i < matches.length; i++) {
+              const match = matches[i];
+              const startIdx = match.index!;
+              const endIdx = i < matches.length - 1 ? matches[i + 1].index! : rawLine.length;
+
+              // For the first segment, include any text before the first speaker pattern
+              const actualStartIdx = i === 0 ? 0 : startIdx;
+
+              // Extract the segment: "[prefix text] SPEAKER HH:MM:SS text until next speaker"
+              const segment = rawLine.substring(actualStartIdx, endIdx).trim();
+              if (segment) {
+                processedLines.push(segment);
+                console.log(`  Split segment ${i + 1}: ${segment.substring(0, 80)}`);
+              }
+            }
+          } else if (matches.length === 1) {
+            // Single pattern - include entire line (in case there's text before the pattern)
+            processedLines.push(rawLine);
+          } else {
+            // No pattern - keep as is
+            processedLines.push(rawLine);
+          }
+        }
+
+        const lines = processedLines;
         const parsedLines = [];
 
-        console.log(`Split into ${lines.length} lines`);
+        console.log(`Preprocessed ${rawLines.length} lines into ${lines.length} lines`);
 
         let i = 0;
         while (i < lines.length) {
@@ -154,19 +195,25 @@ export function TranscriptInput() {
           // Check format: SPEAKER_NAME timestamp text (e.g., "Tara 00:00:22 text" or "CUSTOMER 00:00:37 text")
           // This handles cases where speaker name/label comes before the timestamp
           // Also handles mobile numbers as speaker names (e.g., "919820203664 00:00:05 text")
-          const speakerTimestampMatch = trimmedLine.match(/^(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+          // Now also handles optional prefix text (e.g., "हां. Tara 00:00:09 text")
+          const speakerTimestampMatch = trimmedLine.match(/^(.*?)\s*(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
           if (speakerTimestampMatch) {
-            const speakerStr = speakerTimestampMatch[1].toLowerCase();
+            const prefixText = speakerTimestampMatch[1].trim();
+            const speakerName = speakerTimestampMatch[2];
+            const speakerStr = speakerName.toLowerCase();
             // If speaker is "customer" (case-insensitive) OR a mobile number → customer; otherwise → agent
-            const isMobileNumber = /^\+?\d{10,}$/.test(speakerTimestampMatch[1]);
+            const isMobileNumber = /^\+?\d{10,}$/.test(speakerName);
             speaker = (speakerStr === 'customer' || isMobileNumber ? 'customer' : 'agent') as 'agent' | 'customer';
-            timestamp = speakerTimestampMatch[2];
+            timestamp = speakerTimestampMatch[3];
+            const messageText = speakerTimestampMatch[4].trim();
+            // Combine prefix text with message if prefix exists
+            const fullText = prefixText ? `${prefixText} ${messageText}` : messageText;
             parsedLines.push({
               speaker,
-              text: speakerTimestampMatch[3].trim(),
+              text: fullText,
               timestamp,
             });
-            console.log(`Parsed ${speaker} (${speakerTimestampMatch[1]}) at ${timestamp}:`, speakerTimestampMatch[3].substring(0, 50));
+            console.log(`Parsed ${speaker} (${speakerName}) at ${timestamp}:`, fullText.substring(0, 50));
             i++;
             continue;
           }
@@ -295,10 +342,51 @@ export function TranscriptInput() {
 
         // Parse transcript based on speaker indicators
         // Format: speaker and timestamp on one line, message on next line(s)
-        const lines = transcriptText.split('\n');
+
+        // Preprocessing: Split lines that contain multiple embedded "SPEAKER HH:MM:SS" patterns
+        // This handles formats like: "हां. Tara 00:00:09 text1 Tara 00:00:11 text2"
+        let preprocessedText = transcriptText;
+        const embeddedSpeakerPattern = /(\+?\d{10,}|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})/g;
+
+        // For each line, check if it contains multiple speaker+timestamp patterns
+        const rawLines = transcriptText.split('\n');
+        const processedLines: string[] = [];
+
+        for (const rawLine of rawLines) {
+          const matches = Array.from(rawLine.matchAll(embeddedSpeakerPattern));
+
+          if (matches.length > 1) {
+            // Multiple speaker+timestamp patterns in one line - split them
+            console.log(`Found ${matches.length} embedded speaker patterns in line:`, rawLine.substring(0, 100));
+
+            for (let i = 0; i < matches.length; i++) {
+              const match = matches[i];
+              const startIdx = match.index!;
+              const endIdx = i < matches.length - 1 ? matches[i + 1].index! : rawLine.length;
+
+              // For the first segment, include any text before the first speaker pattern
+              const actualStartIdx = i === 0 ? 0 : startIdx;
+
+              // Extract the segment: "[prefix text] SPEAKER HH:MM:SS text until next speaker"
+              const segment = rawLine.substring(actualStartIdx, endIdx).trim();
+              if (segment) {
+                processedLines.push(segment);
+                console.log(`  Split segment ${i + 1}: ${segment.substring(0, 80)}`);
+              }
+            }
+          } else if (matches.length === 1) {
+            // Single pattern - include entire line (in case there's text before the pattern)
+            processedLines.push(rawLine);
+          } else {
+            // No pattern - keep as is
+            processedLines.push(rawLine);
+          }
+        }
+
+        const lines = processedLines;
         const parsedLines = [];
 
-        console.log(`Split into ${lines.length} lines`);
+        console.log(`Preprocessed ${rawLines.length} lines into ${lines.length} lines`);
 
         let i = 0;
         while (i < lines.length) {
@@ -334,19 +422,25 @@ export function TranscriptInput() {
           // Check format: SPEAKER_NAME timestamp text (e.g., "Tara 00:00:22 text" or "CUSTOMER 00:00:37 text")
           // This handles cases where speaker name/label comes before the timestamp
           // Also handles mobile numbers as speaker names (e.g., "919820203664 00:00:05 text")
-          const speakerTimestampMatch = trimmedLine.match(/^(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
+          // Now also handles optional prefix text (e.g., "हां. Tara 00:00:09 text")
+          const speakerTimestampMatch = trimmedLine.match(/^(.*?)\s*(\+?\d+|[A-Za-z]+)\s+(\d{2}:\d{2}:\d{2})\s+(.+)$/);
           if (speakerTimestampMatch) {
-            const speakerStr = speakerTimestampMatch[1].toLowerCase();
+            const prefixText = speakerTimestampMatch[1].trim();
+            const speakerName = speakerTimestampMatch[2];
+            const speakerStr = speakerName.toLowerCase();
             // If speaker is "customer" (case-insensitive) OR a mobile number → customer; otherwise → agent
-            const isMobileNumber = /^\+?\d{10,}$/.test(speakerTimestampMatch[1]);
+            const isMobileNumber = /^\+?\d{10,}$/.test(speakerName);
             speaker = (speakerStr === 'customer' || isMobileNumber ? 'customer' : 'agent') as 'agent' | 'customer';
-            timestamp = speakerTimestampMatch[2];
+            timestamp = speakerTimestampMatch[3];
+            const messageText = speakerTimestampMatch[4].trim();
+            // Combine prefix text with message if prefix exists
+            const fullText = prefixText ? `${prefixText} ${messageText}` : messageText;
             parsedLines.push({
               speaker,
-              text: speakerTimestampMatch[3].trim(),
+              text: fullText,
               timestamp,
             });
-            console.log(`Parsed ${speaker} (${speakerTimestampMatch[1]}) at ${timestamp}:`, speakerTimestampMatch[3].substring(0, 50));
+            console.log(`Parsed ${speaker} (${speakerName}) at ${timestamp}:`, fullText.substring(0, 50));
             i++;
             continue;
           }
@@ -601,6 +695,7 @@ export function TranscriptInput() {
                     <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">AgentName 00:00:00 Message</code> for agent (name-first)</li>
                     <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">CUSTOMER 00:00:05 Message</code> for customer</li>
                     <li>Format: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">919820203664 00:00:05 Message</code> for customer (phone)</li>
+                    <li>Supports embedded patterns: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Tara 00:00:05 text Tara 00:00:10 more text</code> (auto-splits)</li>
                     <li>First row should be header: <code className="bg-[var(--color-navy-700)] px-1 py-0.5 rounded">Transcript</code></li>
                   </ul>
                 </div>
