@@ -5,6 +5,22 @@ export interface OpenAIMessage {
   content: string;
 }
 
+/**
+ * Sanitize text to prevent JSON parsing issues
+ * Removes control characters and normalizes whitespace
+ */
+function sanitizeText(text: string): string {
+  return text
+    // Remove control characters except newline and tab
+    .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
+    // Normalize unicode quotes to ASCII
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    // Remove zero-width characters
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+}
+
 export async function callOpenAI(
   apiKey: string,
   model: string,
@@ -106,9 +122,9 @@ export async function analyzeTranscript(
     return [];
   }
 
-  // Build transcript text
+  // Build transcript text with sanitization
   const transcriptText = transcript.lines
-    .map((line, idx) => `[${idx + 1}] ${line.speaker.toUpperCase()}: ${line.text}`)
+    .map((line, idx) => `[${idx + 1}] ${line.speaker.toUpperCase()}: ${sanitizeText(line.text)}`)
     .join('\n');
 
   console.log(`Analyzing transcript ${transcript.id} with ${transcript.lines.length} lines`);
@@ -476,7 +492,7 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
   const issuesSummary = issues
     .map(
       (issue) =>
-        `Issue ID: ${issue.id}\nType: ${issue.type}\nSeverity: ${issue.severity}\nExplanation: ${issue.explanation}\nEvidence: ${issue.evidenceSnippet}`
+        `Issue ID: ${issue.id}\nType: ${issue.type}\nSeverity: ${issue.severity}\nExplanation: ${sanitizeText(issue.explanation)}\nEvidence: ${sanitizeText(issue.evidenceSnippet)}`
     )
     .join('\n\n---\n\n');
 
@@ -525,7 +541,8 @@ Think: "suggestion" = Exact prompt text to add | "exampleResponse" = What bot sa
       fixesData = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('Attempted to parse:', jsonStr.substring(0, 500)); // Log first 500 chars
+      console.error('Attempted to parse (first 500 chars):', jsonStr.substring(0, 500));
+      console.error('Last 200 chars:', jsonStr.substring(Math.max(0, jsonStr.length - 200)));
 
       // Try multiple cleanup strategies
       try {
@@ -537,6 +554,7 @@ Think: "suggestion" = Exact prompt text to add | "exampleResponse" = What bot sa
           .replace(/\t/g, ' ');            // Replace tabs with spaces
 
         fixesData = JSON.parse(cleaned);
+        console.log('Strategy 1 succeeded');
       } catch (secondError) {
         try {
           // Strategy 2: More aggressive - fix escaped quotes
@@ -547,14 +565,54 @@ Think: "suggestion" = Exact prompt text to add | "exampleResponse" = What bot sa
             .replace(/\s+/g, ' ');          // Collapse multiple spaces
 
           fixesData = JSON.parse(cleaned);
+          console.log('Strategy 2 succeeded');
         } catch (thirdError) {
-          // Last resort: try to extract just the arrays
-          console.error('All parsing strategies failed');
-          console.error('Original error:', parseError);
-          console.error('Second error:', secondError);
-          console.error('Third error:', thirdError);
+          try {
+            // Strategy 3: Ultra-aggressive cleanup for malformed strings
+            let cleaned = jsonStr
+              // Fix unescaped quotes in strings (try to escape quotes that aren't already escaped)
+              .replace(/([^\\])"([^":,}\]])/g, '$1\\"$2')
+              // Remove trailing commas
+              .replace(/,(\s*[}\]])/g, '$1')
+              // Normalize whitespace
+              .replace(/[\n\r\t]/g, ' ')
+              .replace(/\s+/g, ' ')
+              // Fix double backslashes
+              .replace(/\\\\\\/g, '\\')
+              // Remove any control characters
+              .replace(/[\x00-\x1F\x7F]/g, '');
 
-          throw new Error(`Failed to parse fix suggestions. The AI response was not in valid JSON format. Please try again.`);
+            fixesData = JSON.parse(cleaned);
+            console.log('Strategy 3 succeeded');
+          } catch (fourthError) {
+            // Strategy 4: Try to parse as lenient JSON by manually fixing common AI mistakes
+            try {
+              let cleaned = jsonStr
+                // Fix missing quotes around property names
+                .replace(/(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+                // Remove trailing commas
+                .replace(/,(\s*[}\]])/g, '$1')
+                // Normalize whitespace
+                .replace(/[\n\r\t]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+              fixesData = JSON.parse(cleaned);
+              console.log('Strategy 4 succeeded');
+            } catch (fifthError) {
+              // Last resort: log comprehensive error details
+              console.error('All 4 parsing strategies failed');
+              console.error('Original error:', parseError);
+              console.error('Second error:', secondError);
+              console.error('Third error:', thirdError);
+              console.error('Fourth error:', fourthError);
+              console.error('Fifth error:', fifthError);
+              console.error('\nFull response that failed to parse:');
+              console.error(jsonStr);
+
+              throw new Error(`Failed to parse fix suggestions. The AI response was not in valid JSON format. Please try again.`);
+            }
+          }
         }
       }
     }
@@ -634,9 +692,9 @@ export async function analyzeTranscriptScenarios(
     return [];
   }
 
-  // Build transcript text
+  // Build transcript text with sanitization
   const transcriptText = transcript.lines
-    .map((line, idx) => `[${idx + 1}] ${line.speaker.toUpperCase()}: ${line.text}`)
+    .map((line, idx) => `[${idx + 1}] ${line.speaker.toUpperCase()}: ${sanitizeText(line.text)}`)
     .join('\n');
 
   console.log(`Analyzing transcript ${transcript.id} for scenarios with ${transcript.lines.length} lines`);
