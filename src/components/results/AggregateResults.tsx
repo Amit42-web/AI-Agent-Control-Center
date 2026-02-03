@@ -1426,7 +1426,7 @@ function ObjectiveIssuesBreakdown({
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="text-xs font-mono text-blue-400">{instance.callId}</span>
+                                <span className="text-xs font-mono text-blue-400 hover:text-blue-300 hover:underline cursor-pointer">{instance.callId}</span>
                                 <span className="text-xs text-[var(--color-slate-500)]">•</span>
                                 <span className="text-xs text-[var(--color-slate-400)]">
                                   Lines {instance.lineNumbers[0]}-{instance.lineNumbers[instance.lineNumbers.length - 1]}
@@ -1788,7 +1788,7 @@ function DimensionBreakdownWithAggregation({
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                          <span className="text-xs font-mono text-blue-400">{scenario.callId}</span>
+                                          <span className="text-xs font-mono text-blue-400 hover:text-blue-300 hover:underline cursor-pointer">{scenario.callId}</span>
                                           <span className="text-xs text-[var(--color-slate-500)]">•</span>
                                           <span className="text-xs text-[var(--color-slate-400)]">Lines {scenario.lineNumbers[0]}-{scenario.lineNumbers[scenario.lineNumbers.length - 1]}</span>
                                           {scenario.title !== group.title && (
@@ -1976,7 +1976,7 @@ function AggregatedScenariosView({ aggregated, issues }: { aggregated: Aggregate
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-mono text-blue-400">{scenario.callId}</span>
+                                <span className="text-xs font-mono text-blue-400 hover:text-blue-300 hover:underline cursor-pointer">{scenario.callId}</span>
                                 <span className="text-xs text-[var(--color-slate-500)]">•</span>
                                 <span className="text-xs text-[var(--color-slate-400)]">Lines {scenario.lineNumbers[0]}-{scenario.lineNumbers[scenario.lineNumbers.length - 1]}</span>
                                 {scenario.title !== group.title && (
