@@ -432,124 +432,6 @@ export function AggregateResults() {
           </motion.div>
         </div>
 
-        {/* Interactive Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Audit Dimensions Distribution */}
-          <motion.div
-            className="glass-card p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <PieChart className="w-5 h-5 text-purple-400" />
-                <h3 className="text-lg font-semibold text-white">Scenarios by Audit Dimension</h3>
-              </div>
-              <p className="text-xs text-[var(--color-slate-400)] ml-7">Click any segment to filter scenarios</p>
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <RechartsPieChart
-                onClick={(data) => {
-                  if (data && data.activeLabel) {
-                    const clickedDimension = scenarioAggregation.dimensionChartData
-                      .filter(d => d.hasIssues)
-                      .find(d => d.shortName === data.activeLabel);
-                    if (clickedDimension) {
-                      setSelectedDimension(clickedDimension.fullName);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                  }
-                }}
-              >
-                <Pie
-                  data={scenarioAggregation.dimensionChartData.filter(d => d.hasIssues)}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry: any) => `${entry.icon} ${entry.shortName} (${entry.percentage}%)`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                  cursor="pointer"
-                >
-                  {scenarioAggregation.dimensionChartData.filter(d => d.hasIssues).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={DIMENSION_COLORS[index % DIMENSION_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div style={{
-                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                          border: '1px solid rgba(148, 163, 184, 0.2)',
-                          borderRadius: '8px',
-                          padding: '8px 12px',
-                          color: '#fff'
-                        }}>
-                          <p style={{ marginBottom: '4px', fontWeight: 'bold' }}>{data.icon} {data.shortName}</p>
-                          <p style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>{data.fullName}</p>
-                          <p style={{ color: '#60a5fa' }}>{data.value} scenarios across {data.uniqueCalls} calls</p>
-                          <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Click to filter</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-          </motion.div>
-
-          {/* Severity Distribution */}
-          <motion.div
-            className="glass-card p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-5 h-5 text-orange-400" />
-              <h3 className="text-lg font-semibold text-white">Severity Distribution</h3>
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <RechartsBarChart data={scenarioAggregation.severityChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-                <XAxis
-                  dataKey="name"
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-                <Bar dataKey="value" fill="#8884d8" radius={[8, 8, 0, 0]}>
-                  {scenarioAggregation.severityChartData.map((entry, index) => {
-                    const colorKey = entry.name.toLowerCase() as Severity;
-                    return <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[colorKey] || '#8884d8'} />;
-                  })}
-                </Bar>
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </motion.div>
-        </div>
 
         {/* Root Cause Distribution Chart */}
         {scenarioAggregation.rootCauseChartData && scenarioAggregation.rootCauseChartData.length > 0 && (
@@ -901,7 +783,12 @@ export function AggregateResults() {
                             <TrendingUp className="w-4 h-4 text-purple-400" />
                           </div>
                           <div>
-                            <p className="text-white font-semibold">{issue.affectedCalls}</p>
+                            <p className="text-white font-semibold">
+                              {issue.affectedCalls}
+                              <span className="text-xs text-purple-400 ml-1">
+                                ({Math.round((issue.affectedCalls / scenarioAggregation.affectedCalls) * 100)}%)
+                              </span>
+                            </p>
                             <p className="text-xs text-[var(--color-slate-400)]">Call{issue.affectedCalls !== 1 ? 's' : ''} Affected</p>
                           </div>
                         </div>
