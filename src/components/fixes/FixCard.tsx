@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, ChevronDown, ChevronUp, Target, MapPin, MessageSquare } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, Target, MapPin, MessageSquare, AlertCircle } from 'lucide-react';
 import { Fix, RootCauseType } from '@/types';
 
 const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
@@ -119,6 +119,21 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
                 </>
               )}
             </button>
+          </div>
+
+          {/* Issue/Problem Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                Issue Identified
+              </span>
+            </div>
+            <div className="glass-card-subtle p-3 border-l-2 border-amber-500 bg-amber-500/5">
+              <p className="text-sm text-[var(--color-slate-200)]">
+                {fix.problem}
+              </p>
+            </div>
           </div>
 
           {/* Target Content (for remove/replace) */}
