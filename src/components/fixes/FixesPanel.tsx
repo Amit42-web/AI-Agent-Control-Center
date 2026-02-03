@@ -674,14 +674,15 @@ export function FixesPanel() {
               <button
                 className="btn-secondary"
                 onClick={() => setShowReviewModal(false)}
+                disabled={isGeneratingScript}
               >
                 Cancel
               </button>
               <button
                 className="btn-primary flex items-center gap-2"
                 onClick={async () => {
-                  setShowReviewModal(false);
                   await generateFinalScript();
+                  setShowReviewModal(false);
                 }}
                 disabled={isGeneratingScript}
               >
@@ -698,6 +699,21 @@ export function FixesPanel() {
                 )}
               </button>
             </div>
+
+            {/* Loading Overlay */}
+            {isGeneratingScript && (
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-10">
+                <div className="glass-card p-8 flex flex-col items-center gap-4">
+                  <Loader2 className="w-12 h-12 animate-spin text-blue-400" />
+                  <div className="text-center">
+                    <h4 className="text-lg font-semibold text-white mb-2">Generating Final Script</h4>
+                    <p className="text-sm text-[var(--color-slate-400)]">
+                      AI is analyzing optimal placement and applying fixes...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
