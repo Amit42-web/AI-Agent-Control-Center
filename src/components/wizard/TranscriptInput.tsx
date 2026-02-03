@@ -103,13 +103,44 @@ export function TranscriptInput() {
 
       // Skip header row and parse transcripts
       const parsedTranscripts = rows.slice(1).map((row, index) => {
+        // Split row into columns (meeting id, transcript)
+        // Handle CSV format with comma separator, respecting quotes
+        const columns: string[] = [];
+        let currentColumn = '';
+        let insideQuotes = false;
+
+        for (let i = 0; i < row.length; i++) {
+          const char = row[i];
+          const nextChar = row[i + 1];
+
+          if (char === '"') {
+            if (nextChar === '"') {
+              currentColumn += '"';
+              i++; // Skip next quote
+            } else {
+              insideQuotes = !insideQuotes;
+            }
+          } else if (char === ',' && !insideQuotes) {
+            columns.push(currentColumn.trim());
+            currentColumn = '';
+          } else {
+            currentColumn += char;
+          }
+        }
+        columns.push(currentColumn.trim()); // Add last column
+
+        // Extract meeting ID and transcript text
+        let meetingId = columns[0] || `csv-call-${index + 1}`;
+        let transcriptText = columns[1] || columns[0]; // Fallback to first column if no second column
+
         // Remove surrounding quotes if present
-        let transcriptText = row.trim();
+        meetingId = meetingId.replace(/^"(.*)"$/, '$1').trim();
         if (transcriptText.startsWith('"') && transcriptText.endsWith('"')) {
           transcriptText = transcriptText.slice(1, -1);
         }
 
         console.log(`\nParsing transcript ${index + 1}:`);
+        console.log('Meeting ID:', meetingId);
         console.log('First 200 chars:', transcriptText.substring(0, 200));
 
         // Multi-format parser supporting various transcript formats
@@ -242,11 +273,12 @@ export function TranscriptInput() {
         }
 
         return {
-          id: `csv-call-${index + 1}`,
+          id: meetingId,
           lines: parsedLines,
           metadata: {
             date: new Date().toISOString().split('T')[0],
-            source: 'csv-upload'
+            source: 'csv-upload',
+            meetingId: meetingId
           },
         };
       }).filter(t => t.lines.length > 0);
@@ -399,8 +431,11 @@ export function TranscriptInput() {
         }
 
         if (parsedLines.length > 0) {
+          // Use filename (without extension) as the ID
+          const fileId = file.name.replace(/\.(txt|text)$/i, '');
+
           parsedTranscripts.push({
-            id: `txt-call-${fileIndex + 1}`,
+            id: fileId,
             lines: parsedLines,
             metadata: {
               date: new Date().toISOString().split('T')[0],
