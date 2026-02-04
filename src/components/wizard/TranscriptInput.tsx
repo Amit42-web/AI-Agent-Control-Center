@@ -10,6 +10,7 @@ export function TranscriptInput() {
   const { transcripts, setTranscripts } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(true);
   const [inputMode, setInputMode] = useState<'single' | 'batch'>('batch');
+  const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
 
   const transcript = transcripts[0] || demoTranscript;
 
@@ -55,11 +56,30 @@ export function TranscriptInput() {
 
   const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      setUploadStatus({ type: 'error', message: 'No file selected. Please select a CSV file to upload.' });
+      return;
+    }
+
+    // Clear any previous status messages
+    setUploadStatus({ type: null, message: '' });
 
     const reader = new FileReader();
+
+    reader.onerror = () => {
+      setUploadStatus({ type: 'error', message: 'Failed to read the file. Please try again or select a different file.' });
+      // Reset the file input
+      event.target.value = '';
+    };
+
     reader.onload = (e) => {
       const text = e.target?.result as string;
+
+      if (!text || text.trim().length === 0) {
+        setUploadStatus({ type: 'error', message: 'The uploaded file is empty. Please select a file with valid transcript data.' });
+        event.target.value = '';
+        return;
+      }
 
       console.log('CSV file loaded, total length:', text.length);
 
@@ -100,6 +120,12 @@ export function TranscriptInput() {
       }
 
       console.log(`Parsed ${rows.length} rows from CSV (including header)`);
+
+      if (rows.length <= 1) {
+        setUploadStatus({ type: 'error', message: 'No valid data found in the CSV file. Please ensure the file has a header row and at least one transcript row.' });
+        event.target.value = '';
+        return;
+      }
 
       // Skip header row and parse transcripts
       const parsedTranscripts = rows.slice(1).map((row, index) => {
@@ -284,7 +310,23 @@ export function TranscriptInput() {
       }).filter(t => t.lines.length > 0);
 
       console.log(`\nFinal result: ${parsedTranscripts.length} valid transcripts`);
+
+      if (parsedTranscripts.length === 0) {
+        setUploadStatus({
+          type: 'error',
+          message: 'No valid transcripts could be parsed from the CSV file. Please check that your file matches one of the supported formats (see format guide below).'
+        });
+        event.target.value = '';
+        return;
+      }
+
       setTranscripts(parsedTranscripts);
+      setUploadStatus({
+        type: 'success',
+        message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from CSV file.`
+      });
+      // Reset the file input so the same file can be uploaded again if needed
+      event.target.value = '';
     };
 
     reader.readAsText(file);
@@ -292,17 +334,68 @@ export function TranscriptInput() {
 
   const handleTextFilesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      setUploadStatus({ type: 'error', message: 'No files selected. Please select one or more .txt files to upload.' });
+      return;
+    }
+
+    // Clear any previous status messages
+    setUploadStatus({ type: null, message: '' });
 
     console.log(`Loading ${files.length} text file(s)`);
 
     const parsedTranscripts: any[] = [];
     let filesProcessed = 0;
+    let filesWithErrors = 0;
 
     Array.from(files).forEach((file, fileIndex) => {
       const reader = new FileReader();
+
+      reader.onerror = () => {
+        console.error(`Failed to read file: ${file.name}`);
+        filesWithErrors++;
+        filesProcessed++;
+        if (filesProcessed === files.length) {
+          if (parsedTranscripts.length === 0) {
+            setUploadStatus({
+              type: 'error',
+              message: `Failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}. Please try again or select different files.`
+            });
+          } else {
+            setUploadStatus({
+              type: 'error',
+              message: `Loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+            });
+            setTranscripts(parsedTranscripts);
+          }
+          event.target.value = '';
+        }
+      };
+
       reader.onload = (e) => {
         const transcriptText = e.target?.result as string;
+
+        if (!transcriptText || transcriptText.trim().length === 0) {
+          console.warn(`File ${file.name} is empty`);
+          filesWithErrors++;
+          filesProcessed++;
+          if (filesProcessed === files.length) {
+            if (parsedTranscripts.length === 0) {
+              setUploadStatus({
+                type: 'error',
+                message: 'All selected files are empty. Please select files with valid transcript data.'
+              });
+            } else {
+              setUploadStatus({
+                type: 'error',
+                message: `Loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+              });
+              setTranscripts(parsedTranscripts);
+            }
+            event.target.value = '';
+          }
+          return;
+        }
 
         console.log(`\nProcessing text file: ${file.name}`);
         console.log('First 200 chars:', transcriptText.substring(0, 200));
@@ -446,12 +539,34 @@ export function TranscriptInput() {
           console.log(`Successfully parsed ${parsedLines.length} lines from ${file.name}`);
         } else {
           console.warn(`No lines were parsed from ${file.name}`);
+          filesWithErrors++;
         }
 
         filesProcessed++;
         if (filesProcessed === files.length) {
           console.log(`\nAll files processed. Total transcripts: ${parsedTranscripts.length}`);
-          setTranscripts(parsedTranscripts);
+
+          if (parsedTranscripts.length === 0) {
+            setUploadStatus({
+              type: 'error',
+              message: `Failed to parse any valid transcripts from the ${files.length} selected file${files.length !== 1 ? 's' : ''}. Please check that your files match one of the supported formats (see format guide below).`
+            });
+          } else {
+            setTranscripts(parsedTranscripts);
+            if (filesWithErrors > 0) {
+              setUploadStatus({
+                type: 'error',
+                message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''} could not be parsed or were empty.`
+              });
+            } else {
+              setUploadStatus({
+                type: 'success',
+                message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from ${files.length} text file${files.length !== 1 ? 's' : ''}.`
+              });
+            }
+          }
+          // Reset the file input
+          event.target.value = '';
         }
       };
 
@@ -522,7 +637,10 @@ export function TranscriptInput() {
                     ? 'bg-blue-500 text-white'
                     : 'text-[var(--color-slate-400)] hover:text-white'
                 }`}
-                onClick={() => setInputMode('single')}
+                onClick={() => {
+                  setInputMode('single');
+                  setUploadStatus({ type: null, message: '' });
+                }}
               >
                 Single Transcript
               </button>
@@ -532,7 +650,10 @@ export function TranscriptInput() {
                     ? 'bg-blue-500 text-white'
                     : 'text-[var(--color-slate-400)] hover:text-white'
                 }`}
-                onClick={() => setInputMode('batch')}
+                onClick={() => {
+                  setInputMode('batch');
+                  setUploadStatus({ type: null, message: '' });
+                }}
               >
                 Batch (CSV)
               </button>
@@ -596,6 +717,19 @@ export function TranscriptInput() {
                   Download Sample CSV
                 </button>
               </div>
+
+              {/* Upload Status Messages */}
+              {uploadStatus.type && (
+                <div
+                  className={`p-4 rounded-lg border ${
+                    uploadStatus.type === 'success'
+                      ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  }`}
+                >
+                  <p className="text-sm">{uploadStatus.message}</p>
+                </div>
+              )}
 
               <div className="glass-card-subtle p-4 space-y-3">
                 <div>
