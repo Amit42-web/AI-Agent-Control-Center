@@ -79,10 +79,21 @@ export function AnalysisManager() {
       alert('Please enter an analysis name');
       return;
     }
-    createNewAnalysis(newAnalysisName.trim(), selectedFlowType);
+
+    // Get the selected template prompt if a template is selected
+    let templatePrompt: string | undefined;
+    if (selectedTemplateId && selectedFlowType === 'open-ended') {
+      const selectedTemplate = savedTemplates.find(t => t.id === selectedTemplateId);
+      if (selectedTemplate) {
+        templatePrompt = selectedTemplate.prompt;
+      }
+    }
+
+    createNewAnalysis(newAnalysisName.trim(), selectedFlowType, templatePrompt);
     setShowNewAnalysisModal(false);
     setNewAnalysisName('');
     setSelectedFlowType('objective');
+    setSelectedTemplateId('');
   };
 
   const handleLoadAnalysis = async (id: string) => {
@@ -507,7 +518,10 @@ export function AnalysisManager() {
           >
             <motion.div
               className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              onClick={() => setShowNewAnalysisModal(false)}
+              onClick={() => {
+                setShowNewAnalysisModal(false);
+                setSelectedTemplateId('');
+              }}
             />
             <motion.div
               className="glass-card max-w-2xl w-full p-6 relative z-10"
@@ -608,6 +622,33 @@ export function AnalysisManager() {
                 </div>
               </div>
 
+              {/* Template Selector - Only show for open-ended flow */}
+              {selectedFlowType === 'open-ended' && savedTemplates.length > 0 && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-white mb-2">
+                    Saved Templates (Optional)
+                  </label>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="w-full px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                  >
+                    <option value="">-- Start with blank prompt --</option>
+                    {savedTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedTemplateId && (
+                    <p className="text-xs text-purple-400 mt-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Template will be pre-loaded in the audit prompt
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Name Input */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-white mb-2">
@@ -642,6 +683,7 @@ export function AnalysisManager() {
                     setShowNewAnalysisModal(false);
                     setNewAnalysisName('');
                     setSelectedFlowType('objective');
+                    setSelectedTemplateId('');
                   }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

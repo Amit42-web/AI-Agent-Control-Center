@@ -282,7 +282,7 @@ export interface AppState {
   // Analysis management
   saveAnalysis: (name: string) => Promise<void>;
   loadAnalysis: (id: string) => Promise<void>;
-  createNewAnalysis: (name: string, flowType: FlowType) => void;
+  createNewAnalysis: (name: string, flowType: FlowType, auditPrompt?: string) => void;
   getAnalysisState: () => AnalysisState;
   restoreAnalysisState: (state: AnalysisState) => void;
 }
