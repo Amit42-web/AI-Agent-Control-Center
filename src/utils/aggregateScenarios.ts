@@ -26,8 +26,9 @@ function extractSemanticEntities(text: string): Set<string> {
   // 1. Extract multi-word noun phrases (2-3 words)
   // Pattern: adjective? noun+ (e.g., "customer name", "bike details", "payment information")
   const multiWordPatterns = [
-    /\b(customer|user|agent|caller|bike|vehicle|payment|address|name|identity|contact|email|phone|timeline|pincode|showroom|dealer|qualification|verification|order|booking)\s+(name|info|information|details|data|verification|check|capture|confirmation|step|process|flow|number|code|address|identity)\b/gi,
-    /\b(mandatory|required|core|essential|critical)\s+(step|steps|flow|process|check|information|data|field|fields)\b/gi,
+    /\b(customer|user|agent|caller|bike|vehicle|payment|address|name|identity|contact|email|phone|timeline|pincode|showroom|dealer|qualification|verification|order|booking|greeting)\s+(name|info|information|details|data|verification|check|capture|confirmation|step|process|flow|number|code|address|identity|sequence)\b/gi,
+    /\b(mandatory|required|core|essential|critical|incomplete)\s+(step|steps|flow|process|check|information|data|field|fields|greeting|confirmation|verification|identity|sequence)\b/gi,
+    /\b(identity|name|customer|greeting)\s+(confirmation|verification|check|capture|sequence|process)\b/gi,
   ];
 
   for (const pattern of multiWordPatterns) {
@@ -44,7 +45,7 @@ function extractSemanticEntities(text: string): Set<string> {
   // 2. Extract important single-word entities (domain objects)
   // These are likely to be the subject of the issue
   const singleWordEntities = [
-    /\b(name|address|email|phone|pincode|timeline|bike|vehicle|showroom|dealer|customer|payment|order|booking|identity|qualification|verification|flow|process|step|information|data|details)\b/gi,
+    /\b(name|address|email|phone|pincode|timeline|bike|vehicle|showroom|dealer|customer|payment|order|booking|identity|qualification|verification|flow|process|step|information|data|details|greeting|confirmation|sequence)\b/gi,
   ];
 
   for (const pattern of singleWordEntities) {
@@ -155,6 +156,8 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
     "didn't": 'fail',
     'didnt': 'fail',
     'never': 'fail',
+    'incomplete': 'fail',
+    'missing': 'fail',
 
     // Collection actions → 'capture'
     'capture': 'capture',
@@ -172,6 +175,7 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
     'verified': 'verify',
     'confirm': 'verify',
     'confirmed': 'verify',
+    'confirmation': 'verify',
     'check': 'verify',
     'checked': 'verify',
     'validate': 'verify',
@@ -186,6 +190,14 @@ function calculateTokenSimilarity(str1: string, str2: string): number {
     'steps': 'process',
     'procedure': 'process',
     'workflow': 'process',
+    'sequence': 'process',
+
+    // Introduction/greeting synonyms → 'greeting'
+    'greeting': 'greeting',
+    'greet': 'greeting',
+    'introduction': 'greeting',
+    'intro': 'greeting',
+    'welcome': 'greeting',
 
     // Required synonyms → 'required'
     'mandatory': 'required',
@@ -508,6 +520,85 @@ export function aggregateScenarios(
     }
   }
 
+  // Step 4: Cross-dimension similarity check to merge scenarios that are similar
+  // but were placed in different dimensions (e.g., "Incomplete Identity Confirmation"
+  // in "Process" vs "Flow Control" dimensions)
+  // This fixes the issue where semantically similar scenarios remain separate
+  // due to different dimension classifications
+  const crossDimensionMerged: AggregatedScenario[] = [];
+  const mergedIndices = new Set<number>();
+
+  for (let i = 0; i < aggregated.length; i++) {
+    if (mergedIndices.has(i)) continue;
+
+    const agg1 = aggregated[i];
+    let mergedGroup = { ...agg1 };
+
+    // Compare with all subsequent aggregated scenarios
+    for (let j = i + 1; j < aggregated.length; j++) {
+      if (mergedIndices.has(j)) continue;
+
+      const agg2 = aggregated[j];
+
+      // Skip if same dimension AND root cause (already grouped in Step 2)
+      if (agg1.dimension === agg2.dimension && agg1.rootCauseType === agg2.rootCauseType) {
+        continue;
+      }
+
+      // Calculate similarity between representative scenarios from each group
+      // Use the first scenario from each cluster as representative
+      const scenario1 = agg1.scenarios[0];
+      const scenario2 = agg2.scenarios[0];
+
+      const embedding1 = useSemanticSimilarity ? scenarioEmbeddings?.get(scenario1.id) : undefined;
+      const embedding2 = useSemanticSimilarity ? scenarioEmbeddings?.get(scenario2.id) : undefined;
+
+      const similarity = calculateScenarioSimilarity(
+        scenario1,
+        scenario2,
+        embedding1,
+        embedding2,
+        useSemanticSimilarity
+      );
+
+      // Higher threshold for cross-dimension merging (0.40 instead of 0.30)
+      // This ensures we only merge scenarios that are VERY similar
+      // Lower than 0.45 to catch cases like "Incomplete Identity Confirmation Sequence"
+      // vs "Incomplete Greeting and Identity Confirmation" which share core concepts
+      if (similarity >= 0.40) {
+        console.log(`[Cross-Dimension Merge] Merging "${agg1.title}" (${agg1.dimension}) with "${agg2.title}" (${agg2.dimension}) - similarity: ${similarity.toFixed(2)}`);
+
+        // Merge agg2 into mergedGroup
+        mergedGroup.scenarios = [...mergedGroup.scenarios, ...agg2.scenarios];
+        mergedGroup.occurrences += agg2.occurrences;
+        mergedGroup.affectedCallIds = Array.from(new Set([...mergedGroup.affectedCallIds, ...agg2.affectedCallIds]));
+        mergedGroup.uniqueCalls = mergedGroup.affectedCallIds.length;
+
+        // Update severity to highest
+        const allSeverities = [...mergedGroup.scenarios.map(s => s.severity)];
+        mergedGroup.severity = getHighestSeverity(allSeverities);
+
+        // Recalculate average confidence
+        const totalConfidence = mergedGroup.scenarios.reduce((sum, s) => sum + s.confidence, 0);
+        mergedGroup.avgConfidence = Math.round(totalConfidence / mergedGroup.scenarios.length);
+
+        // Keep the dimension and root cause from the larger group
+        if (agg2.occurrences > agg1.occurrences) {
+          mergedGroup.dimension = agg2.dimension;
+          mergedGroup.rootCauseType = agg2.rootCauseType;
+        }
+
+        mergedIndices.add(j);
+      }
+    }
+
+    crossDimensionMerged.push(mergedGroup);
+    mergedIndices.add(i);
+  }
+
+  // Update aggregated with merged results
+  const finalAggregated = crossDimensionMerged;
+
   // Sort by impact: occurrences * severity weight
   const severityWeight = (s: Severity) => {
     switch (s) {
@@ -518,7 +609,7 @@ export function aggregateScenarios(
     }
   };
 
-  return aggregated.sort((a, b) => {
+  return finalAggregated.sort((a, b) => {
     const impactA = a.occurrences * severityWeight(a.severity);
     const impactB = b.occurrences * severityWeight(b.severity);
 
