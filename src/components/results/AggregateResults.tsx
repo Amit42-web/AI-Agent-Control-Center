@@ -750,11 +750,8 @@ export function AggregateResults() {
 
                     <div className="pl-20 pr-6 py-5">
                       {/* Issue Title, Priority, and Severity */}
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <h4 className="text-white font-semibold text-base leading-tight flex-grow group-hover:text-white transition-colors">
-                          {issue.title}
-                        </h4>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex flex-col gap-3 mb-4">
+                        <div className="flex items-center justify-end gap-2">
                           {/* Priority Badge */}
                           <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${priorityStyle.bg} ${priorityStyle.text} shadow-lg border ${priorityStyle.border}`}>
                             {priorityLevel} Priority
@@ -765,10 +762,13 @@ export function AggregateResults() {
                             {issue.severity}
                           </span>
                         </div>
+                        <h4 className="text-white font-semibold text-base leading-snug pr-2 group-hover:text-white transition-colors line-clamp-2">
+                          {issue.title}
+                        </h4>
                       </div>
 
                       {/* Stats Grid */}
-                      <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="grid grid-cols-2 gap-3 mb-4">
                         <div className="flex items-center gap-2 text-sm">
                           <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
                             <BarChart3 className="w-4 h-4 text-blue-400" />
@@ -794,21 +794,23 @@ export function AggregateResults() {
                         </div>
                       </div>
 
-                      {/* Tags */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {issue.dimension && (
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-[var(--color-slate-300)] border border-white/10 flex items-center gap-1.5">
-                            <span>{dimensionLabels[issue.dimension]?.icon || '📊'}</span>
-                            <span>{dimensionLabels[issue.dimension]?.short || issue.dimension}</span>
-                          </span>
-                        )}
-                        {issue.rootCause && (
-                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-[var(--color-slate-300)] border border-white/10 flex items-center gap-1.5">
-                            <span>{rcaCategoryLabels[issue.rootCause]?.icon || '🔍'}</span>
-                            <span>{rcaCategoryLabels[issue.rootCause]?.short || issue.rootCause}</span>
-                          </span>
-                        )}
-                        <span className="ml-auto text-[var(--color-slate-500)] group-hover:text-white transition-colors">
+                      {/* Tags and Navigation */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {issue.dimension && (
+                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-[var(--color-slate-300)] border border-white/10 flex items-center gap-1.5 whitespace-nowrap">
+                              <span>{dimensionLabels[issue.dimension]?.icon || '📊'}</span>
+                              <span>{dimensionLabels[issue.dimension]?.short || issue.dimension}</span>
+                            </span>
+                          )}
+                          {issue.rootCause && (
+                            <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-[var(--color-slate-300)] border border-white/10 flex items-center gap-1.5 whitespace-nowrap">
+                              <span>{rcaCategoryLabels[issue.rootCause]?.icon || '🔍'}</span>
+                              <span>{rcaCategoryLabels[issue.rootCause]?.short || issue.rootCause}</span>
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[var(--color-slate-500)] group-hover:text-white transition-colors flex-shrink-0">
                           <ArrowRight className="w-5 h-5" />
                         </span>
                       </div>
