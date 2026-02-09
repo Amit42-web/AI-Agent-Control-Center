@@ -5,20 +5,76 @@ import { motion } from 'framer-motion';
 import { FileText, Upload, RotateCcw, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { demoTranscript, demoCSVContent } from '@/data/demoData';
+import { deduplicateTranscriptLines } from '@/services/openai';
+import type { Transcript } from '@/types';
 
 export function TranscriptInput() {
-  const { transcripts, setTranscripts } = useAppStore();
+  const { transcripts, setTranscripts, deduplicationEnabled, openaiConfig } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(true);
   const [inputMode, setInputMode] = useState<'single' | 'batch'>('batch');
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
 
   const transcript = transcripts[0] || demoTranscript;
 
+  /**
+   * Helper function to deduplicate transcripts using LLM
+   * Returns deduplicated transcripts or original on error/disabled
+   */
+  const deduplicateTranscripts = async (transcriptsToProcess: Transcript[]): Promise<Transcript[]> => {
+    // If deduplication is disabled, return original transcripts
+    if (!deduplicationEnabled) {
+      console.log('[Deduplication] Disabled - skipping');
+      return transcriptsToProcess;
+    }
+
+    // Get API key from environment variable
+    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+
+    if (!apiKey || apiKey.trim().length === 0) {
+      console.warn('[Deduplication] No API key available - skipping');
+      return transcriptsToProcess;
+    }
+
+    console.log(`[Deduplication] Processing ${transcriptsToProcess.length} transcript(s)`);
+
+    // Process each transcript independently
+    const deduplicatedTranscripts = await Promise.all(
+      transcriptsToProcess.map(async (transcript) => {
+        try {
+          if (transcript.lines.length === 0) {
+            return transcript;
+          }
+
+          console.log(`[Deduplication] Processing transcript ${transcript.id} with ${transcript.lines.length} lines`);
+
+          const deduplicatedLines = await deduplicateTranscriptLines(
+            apiKey,
+            openaiConfig.model,
+            transcript.lines
+          );
+
+          console.log(`[Deduplication] ${transcript.id}: ${transcript.lines.length} → ${deduplicatedLines.length} lines`);
+
+          return {
+            ...transcript,
+            lines: deduplicatedLines,
+          };
+        } catch (error) {
+          console.error(`[Deduplication] Error processing transcript ${transcript.id}:`, error);
+          // On error, return original transcript
+          return transcript;
+        }
+      })
+    );
+
+    return deduplicatedTranscripts;
+  };
+
   const transcriptText = transcript.lines
     .map((line) => `[${line.speaker.toUpperCase()}]: ${line.text}`)
     .join('\n');
 
-  const handleTextChange = (text: string) => {
+  const handleTextChange = async (text: string) => {
     const lines = text.split('\n').filter((l) => l.trim());
     const parsedLines = lines.map((line) => {
       // Try format: [BOT/AGENT/CUSTOMER]: text
@@ -45,13 +101,17 @@ export function TranscriptInput() {
       return { speaker: 'customer' as const, text: line.trim() };
     });
 
-    setTranscripts([
+    const parsedTranscripts = [
       {
         id: 'user-input',
         lines: parsedLines,
         metadata: { date: new Date().toISOString().split('T')[0] },
       },
-    ]);
+    ];
+
+    // Apply deduplication if enabled
+    const finalTranscripts = await deduplicateTranscripts(parsedTranscripts);
+    setTranscripts(finalTranscripts);
   };
 
   const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,13 +380,24 @@ export function TranscriptInput() {
         return;
       }
 
-      setTranscripts(parsedTranscripts);
-      setUploadStatus({
-        type: 'success',
-        message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from CSV file.`
+      // Apply deduplication if enabled
+      deduplicateTranscripts(parsedTranscripts).then((finalTranscripts) => {
+        setTranscripts(finalTranscripts);
+        setUploadStatus({
+          type: 'success',
+          message: `Successfully loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from CSV file.`
+        });
+        // Reset the file input so the same file can be uploaded again if needed
+        event.target.value = '';
+      }).catch((error) => {
+        console.error('[CSV Upload] Deduplication failed, using original transcripts:', error);
+        setTranscripts(parsedTranscripts);
+        setUploadStatus({
+          type: 'success',
+          message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from CSV file.`
+        });
+        event.target.value = '';
       });
-      // Reset the file input so the same file can be uploaded again if needed
-      event.target.value = '';
     };
 
     reader.readAsText(file);
@@ -362,11 +433,21 @@ export function TranscriptInput() {
               message: `Failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}. Please try again or select different files.`
             });
           } else {
-            setUploadStatus({
-              type: 'error',
-              message: `Loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+            // Apply deduplication if enabled
+            deduplicateTranscripts(parsedTranscripts).then((finalTranscripts) => {
+              setTranscripts(finalTranscripts);
+              setUploadStatus({
+                type: 'error',
+                message: `Loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+              });
+            }).catch((error) => {
+              console.error('[TXT Upload] Deduplication failed in error handler, using original transcripts:', error);
+              setTranscripts(parsedTranscripts);
+              setUploadStatus({
+                type: 'error',
+                message: `Loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+              });
             });
-            setTranscripts(parsedTranscripts);
           }
           event.target.value = '';
         }
@@ -386,11 +467,21 @@ export function TranscriptInput() {
                 message: 'All selected files are empty. Please select files with valid transcript data.'
               });
             } else {
-              setUploadStatus({
-                type: 'error',
-                message: `Loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+              // Apply deduplication if enabled
+              deduplicateTranscripts(parsedTranscripts).then((finalTranscripts) => {
+                setTranscripts(finalTranscripts);
+                setUploadStatus({
+                  type: 'error',
+                  message: `Loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+                });
+              }).catch((error) => {
+                console.error('[TXT Upload] Deduplication failed in empty file handler, using original transcripts:', error);
+                setTranscripts(parsedTranscripts);
+                setUploadStatus({
+                  type: 'error',
+                  message: `Loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+                });
               });
-              setTranscripts(parsedTranscripts);
             }
             event.target.value = '';
           }
@@ -552,18 +643,35 @@ export function TranscriptInput() {
               message: `Failed to parse any valid transcripts from the ${files.length} selected file${files.length !== 1 ? 's' : ''}. Please check that your files match one of the supported formats (see format guide below).`
             });
           } else {
-            setTranscripts(parsedTranscripts);
-            if (filesWithErrors > 0) {
-              setUploadStatus({
-                type: 'error',
-                message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''} could not be parsed or were empty.`
-              });
-            } else {
-              setUploadStatus({
-                type: 'success',
-                message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from ${files.length} text file${files.length !== 1 ? 's' : ''}.`
-              });
-            }
+            // Apply deduplication if enabled
+            deduplicateTranscripts(parsedTranscripts).then((finalTranscripts) => {
+              setTranscripts(finalTranscripts);
+              if (filesWithErrors > 0) {
+                setUploadStatus({
+                  type: 'error',
+                  message: `Successfully loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''} could not be parsed or were empty.`
+                });
+              } else {
+                setUploadStatus({
+                  type: 'success',
+                  message: `Successfully loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from ${files.length} text file${files.length !== 1 ? 's' : ''}.`
+                });
+              }
+            }).catch((error) => {
+              console.error('[TXT Upload] Deduplication failed, using original transcripts:', error);
+              setTranscripts(parsedTranscripts);
+              if (filesWithErrors > 0) {
+                setUploadStatus({
+                  type: 'error',
+                  message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''} could not be parsed or were empty.`
+                });
+              } else {
+                setUploadStatus({
+                  type: 'success',
+                  message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from ${files.length} text file${files.length !== 1 ? 's' : ''}.`
+                });
+              }
+            });
           }
           // Reset the file input
           event.target.value = '';
