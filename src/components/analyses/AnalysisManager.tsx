@@ -29,10 +29,35 @@ export function AnalysisManager() {
   const [selectedFlowType, setSelectedFlowType] = useState<FlowType>('objective');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [savedTemplates, setSavedTemplates] = useState<Array<{
+    id: string;
+    name: string;
+    prompt: string;
+    createdAt: string;
+  }>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
   useEffect(() => {
     loadAnalyses();
   }, []);
+
+  // Load saved templates when modal opens
+  useEffect(() => {
+    if (showNewAnalysisModal && selectedFlowType === 'open-ended') {
+      try {
+        const saved = localStorage.getItem('auditPromptTemplates');
+        if (saved) {
+          const templates = JSON.parse(saved);
+          setSavedTemplates(Array.isArray(templates) ? templates : []);
+        } else {
+          setSavedTemplates([]);
+        }
+      } catch (e) {
+        console.error('Failed to load templates:', e);
+        setSavedTemplates([]);
+      }
+    }
+  }, [showNewAnalysisModal, selectedFlowType]);
 
   const loadAnalyses = async () => {
     setIsLoading(true);

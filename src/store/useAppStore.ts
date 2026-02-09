@@ -519,7 +519,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  createNewAnalysis: (name: string, flowType) => {
+  createNewAnalysis: (name: string, flowType, auditPrompt?: string) => {
     // Reset to initial state but keep the name and flowType
     set({
       ...initialState,
@@ -527,6 +527,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentAnalysisId: `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       currentAnalysisName: name,
       currentStep: 'input',
+      // If auditPrompt is provided, use it; otherwise use initialState's auditPrompt
+      auditPrompt: auditPrompt !== undefined ? auditPrompt : initialState.auditPrompt,
     });
   },
 
