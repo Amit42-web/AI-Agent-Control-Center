@@ -85,6 +85,7 @@ const initialState = {
     apiKey: '',
     model: 'gpt-4.1-mini',
   },
+  deduplicationEnabled: true,
   isRunning: false,
   runProgress: 0,
   currentStep: 'analyses' as const,
@@ -131,6 +132,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentConfig = get().openaiConfig;
     set({ openaiConfig: { ...currentConfig, ...config } });
   },
+
+  setDeduplicationEnabled: (enabled: boolean) => set({ deduplicationEnabled: enabled }),
 
   toggleCheck: (checkId: CheckType) => {
     const { checks, referenceEnabled } = get();

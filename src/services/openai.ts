@@ -1015,6 +1015,119 @@ Return ONLY a valid JSON array of scenarios. If no concerning scenarios are foun
 }
 
 // Open-ended flow: Generate enhanced fix suggestions with implementation details
+/**
+ * Deduplicate transcript lines using LLM to intelligently remove duplicates
+ * while preserving conversation flow and context
+ */
+export async function deduplicateTranscriptLines(
+  apiKey: string,
+  model: string,
+  lines: { speaker: 'agent' | 'customer'; text: string; timestamp?: string }[]
+): Promise<{ speaker: 'agent' | 'customer'; text: string; timestamp?: string }[]> {
+  if (!apiKey || apiKey.trim().length === 0) {
+    console.warn('No API key provided for deduplication, skipping');
+    return lines;
+  }
+
+  if (lines.length === 0) {
+    return lines;
+  }
+
+  // Format lines with indices for reference
+  const numberedLines = lines
+    .map((line, idx) =>
+      `[${idx + 1}] ${line.timestamp ? `${line.timestamp} ` : ''}${line.speaker.toUpperCase()}: ${sanitizeText(line.text)}`
+    )
+    .join('\n');
+
+  const systemPrompt = `You are an expert transcript quality analyst. Your task is to identify and remove DUPLICATE lines from transcripts while preserving the natural conversation flow.
+
+CRITICAL RULES FOR DEDUPLICATION:
+1. Remove EXACT or NEAR-EXACT duplicates of the same speaker's message
+2. Preserve ALL unique messages even if they seem similar
+3. Keep the FIRST occurrence and remove subsequent duplicates
+4. Do NOT remove messages that are similar but contextually different (e.g., repeated greetings in different parts of conversation)
+5. Preserve conversation flow - only remove true duplicates that add no value
+6. Pay attention to timestamps - duplicate lines often appear close together
+
+WHAT TO REMOVE:
+✓ Exact text repetitions by same speaker
+✓ Near-identical repetitions with minor variations (typos, extra spaces)
+✓ Parsing artifacts where same line appears twice
+✓ Stuttering or system glitches causing immediate repeats
+
+WHAT NOT TO REMOVE:
+✗ Similar but contextually different messages (e.g., "Thank you" at different points)
+✗ Natural conversation patterns (acknowledgments, confirmations)
+✗ Follow-up questions that seem similar
+✗ Paraphrasing or restating with new information
+
+Return a JSON object with:
+{
+  "keepIndices": [1, 2, 3, 5, 7, ...],  // Array of line numbers (1-indexed) to KEEP
+  "reasoning": "Brief explanation of what was removed and why"
+}
+
+IMPORTANT: Return ONLY valid JSON. The keepIndices array should contain line numbers (1-indexed) of lines to preserve.`;
+
+  const userPrompt = `Analyze this transcript and identify which lines to keep (removing only true duplicates):
+
+${numberedLines}
+
+Return the keepIndices array and reasoning.`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    let jsonStr = response.trim();
+
+    // Remove markdown code blocks if present
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    // Find the first { and last }
+    const startIdx = jsonStr.indexOf('{');
+    const endIdx = jsonStr.lastIndexOf('}');
+
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+      console.warn('No valid JSON found in deduplication response, returning original lines');
+      return lines;
+    }
+
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+
+    let result;
+    try {
+      result = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.warn('Failed to parse deduplication response, returning original lines:', parseError);
+      return lines;
+    }
+
+    if (!result.keepIndices || !Array.isArray(result.keepIndices)) {
+      console.warn('Invalid keepIndices in deduplication response, returning original lines');
+      return lines;
+    }
+
+    // Convert 1-indexed keepIndices to 0-indexed and filter lines
+    const keepSet = new Set(result.keepIndices.map((idx: number) => idx - 1));
+    const deduplicatedLines = lines.filter((_, idx) => keepSet.has(idx));
+
+    console.log(`Deduplication: ${lines.length} → ${deduplicatedLines.length} lines (removed ${lines.length - deduplicatedLines.length})`);
+    console.log(`Reasoning: ${result.reasoning}`);
+
+    return deduplicatedLines;
+  } catch (error) {
+    console.error('Error during deduplication:', error);
+    // Return original lines if deduplication fails
+    return lines;
+  }
+}
+
 export async function generateEnhancedFixSuggestions(
   apiKey: string,
   model: string,

@@ -234,6 +234,9 @@ export interface AppState {
   // OpenAI configuration
   openaiConfig: OpenAIConfig;
 
+  // Transcript parsing options
+  deduplicationEnabled: boolean;
+
   // Run state
   isRunning: boolean;
   runProgress: number;
@@ -266,6 +269,7 @@ export interface AppState {
   setKnowledgeBaseEnabled: (enabled: boolean) => void;
   setAuditPrompt: (prompt: string) => void;
   setOpenAIConfig: (config: Partial<OpenAIConfig>) => void;
+  setDeduplicationEnabled: (enabled: boolean) => void;
   toggleCheck: (checkId: CheckType) => void;
   updateCheckInstructions: (checkId: CheckType, instructions: string) => void;
   updateCheckName: (checkId: CheckType, name: string) => void;
