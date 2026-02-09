@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { SavedAnalysis, FlowType } from '@/types';
+import { useSaveLoadTemplates } from '@/hooks/useSaveLoadTemplates';
 
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
@@ -29,35 +30,14 @@ export function AnalysisManager() {
   const [selectedFlowType, setSelectedFlowType] = useState<FlowType>('objective');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [savedTemplates, setSavedTemplates] = useState<Array<{
-    id: string;
-    name: string;
-    prompt: string;
-    createdAt: string;
-  }>>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+
+  // Use the proper template management hook
+  const { templates: savedTemplates } = useSaveLoadTemplates('auditPromptTemplates');
 
   useEffect(() => {
     loadAnalyses();
   }, []);
-
-  // Load saved templates when modal opens
-  useEffect(() => {
-    if (showNewAnalysisModal && selectedFlowType === 'open-ended') {
-      try {
-        const saved = localStorage.getItem('auditPromptTemplates');
-        if (saved) {
-          const templates = JSON.parse(saved);
-          setSavedTemplates(Array.isArray(templates) ? templates : []);
-        } else {
-          setSavedTemplates([]);
-        }
-      } catch (e) {
-        console.error('Failed to load templates:', e);
-        setSavedTemplates([]);
-      }
-    }
-  }, [showNewAnalysisModal, selectedFlowType]);
 
   const loadAnalyses = async () => {
     setIsLoading(true);
@@ -85,7 +65,7 @@ export function AnalysisManager() {
     if (selectedTemplateId && selectedFlowType === 'open-ended') {
       const selectedTemplate = savedTemplates.find(t => t.id === selectedTemplateId);
       if (selectedTemplate) {
-        templatePrompt = selectedTemplate.prompt;
+        templatePrompt = selectedTemplate.content;
       }
     }
 

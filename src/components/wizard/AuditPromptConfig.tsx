@@ -5,13 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, RotateCcw, Edit3, Eye, EyeOff, Save, BookOpen, RefreshCw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
-
-interface SavedTemplate {
-  id: string;
-  name: string;
-  prompt: string;
-  createdAt: string;
-}
+import { useSaveLoadTemplates } from '@/hooks/useSaveLoadTemplates';
 
 export function AuditPromptConfig() {
   const { auditPrompt, setAuditPrompt } = useAppStore();
@@ -20,43 +14,15 @@ export function AuditPromptConfig() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [templateName, setTemplateName] = useState('');
-  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
 
-  // Load saved templates from localStorage
-  const loadTemplates = () => {
-    try {
-      const saved = localStorage.getItem('auditPromptTemplates');
-      console.log('Loading templates from localStorage, raw data:', saved);
-
-      if (saved) {
-        const templates = JSON.parse(saved);
-        console.log('✅ Successfully loaded templates:', templates);
-        console.log('Template count:', Array.isArray(templates) ? templates.length : 0);
-        setSavedTemplates(Array.isArray(templates) ? templates : []);
-      } else {
-        console.log('📭 No templates found in localStorage');
-        setSavedTemplates([]);
-      }
-    } catch (e) {
-      console.error('❌ Failed to load templates:', e);
-      setSavedTemplates([]);
-    }
-  };
-
-  useEffect(() => {
-    loadTemplates();
-
-    // Listen for storage changes (when templates are saved/deleted)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auditPromptTemplates') {
-        console.log('Storage change detected for auditPromptTemplates');
-        loadTemplates();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  // Use the proper template management hook
+  const {
+    templates: savedTemplates,
+    saveTemplate,
+    deleteTemplate,
+    isUsingDatabase,
+    isLoading: templatesLoading,
+  } = useSaveLoadTemplates('auditPromptTemplates');
 
   const handleReset = () => {
     if (confirm('Reset to default comprehensive audit prompt?')) {
@@ -64,61 +30,41 @@ export function AuditPromptConfig() {
     }
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     if (!templateName.trim()) {
       alert('Please enter a template name');
       return;
     }
 
-    const newTemplate: SavedTemplate = {
-      id: Date.now().toString(),
-      name: templateName.trim(),
-      prompt: auditPrompt,
-      createdAt: new Date().toISOString()
-    };
-
-    const updated = [...savedTemplates, newTemplate];
-    setSavedTemplates(updated);
-    localStorage.setItem('auditPromptTemplates', JSON.stringify(updated));
-    console.log('✅ Template saved successfully:', newTemplate.name);
-    console.log('Total templates after save:', updated.length);
-    setTemplateName('');
-    setShowSaveModal(false);
-    // Reload templates to ensure UI is in sync
-    loadTemplates();
-    alert(`Template "${newTemplate.name}" saved successfully!`);
+    try {
+      await saveTemplate(templateName.trim(), auditPrompt);
+      console.log('✅ Template saved successfully:', templateName.trim());
+      setTemplateName('');
+      setShowSaveModal(false);
+      alert(`Template "${templateName.trim()}" saved successfully!${isUsingDatabase ? ' (Stored in database)' : ' (Stored locally - set up database for persistence)'}`);
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      alert('Failed to save template. Check console for details.');
+    }
   };
 
-  const handleLoadTemplate = (template: SavedTemplate) => {
+  const handleLoadTemplate = (template: typeof savedTemplates[0]) => {
     if (confirm(`Load template "${template.name}"? Your current prompt will be replaced.`)) {
-      setAuditPrompt(template.prompt);
+      setAuditPrompt(template.content);
       setShowLoadModal(false);
     }
   };
 
-  const handleDeleteTemplate = (templateId: string) => {
+  const handleDeleteTemplate = async (templateId: string) => {
     const template = savedTemplates.find(t => t.id === templateId);
     if (template && confirm(`Delete template "${template.name}"?`)) {
-      const updated = savedTemplates.filter(t => t.id !== templateId);
-      setSavedTemplates(updated);
-      localStorage.setItem('auditPromptTemplates', JSON.stringify(updated));
-    }
-  };
-
-  const handleRefreshTemplates = () => {
-    const saved = localStorage.getItem('auditPromptTemplates');
-    if (saved) {
       try {
-        const templates = JSON.parse(saved);
-        setSavedTemplates(templates);
-        alert(`Refreshed! Found ${templates.length} template(s).`);
-      } catch (e) {
-        console.error('Failed to refresh templates:', e);
-        alert('Failed to load templates. Check console for details.');
+        await deleteTemplate(templateId);
+        console.log('✅ Template deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete template:', error);
+        alert('Failed to delete template. Check console for details.');
       }
-    } else {
-      setSavedTemplates([]);
-      alert('No templates found in storage.');
     }
   };
 
@@ -275,32 +221,15 @@ export function AuditPromptConfig() {
               console.log('Load Template button clicked. Current templates:', savedTemplates);
               console.log('savedTemplates.length:', savedTemplates.length);
               if (savedTemplates.length > 0) {
-                loadTemplates(); // Refresh templates before opening modal
                 setShowLoadModal(true);
-              } else {
-                console.warn('Button clicked but no templates found. Forcing reload...');
-                loadTemplates();
               }
             }}
             whileHover={savedTemplates.length > 0 ? { scale: 1.02 } : {}}
             whileTap={savedTemplates.length > 0 ? { scale: 0.98 } : {}}
-            disabled={savedTemplates.length === 0}
+            disabled={savedTemplates.length === 0 || templatesLoading}
           >
             <BookOpen className="w-4 h-4" />
-            Load Template {savedTemplates.length > 0 && `(${savedTemplates.length})`}
-          </motion.button>
-
-          <motion.button
-            className="btn-secondary text-sm flex items-center gap-2"
-            onClick={() => {
-              console.log('Refreshing templates...');
-              loadTemplates();
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            title="Refresh template list"
-          >
-            <RefreshCw className="w-4 h-4" />
+            {templatesLoading ? 'Loading...' : `Load Template ${savedTemplates.length > 0 ? `(${savedTemplates.length})` : ''}`}
           </motion.button>
 
           {isCustomized && (
@@ -416,17 +345,17 @@ export function AuditPromptConfig() {
                   <p className="text-[var(--color-slate-400)]">
                     Select a saved template to load. Your current prompt will be replaced.
                   </p>
+                  {isUsingDatabase && (
+                    <p className="text-xs text-green-400 mt-1">
+                      ✓ Using database storage (templates persist across sessions)
+                    </p>
+                  )}
+                  {!isUsingDatabase && (
+                    <p className="text-xs text-yellow-400 mt-1">
+                      ⚠ Using local storage (templates may be lost if browser data is cleared)
+                    </p>
+                  )}
                 </div>
-                <motion.button
-                  className="btn-secondary text-sm flex items-center gap-2 flex-shrink-0"
-                  onClick={handleRefreshTemplates}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  title="Refresh template list"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh
-                </motion.button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
@@ -454,7 +383,7 @@ export function AuditPromptConfig() {
                             Saved on {new Date(template.createdAt).toLocaleString()}
                           </p>
                           <p className="text-xs text-[var(--color-slate-500)] mt-1">
-                            {template.prompt.length} characters
+                            {template.content.length} characters
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
