@@ -195,6 +195,7 @@ export function AggregateResults() {
     const performScenarioAggregation = async () => {
       if (!scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
         setAggregatedScenarios([]);
+        setIsAggregatingScenarios(false);
         return;
       }
 
@@ -725,12 +726,18 @@ export function AggregateResults() {
               <p className="text-sm text-[var(--color-slate-400)]">Top 10 priorities • Click to investigate</p>
             </div>
             <div className="ml-auto px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-              <p className="text-2xl font-bold text-red-400">{burningIssues.length}</p>
+              <p className="text-2xl font-bold text-red-400">{isAggregatingScenarios ? '...' : burningIssues.length}</p>
               <p className="text-xs text-[var(--color-slate-400)]">Issues</p>
             </div>
           </div>
           <div className="space-y-3">
-            {burningIssues.length === 0 ? (
+            {isAggregatingScenarios ? (
+              <div className="text-center py-12 text-[var(--color-slate-400)]">
+                <div className="w-16 h-16 mx-auto mb-3 border-4 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>
+                <p className="text-lg font-medium">Analyzing scenarios...</p>
+                <p className="text-sm">Identifying high-impact issues</p>
+              </div>
+            ) : burningIssues.length === 0 ? (
               <div className="text-center py-12 text-[var(--color-slate-400)]">
                 <CheckCircle className="w-16 h-16 mx-auto mb-3 text-green-400" />
                 <p className="text-lg font-medium">No high-impact issues found</p>
