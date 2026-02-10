@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { aggregateIssuesWithLLM } from '@/services/openai';
 import { aggregateScenarios, aggregateScenariosWithLLM, AggregatedScenario } from '@/utils/aggregateScenarios';
@@ -1507,13 +1507,18 @@ function DimensionBreakdownWithAggregation({
   }, [autoExpandTarget, aggregatedScenarios, dimensionChartData]);
 
   const toggleDimension = (dimensionName: string) => {
+    console.log('[DimensionBreakdown] toggleDimension called for:', dimensionName);
+    console.log('[DimensionBreakdown] Current expandedDimensions:', Array.from(expandedDimensions));
     const newExpanded = new Set(expandedDimensions);
     if (newExpanded.has(dimensionName)) {
       newExpanded.delete(dimensionName);
+      console.log('[DimensionBreakdown] Collapsing dimension:', dimensionName);
     } else {
       newExpanded.add(dimensionName);
+      console.log('[DimensionBreakdown] Expanding dimension:', dimensionName);
     }
     setExpandedDimensions(newExpanded);
+    console.log('[DimensionBreakdown] New expandedDimensions:', Array.from(newExpanded));
   };
 
   const toggleScenario = (scenarioKey: string) => {
@@ -1563,6 +1568,14 @@ function DimensionBreakdownWithAggregation({
           const dimensionAggregatedScenarios = aggregatedScenarios.filter(
             agg => agg.rootCauseType === dimension.name
           );
+
+          console.log(`[DimensionBreakdown] Dimension: ${dimension.name} (${dimension.fullName})`);
+          console.log(`[DimensionBreakdown] - isDimensionExpanded: ${isDimensionExpanded}`);
+          console.log(`[DimensionBreakdown] - hasIssues: ${hasIssues} (value: ${dimension.value})`);
+          console.log(`[DimensionBreakdown] - dimensionAggregatedScenarios.length: ${dimensionAggregatedScenarios.length}`);
+          if (dimensionAggregatedScenarios.length > 0) {
+            console.log(`[DimensionBreakdown] - First scenario:`, dimensionAggregatedScenarios[0]);
+          }
 
           return (
             <div key={dimension.name}>
@@ -1637,14 +1650,15 @@ function DimensionBreakdownWithAggregation({
               </motion.div>
 
               {/* Expanded Aggregated Scenarios for this Dimension */}
-              {isDimensionExpanded && dimensionAggregatedScenarios.length > 0 && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="bg-[var(--color-navy-900)]"
-                >
+              <AnimatePresence>
+                {isDimensionExpanded && dimensionAggregatedScenarios.length > 0 && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-[var(--color-navy-900)]"
+                  >
                   <div className="px-4 py-2">
                     <p className="text-xs text-[var(--color-slate-400)] mb-3 font-semibold uppercase tracking-wide">
                       {dimensionAggregatedScenarios.length} Aggregated Pattern{dimensionAggregatedScenarios.length !== 1 ? 's' : ''}
@@ -1755,14 +1769,15 @@ function DimensionBreakdownWithAggregation({
                         </div>
 
                         {/* Individual Scenario Instances */}
-                        {isScenarioExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="bg-[var(--color-navy-950)] border-t border-[var(--color-navy-700)]"
-                          >
+                        <AnimatePresence>
+                          {isScenarioExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="bg-[var(--color-navy-950)] border-t border-[var(--color-navy-700)]"
+                            >
                             <div className="px-4 py-3">
                               <p className="text-xs text-[var(--color-slate-500)] mb-2 font-semibold uppercase tracking-wide">
                                 Individual Instances ({group.scenarios.length})
@@ -1811,11 +1826,13 @@ function DimensionBreakdownWithAggregation({
                             </div>
                           </motion.div>
                         )}
+                        </AnimatePresence>
                       </div>
                     );
                   })}
                 </motion.div>
               )}
+              </AnimatePresence>
             </div>
           );
         })}
