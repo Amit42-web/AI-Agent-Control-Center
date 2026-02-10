@@ -65,6 +65,21 @@ export interface AggregatedIssue {
   evidenceSnippets: string[]; // Sample evidence from different calls
 }
 
+export interface AggregatedScenario {
+  id: string;
+  groupKey: string; // Unique identifier for this group
+  title: string; // Representative title for the group
+  dimension: string;
+  rootCauseType?: RootCauseType;
+  pattern: string; // Description of the pattern
+  severity: Severity; // Highest severity in group
+  avgConfidence: number;
+  occurrences: number; // Total scenario instances
+  uniqueCalls: number; // Number of unique calls affected
+  affectedCallIds: string[];
+  scenarios: Scenario[]; // All scenarios in this group
+}
+
 export interface CheckConfig {
   id: CheckType;
   name: string;

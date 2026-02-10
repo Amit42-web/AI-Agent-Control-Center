@@ -1,19 +1,4 @@
-import { Scenario, Severity, RootCauseType } from '@/types';
-
-export interface AggregatedScenario {
-  id: string;
-  groupKey: string; // Unique identifier for this group
-  title: string; // Representative title for the group
-  dimension: string;
-  rootCauseType?: RootCauseType;
-  pattern: string; // Description of the pattern
-  severity: Severity; // Highest severity in group
-  avgConfidence: number;
-  occurrences: number; // Total scenario instances
-  uniqueCalls: number; // Number of unique calls affected
-  affectedCallIds: string[];
-  scenarios: Scenario[]; // All scenarios in this group
-}
+import { Scenario, Severity, RootCauseType, AggregatedScenario } from '@/types';
 
 /**
  * Extract semantic entities from text using generic NLP patterns
@@ -736,3 +721,60 @@ export async function computeScenarioEmbeddings(
 
   return embeddingsMap;
 }
+
+/**
+ * LLM-based scenario aggregation (NEW APPROACH)
+ *
+ * This is an alternative to the embedding-based aggregateScenarios() function.
+ * Instead of computing embeddings and using similarity thresholds, this approach
+ * sends all scenarios to an LLM and asks it to intelligently group and deduplicate them.
+ *
+ * ## Why LLM-based aggregation?
+ *
+ * - **Better semantic understanding**: LLM can understand context and nuance better than threshold-based clustering
+ * - **Cross-dimension deduplication**: LLM naturally merges similar scenarios across different dimensions
+ * - **Natural language reasoning**: LLM explains why scenarios were grouped together
+ * - **Simpler implementation**: No need to compute embeddings or tune similarity thresholds
+ *
+ * ## Usage Example:
+ *
+ * ```typescript
+ * const aggregated = await aggregateScenariosWithLLM(
+ *   scenarios,
+ *   apiKey,
+ *   'gpt-4o-mini'
+ * );
+ * ```
+ *
+ * ## How It Works:
+ *
+ * 1. All scenarios are formatted and sent to the LLM in one API call
+ * 2. LLM analyzes semantic similarity, overlapping line numbers, and descriptions
+ * 3. LLM groups scenarios into categories and provides reasoning
+ * 4. Returns aggregated scenarios with all instances preserved
+ *
+ * ## Performance:
+ *
+ * - Single API call for all scenarios (vs many embedding calls)
+ * - Cost: ~$0.10-0.50 per 100 scenarios (using gpt-4o-mini)
+ * - Faster for small batches (<100 scenarios)
+ * - More expensive but more accurate for large batches
+ *
+ * @param scenarios The scenarios to aggregate
+ * @param apiKey OpenAI API key
+ * @param model LLM model to use (default: gpt-4o-mini)
+ * @returns Aggregated scenarios
+ */
+export async function aggregateScenariosWithLLM(
+  scenarios: Scenario[],
+  apiKey: string,
+  model: string = 'gpt-4o-mini'
+): Promise<AggregatedScenario[]> {
+  // Dynamically import to avoid issues with server/client imports
+  const { aggregateScenariosWithLLM: llmAggregation } = await import('@/services/openai');
+
+  return llmAggregation(apiKey, model, scenarios);
+}
+
+// Re-export AggregatedScenario type for backwards compatibility
+export type { AggregatedScenario };

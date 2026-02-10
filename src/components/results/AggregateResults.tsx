@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { aggregateIssuesWithLLM } from '@/services/openai';
-import { aggregateScenarios, AggregatedScenario } from '@/utils/aggregateScenarios';
+import { aggregateScenarios, aggregateScenariosWithLLM, AggregatedScenario } from '@/utils/aggregateScenarios';
 import { IssueType, Severity, AggregatedIssue, CheckConfig, DetectedIssue } from '@/types';
 import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart, ArrowRight } from 'lucide-react';
 import {
@@ -110,6 +110,10 @@ export function AggregateResults() {
   const [isAggregating, setIsAggregating] = useState(false);
   const [aggregationError, setAggregationError] = useState<string | null>(null);
 
+  // State for LLM-based scenario aggregation
+  const [aggregatedScenarios, setAggregatedScenarios] = useState<AggregatedScenario[]>([]);
+  const [isAggregatingScenarios, setIsAggregatingScenarios] = useState(false);
+
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
       return issueTypeLabels[type];
@@ -186,6 +190,46 @@ export function AggregateResults() {
     performAggregation();
   }, [results?.issues]);
 
+  // LLM-based scenario aggregation for open-ended flow
+  useEffect(() => {
+    const performScenarioAggregation = async () => {
+      if (!scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
+        setAggregatedScenarios([]);
+        return;
+      }
+
+      setIsAggregatingScenarios(true);
+
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+        const model = 'gpt-4o-mini';
+
+        if (!apiKey) {
+          console.warn('[LLM Scenario Aggregation] No API key found, using fallback aggregation');
+          // Fallback: use original aggregateScenarios function
+          const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
+          setAggregatedScenarios(fallbackAgg);
+          setIsAggregatingScenarios(false);
+          return;
+        }
+
+        console.log(`[LLM Scenario Aggregation] Starting aggregation for ${scenarioResults.scenarios.length} scenarios`);
+        const aggregated = await aggregateScenariosWithLLM(scenarioResults.scenarios, apiKey, model);
+        console.log(`[LLM Scenario Aggregation] Completed - ${aggregated.length} categories created`);
+        setAggregatedScenarios(aggregated);
+      } catch (error) {
+        console.error('[LLM Scenario Aggregation] Error:', error);
+        // Fallback on error: use original aggregateScenarios function
+        const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
+        setAggregatedScenarios(fallbackAgg);
+      } finally {
+        setIsAggregatingScenarios(false);
+      }
+    };
+
+    performScenarioAggregation();
+  }, [scenarioResults?.scenarios]);
+
   // Aggregate scenarios for open-ended flow
   const scenarioAggregation = useMemo(() => {
     if (!scenarioResults?.scenarios) return null;
@@ -194,9 +238,7 @@ export function AggregateResults() {
     console.log('[AggregateResults] Total scenarios:', scenarios.length);
     console.log('[AggregateResults] First scenario:', scenarios[0]);
 
-    // Aggregate similar scenarios
-    const aggregatedScenarios = aggregateScenarios(scenarios);
-    console.log('[AggregateResults] Aggregated scenarios:', aggregatedScenarios.length);
+    console.log('[AggregateResults] Using LLM-aggregated scenarios:', aggregatedScenarios.length);
     console.log('[AggregateResults] First aggregated:', aggregatedScenarios[0]);
 
     // Group by dimension
@@ -346,7 +388,7 @@ export function AggregateResults() {
       bySeverity,
       aggregatedScenarios
     };
-  }, [scenarioResults]);
+  }, [scenarioResults, aggregatedScenarios]);
 
   // Calculate Impact Zone - unified view of top priority issues across all types
   const burningIssues = useMemo(() => {
@@ -807,7 +849,7 @@ export function AggregateResults() {
                           </span>
                         </div>
                         <h4 className="text-white font-semibold text-base leading-snug pr-2 group-hover:text-white transition-colors line-clamp-2">
-                          {issue.title.split(' ').slice(0, 4).join(' ')}
+                          {issue.title}
                         </h4>
                       </div>
 

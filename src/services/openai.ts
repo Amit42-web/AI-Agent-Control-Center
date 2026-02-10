@@ -1,4 +1,4 @@
-import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType, AggregatedIssue } from '@/types';
+import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType, AggregatedIssue, AggregatedScenario, RootCauseType } from '@/types';
 
 export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -1305,6 +1305,221 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
     console.error('Error generating enhanced fix suggestions:', error);
     throw error;
   }
+}
+
+/**
+ * LLM-based intelligent scenario aggregation
+ * Groups semantically similar scenarios and deduplicates across dimensions
+ */
+export async function aggregateScenariosWithLLM(
+  apiKey: string,
+  model: string,
+  scenarios: Scenario[]
+): Promise<AggregatedScenario[]> {
+  if (scenarios.length === 0) return [];
+
+  console.log(`[LLM Scenario Aggregation] Processing ${scenarios.length} scenarios`);
+
+  // Prepare scenarios summary for LLM
+  const scenariosSummary = scenarios.map((scenario, idx) => ({
+    index: idx,
+    id: scenario.id,
+    callId: scenario.callId,
+    title: scenario.title,
+    dimension: scenario.dimension,
+    rootCauseType: scenario.rootCauseType,
+    severity: scenario.severity,
+    confidence: scenario.confidence,
+    whatHappened: scenario.whatHappened,
+    impact: scenario.impact,
+    lineNumbers: scenario.lineNumbers
+  }));
+
+  const systemPrompt = `You are an expert at categorizing and deduplicating quality scenarios from call transcript analysis.
+
+Your task is to intelligently group similar scenarios into meaningful categories while avoiding duplicates.
+
+DEDUPLICATION RULES:
+1. If two scenarios are from the SAME call with OVERLAPPING line numbers (e.g., lines 6-9 and 7-8), they likely describe the same problem from different angles - MERGE them into one category
+2. If scenarios have semantically similar titles/descriptions (e.g., "Incomplete Greeting and Identity" vs "Incomplete Identity Confirmation Sequence"), MERGE them into a single category with a clear, concise name
+3. Scenarios in DIFFERENT dimensions but describing the SAME underlying issue should be MERGED (e.g., "Flow deviation in greeting" and "Process issue in greeting" are the same)
+4. Keep scenarios separate ONLY if they represent truly distinct problems
+
+CATEGORIZATION GUIDELINES:
+- Create clear, concise category names (descriptive but brief)
+- Group scenarios that share the same root problem, even if worded differently
+- Preserve all individual scenario instances within each category
+- Choose the highest severity among grouped scenarios
+- Calculate average confidence across grouped instances
+- Choose the most appropriate dimension and root cause type from the grouped scenarios
+
+Return a JSON array of categories with this structure:
+{
+  "categories": [
+    {
+      "categoryName": "Clear, Descriptive Category Name",
+      "dimension": "most_appropriate_dimension_from_group",
+      "rootCauseType": "most_appropriate_root_cause_from_group",
+      "severity": "highest_severity_in_group",
+      "scenarioIndices": [0, 3, 7],
+      "reasoning": "Brief explanation of why these scenarios were grouped together"
+    }
+  ]
+}
+
+IMPORTANT:
+- Each scenario index (0 to ${scenarios.length - 1}) must appear in exactly ONE category
+- scenarioIndices should contain the index positions from the input array
+- Prioritize merging over creating separate categories when in doubt
+- Look for semantic similarity, not just exact word matches
+- Consider the underlying issue being described, not just the surface-level wording`;
+
+  const userPrompt = `Categorize and deduplicate these ${scenarios.length} scenarios:\n\n${JSON.stringify(scenariosSummary, null, 2)}`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    // Parse LLM response
+    let jsonStr = response.trim();
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    const startIdx = jsonStr.indexOf('{');
+    const endIdx = jsonStr.lastIndexOf('}');
+    if (startIdx === -1 || endIdx === -1) {
+      console.error('[LLM Scenario Aggregation] No valid JSON found in response');
+      // Fallback: create one category per scenario
+      return createFallbackScenarioAggregation(scenarios);
+    }
+
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+    const result = JSON.parse(jsonStr);
+
+    if (!result.categories || !Array.isArray(result.categories)) {
+      console.error('[LLM Scenario Aggregation] Invalid response structure');
+      return createFallbackScenarioAggregation(scenarios);
+    }
+
+    console.log(`[LLM Scenario Aggregation] Created ${result.categories.length} categories`);
+
+    // Convert to AggregatedScenario format
+    const aggregated = result.categories.map((category: any, idx: number) => {
+      const categoryScenarios = category.scenarioIndices.map((i: number) => scenarios[i]);
+
+      // Get highest severity
+      const severities = categoryScenarios.map((s: Scenario) => s.severity);
+      const highestSeverity = getHighestSeverity(severities);
+
+      // Calculate average confidence
+      const avgConfidence = Math.round(
+        categoryScenarios.reduce((sum: number, s: Scenario) => sum + s.confidence, 0) / categoryScenarios.length
+      );
+
+      // Get unique call IDs
+      const affectedCallIds = Array.from(new Set(categoryScenarios.map((s: Scenario) => s.callId)));
+
+      // Create pattern description
+      const uniqueTitles = new Set(categoryScenarios.map((s: Scenario) => s.title));
+      const pattern = uniqueTitles.size > 1
+        ? `${uniqueTitles.size} similar patterns identified across ${affectedCallIds.length} call${affectedCallIds.length !== 1 ? 's' : ''}`
+        : categoryScenarios[0].whatHappened;
+
+      return {
+        id: `llm-scenario-agg-${idx}`,
+        groupKey: `${category.dimension}-${category.rootCauseType}-${idx}`,
+        title: category.categoryName,
+        dimension: category.dimension,
+        rootCauseType: category.rootCauseType as RootCauseType | undefined,
+        pattern,
+        severity: highestSeverity,
+        avgConfidence,
+        occurrences: categoryScenarios.length,
+        uniqueCalls: affectedCallIds.length,
+        affectedCallIds,
+        scenarios: categoryScenarios.sort((a: Scenario, b: Scenario) => a.callId.localeCompare(b.callId))
+      };
+    });
+
+    // Sort by impact: occurrences * severity weight
+    type AggType = typeof aggregated[0];
+    return aggregated.sort((a: AggType, b: AggType) => {
+      const impactA = a.occurrences * severityWeight(a.severity);
+      const impactB = b.occurrences * severityWeight(b.severity);
+
+      if (impactB !== impactA) {
+        return impactB - impactA;
+      }
+
+      return b.uniqueCalls - a.uniqueCalls;
+    });
+  } catch (error) {
+    console.error('[LLM Scenario Aggregation] Error:', error);
+    return createFallbackScenarioAggregation(scenarios);
+  }
+}
+
+/**
+ * Fallback scenario aggregation when LLM fails
+ * Groups by dimension and root cause
+ */
+function createFallbackScenarioAggregation(scenarios: Scenario[]): AggregatedScenario[] {
+  console.log('[LLM Scenario Aggregation] Using fallback aggregation');
+
+  const grouped = new Map<string, Scenario[]>();
+
+  for (const scenario of scenarios) {
+    const dimension = scenario.dimension || 'Uncategorized';
+    const rootCause = scenario.rootCauseType || 'unknown';
+    const key = `${dimension}||${rootCause}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(scenario);
+  }
+
+  const aggregated: AggregatedScenario[] = [];
+  let idx = 0;
+
+  for (const [key, groupedScenarios] of grouped.entries()) {
+    const [dimension, rootCause] = key.split('||');
+    const severities = groupedScenarios.map(s => s.severity);
+    const highestSeverity = getHighestSeverity(severities);
+    const avgConfidence = Math.round(
+      groupedScenarios.reduce((sum, s) => sum + s.confidence, 0) / groupedScenarios.length
+    );
+    const affectedCallIds = Array.from(new Set(groupedScenarios.map(s => s.callId)));
+
+    aggregated.push({
+      id: `fallback-scenario-agg-${idx++}`,
+      groupKey: key,
+      title: groupedScenarios[0].title,
+      dimension,
+      rootCauseType: rootCause !== 'unknown' ? (rootCause as RootCauseType) : undefined,
+      pattern: `${affectedCallIds.length} occurrence${affectedCallIds.length !== 1 ? 's' : ''}`,
+      severity: highestSeverity,
+      avgConfidence,
+      occurrences: groupedScenarios.length,
+      uniqueCalls: affectedCallIds.length,
+      affectedCallIds,
+      scenarios: groupedScenarios.sort((a, b) => a.callId.localeCompare(b.callId))
+    });
+  }
+
+  type AggType = typeof aggregated[0];
+  return aggregated.sort((a: AggType, b: AggType) => {
+    const impactA = a.occurrences * severityWeight(a.severity);
+    const impactB = b.occurrences * severityWeight(b.severity);
+
+    if (impactB !== impactA) {
+      return impactB - impactA;
+    }
+
+    return b.uniqueCalls - a.uniqueCalls;
+  });
 }
 
 /**
