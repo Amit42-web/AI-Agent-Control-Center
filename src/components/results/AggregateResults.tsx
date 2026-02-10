@@ -763,7 +763,7 @@ export function AggregateResults() {
                           </span>
                         </div>
                         <h4 className="text-white font-semibold text-base leading-snug pr-2 group-hover:text-white transition-colors line-clamp-2">
-                          {issue.title}
+                          {issue.title.split(' ').slice(0, 4).join(' ')}
                         </h4>
                       </div>
 
