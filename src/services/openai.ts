@@ -1339,19 +1339,47 @@ export async function aggregateScenariosWithLLM(
 
 Your task is to intelligently group similar scenarios into meaningful categories while avoiding duplicates.
 
-DEDUPLICATION RULES:
-1. If two scenarios are from the SAME call with OVERLAPPING line numbers (e.g., lines 6-9 and 7-8), they likely describe the same problem from different angles - MERGE them into one category
-2. If scenarios have semantically similar titles/descriptions (e.g., "Incomplete Greeting and Identity" vs "Incomplete Identity Confirmation Sequence"), MERGE them into a single category with a clear, concise name
-3. Scenarios in DIFFERENT dimensions but describing the SAME underlying issue should be MERGED (e.g., "Flow deviation in greeting" and "Process issue in greeting" are the same)
-4. Keep scenarios separate ONLY if they represent truly distinct problems
+🔍 CRITICAL: AGGRESSIVE DEDUPLICATION IS REQUIRED
+Your primary goal is to MERGE scenarios that describe the same core problem, even if they use different words or are in different dimensions.
+
+DEDUPLICATION RULES (READ CAREFULLY):
+
+1. **Same Call + Overlapping Lines** = MERGE
+   - If two scenarios are from the SAME call with OVERLAPPING line numbers (e.g., lines 6-9 and 7-8), they describe the same problem - MERGE them
+
+2. **Same Core Problem + Different Wording** = MERGE
+   - "Incomplete Identity Confirmation" vs "Fragmented Identity Confirmation Process" → SAME PROBLEM (both about identity confirmation) → MERGE
+   - "Missing Name Verification" vs "Skipped Customer Name Check" → SAME PROBLEM (both about name verification) → MERGE
+   - "Greeting Issue" vs "Introduction Problem" → SAME PROBLEM (both about greeting) → MERGE
+   - "Information Shared Before Verification" vs "Premature Data Disclosure" → SAME PROBLEM (both about sharing info too early) → MERGE
+
+3. **Cross-Dimension Merging** = MERGE
+   - Scenarios in DIFFERENT dimensions but describing the SAME underlying issue should be MERGED
+   - Example: "Flow Control: Identity not confirmed" + "Process: Incomplete identity verification" → MERGE (both about identity confirmation)
+
+4. **Semantic Concept Equivalence** = MERGE
+   Look for these equivalent concepts:
+   - Identity = Name = Customer Name = Verification = Confirmation = Authentication
+   - Greeting = Introduction = Welcome = Opening
+   - Premature = Early = Before = Prior to
+   - Information = Data = Details = Sensitive info
+   - Skip = Miss = Omit = Bypass = Fail to
+
+5. **Analyze the PROBLEM, not just the TITLE**
+   - Read the "whatHappened" field carefully to understand the ACTUAL problem
+   - Two scenarios with different titles but the same "whatHappened" description → MERGE
+   - Focus on: "What went wrong?" not "How is it worded?"
 
 CATEGORIZATION GUIDELINES:
-- Create clear, concise category names (descriptive but brief)
+- Create clear, concise category names that capture the core problem (e.g., "Identity Confirmation Failure")
 - Group scenarios that share the same root problem, even if worded differently
 - Preserve all individual scenario instances within each category
 - Choose the highest severity among grouped scenarios
 - Calculate average confidence across grouped instances
 - Choose the most appropriate dimension and root cause type from the grouped scenarios
+
+⚠️ WHEN IN DOUBT → MERGE!
+If you're unsure whether two scenarios should be merged, err on the side of MERGING them. It's better to have fewer, more comprehensive categories than many small fragmented ones.
 
 Return a JSON array of categories with this structure:
 {
@@ -1362,7 +1390,7 @@ Return a JSON array of categories with this structure:
       "rootCauseType": "most_appropriate_root_cause_from_group",
       "severity": "highest_severity_in_group",
       "scenarioIndices": [0, 3, 7],
-      "reasoning": "Brief explanation of why these scenarios were grouped together"
+      "reasoning": "Brief explanation of why these scenarios were grouped together (focus on the core problem they share)"
     }
   ]
 }
@@ -1370,8 +1398,8 @@ Return a JSON array of categories with this structure:
 IMPORTANT:
 - Each scenario index (0 to ${scenarios.length - 1}) must appear in exactly ONE category
 - scenarioIndices should contain the index positions from the input array
-- Prioritize merging over creating separate categories when in doubt
-- Look for semantic similarity, not just exact word matches
+- Prioritize MERGING over creating separate categories
+- Look for semantic similarity and core problem equivalence, not just exact word matches
 - Consider the underlying issue being described, not just the surface-level wording`;
 
   const userPrompt = `Categorize and deduplicate these ${scenarios.length} scenarios:\n\n${JSON.stringify(scenariosSummary, null, 2)}`;
