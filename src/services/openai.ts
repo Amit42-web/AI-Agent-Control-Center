@@ -1335,72 +1335,52 @@ export async function aggregateScenariosWithLLM(
     lineNumbers: scenario.lineNumbers
   }));
 
-  const systemPrompt = `You are an expert at categorizing and deduplicating quality scenarios from call transcript analysis.
+  const systemPrompt = `You are an expert at deduplicating scenarios. Your goal is AGGRESSIVE MERGING - combine everything that's the same underlying problem.
 
-Your task is to intelligently group similar scenarios into meaningful categories while avoiding duplicates.
+CRITICAL: These are SYNONYMS - treat them as IDENTICAL:
+- "Identity" = "Name" = "Verification" = "Confirmation" = "Authentication" = "Identity Check" = "Identity Verification Process"
+- "Greeting" = "Introduction" = "Opening" = "Welcome"
+- "Closing" = "Conclusion" = "Ending" = "Wrap-up"
+- "Empathy" = "Acknowledgment" = "Understanding" = "Active Listening"
+- "Missing" = "Incomplete" = "Absent" = "Not Present" = "Skipped" = "Fragmented"
+- "Premature" = "Early" = "Too Soon" = "Before"
+- "Process" = "Procedure" = "Step" = "Flow"
 
-🔍 CRITICAL: AGGRESSIVE DEDUPLICATION IS REQUIRED
-Your primary goal is to MERGE scenarios that describe the same core problem, even if they use different words or are in different dimensions.
+MERGE AGGRESSIVELY:
+1. Same call + overlapping lines → ALWAYS MERGE (same moment, different wording)
+2. Same core problem + different words → ALWAYS MERGE
+   Examples:
+   - "Missing Identity Verification Process" + "Incomplete Identity Confirmation" → MERGE (both about identity)
+   - "Incomplete Identity Confirmation" + "Fragmented Identity Confirmation Process" → MERGE (both about identity)
+   - "No Greeting" + "Incomplete Introduction" → MERGE (both about opening)
+   - "Early Transfer" + "Premature Agent Transfer" → MERGE (both about timing)
+3. Different dimensions but same root cause → MERGE
+   - "Flow Control: Identity issues" + "Process: Identity verification missing" → MERGE
 
-DEDUPLICATION RULES (READ CAREFULLY):
+READ THE "whatHappened" FIELD - that's the actual problem! Ignore title wording.
 
-1. **Same Call + Overlapping Lines** = MERGE
-   - If two scenarios are from the SAME call with OVERLAPPING line numbers (e.g., lines 6-9 and 7-8), they describe the same problem - MERGE them
+DON'T MERGE only if:
+- Completely different problems (greeting vs payment vs transfer)
+- Different specific errors (wrong account # vs wrong amount)
 
-2. **Same Core Problem + Different Wording** = MERGE
-   - "Incomplete Identity Confirmation" vs "Fragmented Identity Confirmation Process" → SAME PROBLEM (both about identity confirmation) → MERGE
-   - "Missing Name Verification" vs "Skipped Customer Name Check" → SAME PROBLEM (both about name verification) → MERGE
-   - "Greeting Issue" vs "Introduction Problem" → SAME PROBLEM (both about greeting) → MERGE
-   - "Information Shared Before Verification" vs "Premature Data Disclosure" → SAME PROBLEM (both about sharing info too early) → MERGE
-
-3. **Cross-Dimension Merging** = MERGE
-   - Scenarios in DIFFERENT dimensions but describing the SAME underlying issue should be MERGED
-   - Example: "Flow Control: Identity not confirmed" + "Process: Incomplete identity verification" → MERGE (both about identity confirmation)
-
-4. **Semantic Concept Equivalence** = MERGE
-   Look for these equivalent concepts:
-   - Identity = Name = Customer Name = Verification = Confirmation = Authentication
-   - Greeting = Introduction = Welcome = Opening
-   - Premature = Early = Before = Prior to
-   - Information = Data = Details = Sensitive info
-   - Skip = Miss = Omit = Bypass = Fail to
-
-5. **Analyze the PROBLEM, not just the TITLE**
-   - Read the "whatHappened" field carefully to understand the ACTUAL problem
-   - Two scenarios with different titles but the same "whatHappened" description → MERGE
-   - Focus on: "What went wrong?" not "How is it worded?"
-
-CATEGORIZATION GUIDELINES:
-- Create clear, concise category names that capture the core problem (e.g., "Identity Confirmation Failure")
-- Group scenarios that share the same root problem, even if worded differently
-- Preserve all individual scenario instances within each category
-- Choose the highest severity among grouped scenarios
-- Calculate average confidence across grouped instances
-- Choose the most appropriate dimension and root cause type from the grouped scenarios
-
-⚠️ WHEN IN DOUBT → MERGE!
-If you're unsure whether two scenarios should be merged, err on the side of MERGING them. It's better to have fewer, more comprehensive categories than many small fragmented ones.
-
-Return a JSON array of categories with this structure:
+OUTPUT FORMAT:
 {
   "categories": [
     {
-      "categoryName": "Clear, Descriptive Category Name",
-      "dimension": "most_appropriate_dimension_from_group",
-      "rootCauseType": "most_appropriate_root_cause_from_group",
-      "severity": "highest_severity_in_group",
-      "scenarioIndices": [0, 3, 7],
-      "reasoning": "Brief explanation of why these scenarios were grouped together (focus on the core problem they share)"
+      "categoryName": "Identity Verification Missing",
+      "dimension": "Process",
+      "rootCauseType": "Execution Failure",
+      "severity": "HIGH",
+      "scenarioIndices": [0, 2, 5, 8],
+      "reasoning": "All about missing/incomplete identity confirmation"
     }
   ]
 }
 
-IMPORTANT:
-- Each scenario index (0 to ${scenarios.length - 1}) must appear in exactly ONE category
-- scenarioIndices should contain the index positions from the input array
-- Prioritize MERGING over creating separate categories
-- Look for semantic similarity and core problem equivalence, not just exact word matches
-- Consider the underlying issue being described, not just the surface-level wording`;
+RULES:
+- Category names: max 4 words, describe the PROBLEM
+- Every scenario index 0-${scenarios.length - 1} must appear EXACTLY ONCE
+- When in doubt, MERGE IT`;
 
   const userPrompt = `Categorize and deduplicate these ${scenarios.length} scenarios:\n\n${JSON.stringify(scenariosSummary, null, 2)}`;
 
@@ -1578,39 +1558,48 @@ export async function aggregateIssuesWithLLM(
     sourceCheckName: issue.sourceCheckName
   }));
 
-  const systemPrompt = `You are an expert at categorizing and deduplicating quality issues from call transcript analysis.
+  const systemPrompt = `You are an expert at deduplicating and grouping quality issues. Your goal is AGGRESSIVE MERGING - combine everything that's the same underlying problem.
 
-Your task is to intelligently group similar issues into meaningful categories while avoiding duplicates.
+CRITICAL: These are SYNONYMS - treat them as IDENTICAL:
+- "Identity" = "Name" = "Verification" = "Confirmation" = "Authentication" = "Identity Check"
+- "Greeting" = "Introduction" = "Opening" = "Welcome"
+- "Closing" = "Conclusion" = "Ending" = "Wrap-up"
+- "Empathy" = "Acknowledgment" = "Understanding" = "Active Listening"
+- "Missing" = "Incomplete" = "Absent" = "Not Present" = "Skipped"
+- "Premature" = "Early" = "Too Soon" = "Before"
+- "Process" = "Procedure" = "Step" = "Flow"
 
-DEDUPLICATION RULES:
-1. If two issues are from the SAME call with OVERLAPPING line numbers (e.g., lines 6-9 and 7-8), they likely describe the same problem from different angles - MERGE them into one category
-2. If issues have semantically similar types/explanations (e.g., "Incomplete Greeting and Identity" vs "Incomplete Identity Confirmation"), MERGE them into a single category with a clear, concise name
-3. Keep issues separate ONLY if they represent truly distinct problems
+MERGE AGGRESSIVELY:
+1. Same call + overlapping lines → ALWAYS MERGE (same moment, different wording)
+2. Same core problem + different words → ALWAYS MERGE
+   Examples:
+   - "Missing Identity Verification Process" + "Incomplete Identity Confirmation" → MERGE (both about identity)
+   - "No Greeting" + "Incomplete Introduction" → MERGE (both about opening)
+   - "Early Transfer" + "Premature Agent Transfer" → MERGE (both about timing)
+3. Different dimensions/types but same root cause → MERGE
 
-CATEGORIZATION GUIDELINES:
-- Create clear, concise category names (max 4 words)
-- Group issues that share the same root problem
-- Preserve all individual instances within each category
-- Choose the highest severity among grouped issues
-- Calculate average confidence across grouped instances
+DON'T MERGE only if:
+- Completely different problems (greeting vs payment vs transfer)
+- Different specific errors (wrong account # vs wrong amount)
 
-Return a JSON array of categories with this structure:
+OUTPUT FORMAT:
 {
   "categories": [
     {
-      "categoryName": "Clear, Concise Category Name",
-      "categoryType": "representative_issue_type",
-      "severity": "highest_severity_in_group",
-      "issueIndices": [0, 3, 7],
-      "reasoning": "Brief explanation of why these issues were grouped together"
+      "categoryName": "Identity Verification Missing",
+      "categoryType": "Process",
+      "severity": "HIGH",
+      "issueIndices": [0, 2, 5, 8],
+      "reasoning": "All about missing/incomplete identity confirmation"
     }
   ]
 }
 
-IMPORTANT:
-- Each issue index (0 to ${issues.length - 1}) must appear in exactly ONE category
-- issueIndices should contain the index positions from the input array
-- Prioritize merging over creating separate categories when in doubt`;
+RULES:
+- Category names: max 4 words, describe the PROBLEM
+- Every issue index 0-${issues.length - 1} must appear EXACTLY ONCE
+- When in doubt, MERGE IT`;
+
 
   const userPrompt = `Categorize and deduplicate these ${issues.length} issues:\n\n${JSON.stringify(issuesSummary, null, 2)}`;
 
