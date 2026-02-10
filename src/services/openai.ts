@@ -1,4 +1,4 @@
-import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType } from '@/types';
+import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType, AggregatedIssue } from '@/types';
 
 export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -1304,5 +1304,226 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
   } catch (error) {
     console.error('Error generating enhanced fix suggestions:', error);
     throw error;
+  }
+}
+
+/**
+ * LLM-based intelligent issue aggregation
+ * Groups semantically similar issues and deduplicates same-call overlapping instances
+ */
+export async function aggregateIssuesWithLLM(
+  apiKey: string,
+  model: string,
+  issues: DetectedIssue[]
+): Promise<AggregatedIssue[]> {
+  if (issues.length === 0) return [];
+
+  console.log(`[LLM Aggregation] Processing ${issues.length} issues`);
+
+  // Prepare issues summary for LLM
+  const issuesSummary = issues.map((issue, idx) => ({
+    index: idx,
+    id: issue.id,
+    callId: issue.callId,
+    type: issue.type,
+    severity: issue.severity,
+    confidence: issue.confidence,
+    explanation: issue.explanation,
+    evidenceSnippet: issue.evidenceSnippet,
+    lineNumbers: issue.lineNumbers,
+    isCustomCheck: issue.isCustomCheck,
+    sourceCheckName: issue.sourceCheckName
+  }));
+
+  const systemPrompt = `You are an expert at categorizing and deduplicating quality issues from call transcript analysis.
+
+Your task is to intelligently group similar issues into meaningful categories while avoiding duplicates.
+
+DEDUPLICATION RULES:
+1. If two issues are from the SAME call with OVERLAPPING line numbers (e.g., lines 6-9 and 7-8), they likely describe the same problem from different angles - MERGE them into one category
+2. If issues have semantically similar types/explanations (e.g., "Incomplete Greeting and Identity" vs "Incomplete Identity Confirmation"), MERGE them into a single category with a clear, concise name
+3. Keep issues separate ONLY if they represent truly distinct problems
+
+CATEGORIZATION GUIDELINES:
+- Create clear, concise category names (max 4 words)
+- Group issues that share the same root problem
+- Preserve all individual instances within each category
+- Choose the highest severity among grouped issues
+- Calculate average confidence across grouped instances
+
+Return a JSON array of categories with this structure:
+{
+  "categories": [
+    {
+      "categoryName": "Clear, Concise Category Name",
+      "categoryType": "representative_issue_type",
+      "severity": "highest_severity_in_group",
+      "issueIndices": [0, 3, 7],
+      "reasoning": "Brief explanation of why these issues were grouped together"
+    }
+  ]
+}
+
+IMPORTANT:
+- Each issue index (0 to ${issues.length - 1}) must appear in exactly ONE category
+- issueIndices should contain the index positions from the input array
+- Prioritize merging over creating separate categories when in doubt`;
+
+  const userPrompt = `Categorize and deduplicate these ${issues.length} issues:\n\n${JSON.stringify(issuesSummary, null, 2)}`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    // Parse LLM response
+    let jsonStr = response.trim();
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    const startIdx = jsonStr.indexOf('{');
+    const endIdx = jsonStr.lastIndexOf('}');
+    if (startIdx === -1 || endIdx === -1) {
+      console.error('[LLM Aggregation] No valid JSON found in response');
+      // Fallback: create one category per issue
+      return createFallbackAggregation(issues);
+    }
+
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+    const result = JSON.parse(jsonStr);
+
+    if (!result.categories || !Array.isArray(result.categories)) {
+      console.error('[LLM Aggregation] Invalid response structure');
+      return createFallbackAggregation(issues);
+    }
+
+    console.log(`[LLM Aggregation] Created ${result.categories.length} categories`);
+
+    // Convert to AggregatedIssue format
+    const aggregated: AggregatedIssue[] = result.categories.map((category: any, idx: number) => {
+      const categoryIssues = category.issueIndices.map((i: number) => issues[i]);
+
+      // Get highest severity
+      const severities = categoryIssues.map((i: DetectedIssue) => i.severity);
+      const highestSeverity = getHighestSeverity(severities);
+
+      // Calculate average confidence
+      const avgConfidence = Math.round(
+        categoryIssues.reduce((sum: number, i: DetectedIssue) => sum + i.confidence, 0) / categoryIssues.length
+      );
+
+      // Get unique call IDs
+      const affectedCallIds = Array.from(new Set(categoryIssues.map((i: DetectedIssue) => i.callId)));
+
+      // Get sample evidence snippets (up to 3)
+      const evidenceSnippets = Array.from(
+        new Set(categoryIssues.map((i: DetectedIssue) => i.evidenceSnippet))
+      ).slice(0, 3);
+
+      // Create pattern description
+      const uniqueTypes = new Set(categoryIssues.map((i: DetectedIssue) => i.type));
+      const pattern = uniqueTypes.size > 1
+        ? `${uniqueTypes.size} related issue types across ${affectedCallIds.length} call${affectedCallIds.length !== 1 ? 's' : ''}`
+        : `${affectedCallIds.length} occurrence${affectedCallIds.length !== 1 ? 's' : ''} across ${affectedCallIds.length} call${affectedCallIds.length !== 1 ? 's' : ''}`;
+
+      return {
+        id: `llm-agg-${idx}`,
+        type: category.categoryType,
+        pattern: category.categoryName,
+        severity: highestSeverity,
+        avgConfidence,
+        occurrences: affectedCallIds.length,
+        affectedCallIds,
+        instances: categoryIssues,
+        evidenceSnippets
+      };
+    });
+
+    // Sort by occurrences and severity
+    return aggregated.sort((a, b) => {
+      if (b.occurrences !== a.occurrences) {
+        return b.occurrences - a.occurrences;
+      }
+      return severityWeight(b.severity) - severityWeight(a.severity);
+    });
+  } catch (error) {
+    console.error('[LLM Aggregation] Error:', error);
+    return createFallbackAggregation(issues);
+  }
+}
+
+/**
+ * Fallback aggregation when LLM fails
+ * Groups by exact type match
+ */
+function createFallbackAggregation(issues: DetectedIssue[]): AggregatedIssue[] {
+  console.log('[LLM Aggregation] Using fallback aggregation');
+
+  const grouped = new Map<string, DetectedIssue[]>();
+
+  for (const issue of issues) {
+    const key = issue.type;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(issue);
+  }
+
+  const aggregated: AggregatedIssue[] = [];
+  let idx = 0;
+
+  for (const [type, groupedIssues] of grouped.entries()) {
+    const severities = groupedIssues.map(i => i.severity);
+    const highestSeverity = getHighestSeverity(severities);
+    const avgConfidence = Math.round(
+      groupedIssues.reduce((sum, i) => sum + i.confidence, 0) / groupedIssues.length
+    );
+    const affectedCallIds = Array.from(new Set(groupedIssues.map(i => i.callId)));
+    const evidenceSnippets = Array.from(
+      new Set(groupedIssues.map(i => i.evidenceSnippet))
+    ).slice(0, 3);
+
+    aggregated.push({
+      id: `fallback-agg-${idx++}`,
+      type: type as IssueType,
+      pattern: `${affectedCallIds.length} occurrence${affectedCallIds.length !== 1 ? 's' : ''}`,
+      severity: highestSeverity,
+      avgConfidence,
+      occurrences: affectedCallIds.length,
+      affectedCallIds,
+      instances: groupedIssues,
+      evidenceSnippets
+    });
+  }
+
+  return aggregated.sort((a, b) => {
+    if (b.occurrences !== a.occurrences) {
+      return b.occurrences - a.occurrences;
+    }
+    return severityWeight(b.severity) - severityWeight(a.severity);
+  });
+}
+
+/**
+ * Get the highest severity from a list
+ */
+function getHighestSeverity(severities: Severity[]): Severity {
+  if (severities.includes('critical')) return 'critical';
+  if (severities.includes('high')) return 'high';
+  if (severities.includes('medium')) return 'medium';
+  return 'low';
+}
+
+/**
+ * Convert severity to numeric weight for sorting
+ */
+function severityWeight(severity: Severity): number {
+  switch (severity) {
+    case 'critical': return 4;
+    case 'high': return 3;
+    case 'medium': return 2;
+    case 'low': return 1;
   }
 }

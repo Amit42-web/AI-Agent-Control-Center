@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Filter, ExternalLink, Search, BarChart3, List } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { IssueType, Severity } from '@/types';
-import { aggregateIssues } from '@/utils/aggregateIssues';
+import { IssueType, Severity, AggregatedIssue } from '@/types';
+import { aggregateIssuesWithLLM } from '@/services/openai';
 
 const issueTypeLabels: Record<IssueType, string> = {
   flow_deviation: 'Flow Deviation',
@@ -49,11 +49,65 @@ export function IssueTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'aggregated' | 'detailed'>('detailed');
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
+  const [aggregatedIssues, setAggregatedIssues] = useState<AggregatedIssue[]>([]);
+  const [isAggregating, setIsAggregating] = useState(false);
 
   if (!results) return null;
 
-  // Aggregate issues
-  const aggregatedIssues = useMemo(() => aggregateIssues(results.issues), [results.issues]);
+  // LLM-based aggregation
+  useEffect(() => {
+    const performAggregation = async () => {
+      if (!results.issues || results.issues.length === 0) {
+        setAggregatedIssues([]);
+        return;
+      }
+
+      setIsAggregating(true);
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+        const model = 'gpt-4o-mini';
+
+        if (!apiKey) {
+          // Fallback: simple grouping by type
+          const grouped = new Map<string, typeof results.issues>();
+          results.issues.forEach(issue => {
+            const key = issue.type;
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(issue);
+          });
+
+          const fallbackAgg: AggregatedIssue[] = Array.from(grouped.entries()).map(([type, issues], idx) => {
+            const affectedCallIds = Array.from(new Set(issues.map(i => i.callId)));
+            return {
+              id: `fallback-${idx}`,
+              type: type as IssueType,
+              pattern: `${affectedCallIds.length} occurrence${affectedCallIds.length !== 1 ? 's' : ''}`,
+              severity: issues.reduce((max, i) => i.severity > max ? i.severity : max, 'low' as Severity),
+              avgConfidence: Math.round(issues.reduce((sum, i) => sum + i.confidence, 0) / issues.length),
+              occurrences: affectedCallIds.length,
+              affectedCallIds,
+              instances: issues,
+              evidenceSnippets: Array.from(new Set(issues.map(i => i.evidenceSnippet))).slice(0, 3)
+            };
+          });
+
+          setAggregatedIssues(fallbackAgg);
+          setIsAggregating(false);
+          return;
+        }
+
+        const aggregated = await aggregateIssuesWithLLM(apiKey, model, results.issues);
+        setAggregatedIssues(aggregated);
+      } catch (error) {
+        console.error('[IssueTable] Aggregation error:', error);
+        setAggregatedIssues([]);
+      } finally {
+        setIsAggregating(false);
+      }
+    };
+
+    performAggregation();
+  }, [results.issues]);
 
   // Get unique issue types from actual results
   const uniqueIssueTypes = Array.from(new Set(results.issues.map(issue => issue.type)));

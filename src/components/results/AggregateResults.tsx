@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
-import { aggregateIssues } from '@/utils/aggregateIssues';
-import { aggregateCustomAudits } from '@/utils/customAuditAggregation';
+import { aggregateIssuesWithLLM } from '@/services/openai';
 import { aggregateScenarios, AggregatedScenario } from '@/utils/aggregateScenarios';
 import { IssueType, Severity, AggregatedIssue, CheckConfig, DetectedIssue } from '@/types';
 import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Target, Brain, PieChart, ArrowRight } from 'lucide-react';
@@ -106,6 +105,11 @@ export function AggregateResults() {
   const [autoExpandTarget, setAutoExpandTarget] = React.useState<{ scenarioId: string; timestamp: number } | null>(null);
   const rcaBreakdownRef = React.useRef<HTMLDivElement>(null);
 
+  // State for LLM-based aggregation
+  const [aggregatedIssues, setAggregatedIssues] = useState<AggregatedIssue[]>([]);
+  const [isAggregating, setIsAggregating] = useState(false);
+  const [aggregationError, setAggregationError] = useState<string | null>(null);
+
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
       return issueTypeLabels[type];
@@ -120,27 +124,67 @@ export function AggregateResults() {
       .join(' ');
   };
 
-  // Split issues into standard checks and custom audits
-  const standardIssues = useMemo(() =>
-    results?.issues.filter(issue => !issue.isCustomCheck) || [],
-    [results?.issues]
-  );
+  // LLM-based aggregation for all issues
+  useEffect(() => {
+    const performAggregation = async () => {
+      if (!results?.issues || results.issues.length === 0) {
+        setAggregatedIssues([]);
+        return;
+      }
 
-  const customIssues = useMemo(() =>
-    results?.issues.filter(issue => issue.isCustomCheck) || [],
-    [results?.issues]
-  );
+      setIsAggregating(true);
+      setAggregationError(null);
 
-  // Aggregate both types
-  const aggregatedStandardIssues = useMemo(() =>
-    aggregateIssues(standardIssues),
-    [standardIssues]
-  );
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+        const model = 'gpt-4o-mini'; // Fast and cost-effective for aggregation
 
-  const aggregatedCustomIssues = useMemo(() =>
-    aggregateCustomAudits(customIssues),
-    [customIssues]
-  );
+        if (!apiKey) {
+          console.warn('[LLM Aggregation] No API key found, using fallback aggregation');
+          // Fallback: group by exact type
+          const grouped = new Map<string, DetectedIssue[]>();
+          results.issues.forEach(issue => {
+            const key = issue.type;
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(issue);
+          });
+
+          const fallbackAgg: AggregatedIssue[] = Array.from(grouped.entries()).map(([type, issues], idx) => {
+            const affectedCallIds = Array.from(new Set(issues.map(i => i.callId)));
+            return {
+              id: `fallback-${idx}`,
+              type: type as IssueType,
+              pattern: `${affectedCallIds.length} occurrence${affectedCallIds.length !== 1 ? 's' : ''}`,
+              severity: issues.reduce((max, i) => i.severity > max ? i.severity : max, 'low' as Severity),
+              avgConfidence: Math.round(issues.reduce((sum, i) => sum + i.confidence, 0) / issues.length),
+              occurrences: affectedCallIds.length,
+              affectedCallIds,
+              instances: issues,
+              evidenceSnippets: Array.from(new Set(issues.map(i => i.evidenceSnippet))).slice(0, 3)
+            };
+          });
+
+          setAggregatedIssues(fallbackAgg);
+          setIsAggregating(false);
+          return;
+        }
+
+        console.log(`[LLM Aggregation] Starting aggregation for ${results.issues.length} issues`);
+        const aggregated = await aggregateIssuesWithLLM(apiKey, model, results.issues);
+        console.log(`[LLM Aggregation] Completed - ${aggregated.length} categories created`);
+        setAggregatedIssues(aggregated);
+      } catch (error) {
+        console.error('[LLM Aggregation] Error:', error);
+        setAggregationError(error instanceof Error ? error.message : 'Aggregation failed');
+        // Fallback on error
+        setAggregatedIssues([]);
+      } finally {
+        setIsAggregating(false);
+      }
+    };
+
+    performAggregation();
+  }, [results?.issues]);
 
   // Aggregate scenarios for open-ended flow
   const scenarioAggregation = useMemo(() => {
@@ -920,31 +964,46 @@ export function AggregateResults() {
         </motion.div>
       </div>
 
-      {/* Checks Overview by Pillar - Always show to display all enabled checks */}
-      <CheckPillarOverview
-        standardIssues={aggregatedStandardIssues}
-        customIssues={aggregatedCustomIssues}
-        checks={checks}
-      />
+      {/* Loading state for LLM aggregation */}
+      {isAggregating && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-[var(--color-navy-800)] p-6 rounded-lg border border-[var(--color-navy-700)]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+            <p className="text-sm text-[var(--color-slate-300)]">Intelligently categorizing issues with AI...</p>
+          </div>
+        </motion.div>
+      )}
 
-      {/* Standard Checks Aggregation - Hierarchical View */}
-      {aggregatedStandardIssues.length > 0 && (
-        <ObjectiveIssuesBreakdown
-          aggregatedIssues={aggregatedStandardIssues}
-          getIssueTypeLabel={getIssueTypeLabel}
-          title="Standard Checks - Aggregated View"
-          subtitle="Issues grouped by type with expandable details"
+      {/* Error state */}
+      {aggregationError && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-red-900/20 p-4 rounded-lg border border-red-500/30"
+        >
+          <p className="text-sm text-red-400">Aggregation error: {aggregationError}</p>
+        </motion.div>
+      )}
+
+      {/* Checks Overview by Pillar - Always show to display all enabled checks */}
+      {!isAggregating && (
+        <CheckPillarOverview
+          aggregatedIssues={aggregatedIssues}
+          checks={checks}
         />
       )}
 
-      {/* Custom Audits Aggregation - Hierarchical View */}
-      {aggregatedCustomIssues.length > 0 && (
+      {/* LLM-Aggregated Issues - Unified View */}
+      {!isAggregating && aggregatedIssues.length > 0 && (
         <ObjectiveIssuesBreakdown
-          aggregatedIssues={aggregatedCustomIssues}
+          aggregatedIssues={aggregatedIssues}
           getIssueTypeLabel={getIssueTypeLabel}
-          title="Custom Audits - Aggregated View"
-          subtitle="Open-ended audit findings grouped by similarity"
-          customStyle={true}
+          title="AI-Categorized Issues"
+          subtitle={`${aggregatedIssues.length} intelligent categories identified from ${results?.issues.length || 0} detected issues`}
         />
       )}
     </div>
@@ -953,12 +1012,10 @@ export function AggregateResults() {
 
 // Component to display check pillar overview
 function CheckPillarOverview({
-  standardIssues,
-  customIssues,
+  aggregatedIssues,
   checks
 }: {
-  standardIssues: AggregatedIssue[];
-  customIssues: AggregatedIssue[];
+  aggregatedIssues: AggregatedIssue[];
   checks: CheckConfig[];
 }) {
   // Early return if checks is not an array
@@ -967,7 +1024,7 @@ function CheckPillarOverview({
     return null;
   }
 
-  const allIssues = [...standardIssues, ...customIssues];
+  const allIssues = aggregatedIssues;
 
   // Define all possible check categories (standard checks)
   const allCheckCategories: Record<string, { name: string; icon: string; color: string }> = {
