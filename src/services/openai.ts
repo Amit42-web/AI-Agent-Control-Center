@@ -1308,6 +1308,31 @@ Return ONLY a JSON array of enhanced fixes. Return one fix per scenario.`;
 }
 
 /**
+ * Normalize root cause type from various formats to the expected lowercase format
+ */
+function normalizeRootCauseType(value: string | undefined): RootCauseType | undefined {
+  if (!value) return undefined;
+
+  const normalized = value.toLowerCase().trim();
+
+  // Map human-readable labels to internal keys
+  const mapping: Record<string, RootCauseType> = {
+    'knowledge': 'knowledge',
+    'knowledge gap': 'knowledge',
+    'instruction': 'instruction',
+    'instruction gap': 'instruction',
+    'execution': 'execution',
+    'execution failure': 'execution',
+    'conversation': 'conversation',
+    'conversation design': 'conversation',
+    'model': 'model',
+    'model limitation': 'model',
+  };
+
+  return mapping[normalized];
+}
+
+/**
  * LLM-based intelligent scenario aggregation
  * Groups semantically similar scenarios and deduplicates across dimensions
  */
@@ -1369,13 +1394,20 @@ OUTPUT FORMAT:
     {
       "categoryName": "Identity Verification Missing",
       "dimension": "Process",
-      "rootCauseType": "Execution Failure",
+      "rootCauseType": "execution",
       "severity": "HIGH",
       "scenarioIndices": [0, 2, 5, 8],
       "reasoning": "All about missing/incomplete identity confirmation"
     }
   ]
 }
+
+IMPORTANT: rootCauseType must be EXACTLY one of these lowercase values:
+- "knowledge" (for Knowledge Gap issues)
+- "instruction" (for Instruction Gap issues)
+- "execution" (for Execution Failure issues)
+- "conversation" (for Conversation Design issues)
+- "model" (for Model Limitation issues)
 
 RULES:
 - Category names: max 4 words, describe the PROBLEM
@@ -1436,12 +1468,20 @@ RULES:
         ? `${uniqueTitles.size} similar patterns identified across ${affectedCallIds.length} call${affectedCallIds.length !== 1 ? 's' : ''}`
         : categoryScenarios[0].whatHappened;
 
+      // Normalize rootCauseType to ensure it matches expected format
+      const normalizedRootCause = normalizeRootCauseType(category.rootCauseType);
+
+      // Log if normalization changed the value (indicates LLM returned wrong format)
+      if (category.rootCauseType && category.rootCauseType !== normalizedRootCause) {
+        console.log(`[LLM Scenario Aggregation] Normalized rootCauseType: "${category.rootCauseType}" → "${normalizedRootCause}"`);
+      }
+
       return {
         id: `llm-scenario-agg-${idx}`,
-        groupKey: `${category.dimension}-${category.rootCauseType}-${idx}`,
+        groupKey: `${category.dimension}-${normalizedRootCause || 'unknown'}-${idx}`,
         title: category.categoryName,
         dimension: category.dimension,
-        rootCauseType: category.rootCauseType as RootCauseType | undefined,
+        rootCauseType: normalizedRootCause,
         pattern,
         severity: highestSeverity,
         avgConfidence,
