@@ -1496,7 +1496,7 @@ RULES:
       }
 
       // Log the aggregated scenario details
-      console.log(`[LLM Scenario Aggregation] Category "${category.categoryName}": rootCauseType="${normalizedRootCause}", scenarios=${categoryScenarios.length}, sourceRootCauses=[${Array.from(new Set(categoryScenarios.map(s => s.rootCauseType))).join(', ')}]`);
+      console.log(`[LLM Scenario Aggregation] Category "${category.categoryName}": rootCauseType="${normalizedRootCause}", scenarios=${categoryScenarios.length}, sourceRootCauses=[${Array.from(new Set(categoryScenarios.map((s: Scenario) => s.rootCauseType))).join(', ')}]`);
 
       return {
         id: `llm-scenario-agg-${idx}`,
