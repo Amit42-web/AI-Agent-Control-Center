@@ -1573,8 +1573,12 @@ function DimensionBreakdownWithAggregation({
           console.log(`[DimensionBreakdown] - isDimensionExpanded: ${isDimensionExpanded}`);
           console.log(`[DimensionBreakdown] - hasIssues: ${hasIssues} (value: ${dimension.value})`);
           console.log(`[DimensionBreakdown] - dimensionAggregatedScenarios.length: ${dimensionAggregatedScenarios.length}`);
+          console.log(`[DimensionBreakdown] - Total aggregatedScenarios: ${aggregatedScenarios.length}`);
+          console.log(`[DimensionBreakdown] - All aggregated rootCauseTypes:`, aggregatedScenarios.map(a => a.rootCauseType));
           if (dimensionAggregatedScenarios.length > 0) {
             console.log(`[DimensionBreakdown] - First scenario:`, dimensionAggregatedScenarios[0]);
+          } else if (hasIssues) {
+            console.warn(`[DimensionBreakdown] ⚠️ MISMATCH: Dimension shows ${dimension.value} scenarios but no aggregated scenarios match!`);
           }
 
           return (

@@ -1409,10 +1409,13 @@ IMPORTANT: rootCauseType must be EXACTLY one of these lowercase values:
 - "conversation" (for Conversation Design issues)
 - "model" (for Model Limitation issues)
 
+CRITICAL: When merging scenarios, use the rootCauseType that appears most frequently in the scenarios being merged. DO NOT change the rootCauseType unless scenarios have conflicting types - in that case, use the majority type.
+
 RULES:
 - Category names: max 4 words, describe the PROBLEM
 - Every scenario index 0-${scenarios.length - 1} must appear EXACTLY ONCE
-- When in doubt, MERGE IT`;
+- When in doubt, MERGE IT
+- Preserve the original rootCauseType from the scenarios (use majority if there are conflicts)`;
 
   const userPrompt = `Categorize and deduplicate these ${scenarios.length} scenarios:\n\n${JSON.stringify(scenariosSummary, null, 2)}`;
 
@@ -1468,13 +1471,32 @@ RULES:
         ? `${uniqueTitles.size} similar patterns identified across ${affectedCallIds.length} call${affectedCallIds.length !== 1 ? 's' : ''}`
         : categoryScenarios[0].whatHappened;
 
-      // Normalize rootCauseType to ensure it matches expected format
-      const normalizedRootCause = normalizeRootCauseType(category.rootCauseType);
+      // Determine rootCauseType from the scenarios being merged (use majority vote)
+      const rootCauseTypeCounts: Record<string, number> = {};
+      categoryScenarios.forEach((s: Scenario) => {
+        if (s.rootCauseType) {
+          rootCauseTypeCounts[s.rootCauseType] = (rootCauseTypeCounts[s.rootCauseType] || 0) + 1;
+        }
+      });
+
+      // Get the most common rootCauseType from the source scenarios
+      const sourceRootCauseType = Object.entries(rootCauseTypeCounts).length > 0
+        ? Object.entries(rootCauseTypeCounts).sort((a, b) => b[1] - a[1])[0][0]
+        : undefined;
+
+      // Normalize LLM's suggested rootCauseType
+      const llmSuggestedRootCause = normalizeRootCauseType(category.rootCauseType);
+
+      // Prefer source rootCauseType over LLM's suggestion to maintain consistency
+      const normalizedRootCause = sourceRootCauseType || llmSuggestedRootCause;
 
       // Log if normalization changed the value (indicates LLM returned wrong format)
       if (category.rootCauseType && category.rootCauseType !== normalizedRootCause) {
         console.log(`[LLM Scenario Aggregation] Normalized rootCauseType: "${category.rootCauseType}" → "${normalizedRootCause}"`);
       }
+
+      // Log the aggregated scenario details
+      console.log(`[LLM Scenario Aggregation] Category "${category.categoryName}": rootCauseType="${normalizedRootCause}", scenarios=${categoryScenarios.length}, sourceRootCauses=[${Array.from(new Set(categoryScenarios.map(s => s.rootCauseType))).join(', ')}]`);
 
       return {
         id: `llm-scenario-agg-${idx}`,
