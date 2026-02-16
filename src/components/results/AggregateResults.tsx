@@ -113,6 +113,7 @@ export function AggregateResults() {
   // State for LLM-based scenario aggregation
   const [aggregatedScenarios, setAggregatedScenarios] = useState<AggregatedScenario[]>([]);
   const [isAggregatingScenarios, setIsAggregatingScenarios] = useState(false);
+  const lastProcessedScenariosRef = React.useRef<number>(0);
 
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
@@ -196,10 +197,26 @@ export function AggregateResults() {
       if (!scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
         setAggregatedScenarios([]);
         setIsAggregatingScenarios(false);
+        lastProcessedScenariosRef.current = 0;
         return;
       }
 
+      // Prevent duplicate aggregations for the same scenarios
+      if (lastProcessedScenariosRef.current === scenarioResults.scenarios.length && aggregatedScenarios.length > 0) {
+        console.log('[LLM Scenario Aggregation] Skipping - already processed these scenarios');
+        return;
+      }
+
+      lastProcessedScenariosRef.current = scenarioResults.scenarios.length;
       setIsAggregatingScenarios(true);
+
+      // Add timeout to prevent indefinite loading
+      const timeoutId = setTimeout(() => {
+        console.warn('[LLM Scenario Aggregation] Timeout reached, using fallback');
+        const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
+        setAggregatedScenarios(fallbackAgg);
+        setIsAggregatingScenarios(false);
+      }, 30000); // 30 second timeout
 
       try {
         const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
@@ -207,6 +224,7 @@ export function AggregateResults() {
 
         if (!apiKey) {
           console.warn('[LLM Scenario Aggregation] No API key found, using fallback aggregation');
+          clearTimeout(timeoutId);
           // Fallback: use original aggregateScenarios function
           const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
           setAggregatedScenarios(fallbackAgg);
@@ -217,9 +235,11 @@ export function AggregateResults() {
         console.log(`[LLM Scenario Aggregation] Starting aggregation for ${scenarioResults.scenarios.length} scenarios`);
         const aggregated = await aggregateScenariosWithLLM(scenarioResults.scenarios, apiKey, model);
         console.log(`[LLM Scenario Aggregation] Completed - ${aggregated.length} categories created`);
+        clearTimeout(timeoutId);
         setAggregatedScenarios(aggregated);
       } catch (error) {
         console.error('[LLM Scenario Aggregation] Error:', error);
+        clearTimeout(timeoutId);
         // Fallback on error: use original aggregateScenarios function
         const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
         setAggregatedScenarios(fallbackAgg);
