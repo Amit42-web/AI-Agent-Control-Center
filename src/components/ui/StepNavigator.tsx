@@ -12,7 +12,7 @@ const steps = [
 ] as const;
 
 export function StepNavigator() {
-  const { currentStep, goToStep, results, fixes, scenarioResults, saveAnalysis, currentAnalysisName } = useAppStore();
+  const { currentStep, goToStep, results, fixes, scenarioResults, enhancedFixes, saveAnalysis, currentAnalysisName } = useAppStore();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveName, setSaveName] = useState(currentAnalysisName || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -20,7 +20,7 @@ export function StepNavigator() {
   const getStepStatus = (stepId: typeof steps[number]['id']) => {
     if (stepId === 'input') return 'accessible';
     if (stepId === 'results') return (results || scenarioResults) ? 'accessible' : 'locked';
-    if (stepId === 'fixes') return fixes ? 'accessible' : 'locked';
+    if (stepId === 'fixes') return (fixes || enhancedFixes) ? 'accessible' : 'locked';
     return 'locked';
   };
 
@@ -85,7 +85,7 @@ export function StepNavigator() {
           const isAccessible = status === 'accessible';
           const isCompleted =
             (step.id === 'input' && (results || scenarioResults)) ||
-            (step.id === 'results' && fixes);
+            (step.id === 'results' && (fixes || enhancedFixes));
 
           return (
             <div key={step.id} className="flex items-center flex-1">
