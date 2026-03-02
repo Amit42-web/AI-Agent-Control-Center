@@ -51,6 +51,11 @@ export interface DetectedIssue {
   isCustomCheck?: boolean; // Flag if this came from a custom/open-ended audit
   sourceCheckId?: string; // ID of the custom check that generated this
   sourceCheckName?: string; // Name of the custom check for display
+  // RCA fields (Root Cause Analysis)
+  whatHappened?: string; // What the agent did or didn't do
+  impact?: string; // Effect on customer/outcome
+  rootCauseType?: RootCauseType; // Why this happened: knowledge/instruction/execution/conversation/model
+  instructionReference?: InstructionReference; // For execution failures - reference to script/KB instruction not followed
 }
 
 export interface AggregatedIssue {

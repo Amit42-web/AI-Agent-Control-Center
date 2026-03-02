@@ -162,6 +162,32 @@ For each issue found, provide a JSON object with:
 - lineNumbers: array of line numbers where the issue occurs
 - explanation: detailed explanation of why this is an issue
 
+## ROOT CAUSE ANALYSIS (RCA) - REQUIRED FIELDS:
+- whatHappened: Detailed description of what the agent did or didn't do (be specific and observant)
+- impact: Clear explanation of how this affected the customer experience, trust, satisfaction, or call outcome
+- rootCauseType: The PRIMARY root cause. You MUST classify into EXACTLY ONE of these 5 categories:
+  1️⃣ "knowledge" - Information/context doesn't exist anywhere (missing in prompt, KB, or tools)
+  2️⃣ "instruction" - Info exists but agent wasn't instructed HOW or WHEN to use it
+  3️⃣ "execution" - Both info AND instructions exist, but agent FAILED to follow them
+  4️⃣ "conversation" - Technically correct but poor UX/awkward conversation design
+  5️⃣ "model" - Fundamental model capability limitation (use rarely, <5% of cases)
+
+  CLASSIFICATION RULES:
+  - Choose ONLY ONE primary category per issue
+  - If multiple seem applicable, select the EARLIEST root cause: Knowledge > Instruction > Execution > Conversation > Model
+  - NEVER label as Knowledge Gap if the information exists but was unused
+  - NEVER label as Model Limitation unless all other categories are ruled out
+
+- instructionReference (REQUIRED for rootCauseType="execution", optional otherwise): {
+    source: "script" | "kb" | "policy" | "guideline",
+    documentName: optional string (e.g., "Sales Call Script v2.1"),
+    section: string (e.g., "Section 2.3: Pricing Objections", "Lines 15-20"),
+    expectedBehavior: string (what the instruction says the agent should do),
+    actualBehavior: string (what the agent actually did instead),
+    confidence: optional number 0-100 (how confident you are about this specific instruction reference)
+  }
+  NOTE: When classifying as "execution", you MUST identify which specific script/KB/policy instruction was not followed.
+
 Return ONLY a JSON array of issues. If no issues are found, return an empty array [].`;
 
   const userPrompt = `Transcript to analyze:\n${transcriptText}`;
@@ -218,6 +244,9 @@ Return ONLY a JSON array of issues. If no issues are found, return an empty arra
 
     console.log(`Found ${issues.length} issues in transcript ${transcript.id}`);
 
+    // Valid root cause types
+    const validRootCauseTypes = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];
+
     // Convert to DetectedIssue format with IDs
     return issues.map((issue: {
       type: string;
@@ -227,17 +256,44 @@ Return ONLY a JSON array of issues. If no issues are found, return an empty arra
       lineNumbers: number[];
       explanation: string;
       suggestedFix?: string;
-    }, idx: number) => ({
-      id: `${transcript.id}-issue-${idx}`,
-      callId: transcript.id,
-      type: issue.type as IssueType,
-      severity: issue.severity as Severity,
-      confidence: issue.confidence,
-      evidenceSnippet: issue.evidenceSnippet,
-      lineNumbers: issue.lineNumbers,
-      explanation: issue.explanation,
-      suggestedFix: issue.suggestedFix,
-    }));
+      whatHappened?: string;
+      impact?: string;
+      rootCauseType?: string;
+      instructionReference?: {
+        source: 'script' | 'kb' | 'policy' | 'guideline';
+        documentName?: string;
+        section: string;
+        expectedBehavior: string;
+        actualBehavior: string;
+        confidence?: number;
+      };
+    }, idx: number) => {
+      // Validate and normalize rootCauseType
+      let rootCauseType = issue.rootCauseType?.toLowerCase();
+
+      // If rootCauseType is invalid, set to undefined
+      if (rootCauseType && !validRootCauseTypes.includes(rootCauseType)) {
+        console.warn(`[Issue ${transcript.id}-${idx}] Invalid rootCauseType "${issue.rootCauseType}" - setting to undefined. Valid values are: ${validRootCauseTypes.join(', ')}`);
+        rootCauseType = undefined;
+      }
+
+      return {
+        id: `${transcript.id}-issue-${idx}`,
+        callId: transcript.id,
+        type: issue.type as IssueType,
+        severity: issue.severity as Severity,
+        confidence: issue.confidence,
+        evidenceSnippet: issue.evidenceSnippet,
+        lineNumbers: issue.lineNumbers,
+        explanation: issue.explanation,
+        suggestedFix: issue.suggestedFix,
+        // RCA fields
+        whatHappened: issue.whatHappened,
+        impact: issue.impact,
+        rootCauseType: rootCauseType as RootCauseType | undefined,
+        instructionReference: issue.instructionReference,
+      };
+    });
   } catch (error) {
     console.error('Error analyzing transcript:', error);
     throw error;

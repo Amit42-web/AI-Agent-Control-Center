@@ -286,6 +286,32 @@ export function IssueTable() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                 >
+                  {/* Root Cause Analysis Summary */}
+                  {(() => {
+                    const rcaCounts: Record<string, number> = {};
+                    issue.instances.forEach(i => {
+                      if (i.rootCauseType) {
+                        rcaCounts[i.rootCauseType] = (rcaCounts[i.rootCauseType] || 0) + 1;
+                      }
+                    });
+
+                    if (Object.keys(rcaCounts).length > 0) {
+                      return (
+                        <div className="bg-[var(--color-navy-900)] rounded-lg p-3">
+                          <p className="text-xs text-[var(--color-slate-400)] mb-2">Root Cause Distribution:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(rcaCounts).map(([type, count]) => (
+                              <span key={type} className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
+                                {type}: {count}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* All Patterns/Findings */}
                   {(() => {
                     const uniquePatterns = Array.from(new Set(issue.instances.map(i => i.explanation)));
@@ -361,6 +387,7 @@ export function IssueTable() {
                 <th>Call ID</th>
                 <th>Issue Type</th>
                 <th>Severity</th>
+                <th>Root Cause</th>
                 <th>Confidence</th>
                 <th>Evidence</th>
                 <th>Action</th>
@@ -384,6 +411,15 @@ export function IssueTable() {
                     <span className={`badge ${severityClasses[issue.severity]}`}>
                       {issue.severity}
                     </span>
+                  </td>
+                  <td>
+                    {issue.rootCauseType ? (
+                      <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs">
+                        {issue.rootCauseType}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--color-slate-500)] text-xs">-</span>
+                    )}
                   </td>
                   <td>
                     <div className="flex items-center gap-2">

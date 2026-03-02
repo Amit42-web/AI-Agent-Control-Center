@@ -174,6 +174,59 @@ export function CallViewer() {
                       <p className="text-xs text-[var(--color-slate-400)]">
                         {issue.explanation}
                       </p>
+
+                      {/* RCA Fields */}
+                      {issue.whatHappened && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-[var(--color-slate-400)]">What Happened:</p>
+                          <p className="text-xs text-[var(--color-slate-300)]">{issue.whatHappened}</p>
+                        </div>
+                      )}
+                      {issue.impact && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-[var(--color-slate-400)]">Impact:</p>
+                          <p className="text-xs text-[var(--color-slate-300)]">{issue.impact}</p>
+                        </div>
+                      )}
+
+                      {/* Root Cause Type */}
+                      {issue.rootCauseType && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--color-slate-400)]">Root Cause:</span>
+                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">
+                            {issue.rootCauseType}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Instruction Reference for Execution Failures */}
+                      {issue.instructionReference && (
+                        <div className="p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                          <p className="text-xs font-medium text-orange-300 mb-1">Instruction Not Followed:</p>
+                          <div className="space-y-1 text-xs">
+                            <div>
+                              <span className="text-[var(--color-slate-400)]">Source: </span>
+                              <span className="text-[var(--color-slate-300)]">{issue.instructionReference.source}</span>
+                              {issue.instructionReference.documentName && (
+                                <span className="text-[var(--color-slate-400)]"> - {issue.instructionReference.documentName}</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-[var(--color-slate-400)]">Section: </span>
+                              <span className="text-[var(--color-slate-300)]">{issue.instructionReference.section}</span>
+                            </div>
+                            <div>
+                              <p className="text-[var(--color-slate-400)] mb-0.5">Expected:</p>
+                              <p className="text-green-300">{issue.instructionReference.expectedBehavior}</p>
+                            </div>
+                            <div>
+                              <p className="text-[var(--color-slate-400)] mb-0.5">Actual:</p>
+                              <p className="text-red-300">{issue.instructionReference.actualBehavior}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {issue.suggestedFix && (
                         <div className="flex items-start gap-2 p-2 bg-green-500/10 rounded-lg">
                           <Lightbulb className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
