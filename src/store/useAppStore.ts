@@ -22,8 +22,7 @@ import {
   analyzeTranscript,
   generateFixSuggestions,
   analyzeTranscriptScenarios,
-  generateEnhancedFixesByRCACategory,
-  aggregateScenariosWithLLM,
+  generateEnhancedFixSuggestions,
 } from '@/services/openai';
 
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
@@ -418,38 +417,36 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         set({ fixes: validatedFixes, currentStep: 'fixes', isRunning: false });
       } else if (flowType === 'open-ended' && scenarioResults) {
-        // Open-ended flow: Generate RCA-categorized fixes
-        console.log(`Aggregating ${scenarioResults.scenarios.length} scenarios...`);
-        set({ runProgress: 20 });
+        // Open-ended flow: Convert scenarios to issues format and use same fix generation
+        const issuesFromScenarios = scenarioResults.scenarios.map((scenario, index) => ({
+          id: scenario.id || `scenario-${index}`,
+          type: scenario.dimension?.toLowerCase().replace(/\s+/g, '_') || 'general_quality',
+          callId: scenario.callId,
+          severity: scenario.severity,
+          confidence: scenario.confidence,
+          explanation: scenario.context,
+          evidenceSnippet: scenario.context,
+          lineNumbers: [1], // Scenarios don't have specific line numbers
+          isCustomCheck: false
+        }));
 
-        // Step 1: Aggregate scenarios using LLM to group similar ones
-        const aggregatedScenarios = await aggregateScenariosWithLLM(
+        // Generate fixes using the same function as objective flow
+        const fixes = await generateFixSuggestions(
           apiKey,
           openaiConfig.model,
-          scenarioResults.scenarios
-        );
-
-        console.log(`Aggregated into ${aggregatedScenarios.length} scenario groups`);
-        set({ runProgress: 50 });
-
-        // Step 2: Generate RCA-categorized fixes (one fix per RCA category)
-        console.log('Generating RCA-categorized fixes...');
-        const enhancedFixes = await generateEnhancedFixesByRCACategory(
-          apiKey,
-          openaiConfig.model,
-          aggregatedScenarios,
+          issuesFromScenarios,
+          transcripts,
           referenceEnabled ? referenceScript : null,
           knowledgeBaseEnabled ? knowledgeBase : null
         );
 
-        console.log(`Generated ${enhancedFixes.length} RCA-categorized fixes`);
+        // Ensure fixes have the proper structure
+        const validatedFixes = {
+          scriptFixes: Array.isArray(fixes?.scriptFixes) ? fixes.scriptFixes : [],
+          generalFixes: Array.isArray(fixes?.generalFixes) ? fixes.generalFixes : []
+        };
 
-        set({
-          enhancedFixes: { fixes: enhancedFixes },
-          currentStep: 'fixes',
-          isRunning: false,
-          runProgress: 100
-        });
+        set({ fixes: validatedFixes, currentStep: 'fixes', isRunning: false });
       }
     } catch (error) {
       console.error('Error generating fixes:', error);
