@@ -533,7 +533,7 @@ function FixesPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        {flowType === 'objective' ? <FixesPanel /> : <EnhancedFixesList />}
+        <FixesPanel />
       </motion.div>
     </motion.div>
   );
