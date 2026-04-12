@@ -335,7 +335,7 @@ export function TranscriptInput() {
           }
 
           // FORMAT 4: [SPEAKER]: message or SPEAKER: message
-          const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s+(.+)$/i);
+          const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
           if (format4) {
             const speakerStr = format4[1].toLowerCase();
             speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
@@ -597,7 +597,7 @@ export function TranscriptInput() {
           }
 
           // FORMAT 4: [SPEAKER]: message or SPEAKER: message
-          const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s+(.+)$/i);
+          const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
           if (format4) {
             const speakerStr = format4[1].toLowerCase();
             speaker = (speakerStr === 'bot' || speakerStr === 'agent' ? 'agent' : 'customer') as 'agent' | 'customer';
