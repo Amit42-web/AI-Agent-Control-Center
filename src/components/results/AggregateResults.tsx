@@ -463,7 +463,23 @@ export function AggregateResults() {
   if (!results && !scenarioResults) return null;
 
   // If open-ended flow, show scenario aggregation
-  if (flowType === 'open-ended' && scenarioAggregation) {
+  if (flowType === 'open-ended') {
+    // If no scenario aggregation data, show empty state
+    if (!scenarioAggregation || !scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
+      return (
+        <div className="space-y-6">
+          <div className="glass-card p-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
+              <Target className="w-8 h-8 text-purple-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">No Analysis Results</h3>
+            <p className="text-[var(--color-slate-400)]">
+              Run an analysis to see aggregated insights from your voice bot calls.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="space-y-6">
         {/* Overview Cards */}
@@ -959,6 +975,23 @@ export function AggregateResults() {
   const criticalIssues = results.issues.filter(i => i.severity === 'critical').length;
   const highIssues = results.issues.filter(i => i.severity === 'high').length;
   const affectedCalls = new Set(results.issues.map(i => i.callId)).size;
+
+  // Show empty state if no issues detected
+  if (totalIssues === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="glass-card p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+            <BarChart3 className="w-8 h-8 text-blue-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">No Issues Detected</h3>
+          <p className="text-[var(--color-slate-400)]">
+            Run an analysis to see aggregated issues from your voice bot calls.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
