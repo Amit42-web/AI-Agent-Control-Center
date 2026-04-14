@@ -2074,3 +2074,197 @@ function AggregatedScenariosView({ aggregated, issues }: { aggregated: Aggregate
     </motion.div>
   );
 }
+
+// Objective flow aggregation helper (can be extracted as a separate component if needed)
+export function AggregateResultsObjective() {
+  const { results, checks } = useAppStore();
+  const [aggregatedIssues, setAggregatedIssues] = useState<AggregatedIssue[]>([]);
+  const [isAggregating, setIsAggregating] = useState(false);
+
+  const getIssueTypeLabel = (type: IssueType): string => {
+    const issueTypeLabels: Record<string, string> = {
+      flow_deviation: 'Flow Deviation',
+      repetition_loop: 'Repetition Loop',
+      language_mismatch: 'Language Mismatch',
+      mid_call_restart: 'Mid-Call Restart',
+      quality_issue: 'Quality Issue',
+    };
+    if (type in issueTypeLabels) {
+      return issueTypeLabels[type];
+    }
+    const matchingCheck = checks.find(check => check.id === type);
+    if (matchingCheck) {
+      return matchingCheck.name;
+    }
+    return type
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const severityClasses: Record<Severity, string> = {
+    critical: 'badge-critical',
+    high: 'badge-high',
+    medium: 'badge-medium',
+    low: 'badge-low',
+  };
+
+  if (!results || !results.issues || results.issues.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="glass-card p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+            <BarChart3 className="w-8 h-8 text-blue-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">No Issues Detected</h3>
+          <p className="text-[var(--color-slate-400)]">
+            Run an analysis to see aggregated issue insights from your voice bot calls.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <motion.div
+          className="glass-card p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{results.issues.length}</p>
+              <p className="text-xs text-[var(--color-slate-400)]">Total Issues</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="glass-card p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{results.callsWithIssues}</p>
+              <p className="text-xs text-[var(--color-slate-400)]">Calls Affected</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="glass-card p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {results.severityDistribution.critical + results.severityDistribution.high}
+              </p>
+              <p className="text-xs text-[var(--color-slate-400)]">High Priority</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="glass-card p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+              <Brain className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{isAggregating ? '...' : aggregatedIssues.length}</p>
+              <p className="text-xs text-[var(--color-slate-400)]">Issue Patterns</p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Aggregated Issues Table */}
+      <motion.div
+        className="glass-card overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <div className="p-4 border-b border-[var(--color-navy-700)]">
+          <h3 className="text-lg font-semibold text-white">Aggregated Issues</h3>
+          <p className="text-sm text-[var(--color-slate-400)] mt-1">
+            {isAggregating ? 'AI is grouping similar issues...' : `${aggregatedIssues.length} unique issue pattern${aggregatedIssues.length !== 1 ? 's' : ''} identified`}
+          </p>
+        </div>
+
+        {isAggregating ? (
+          <div className="p-12 text-center">
+            <div className="inline-flex items-center gap-3 text-blue-400">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              >
+                <Brain className="w-8 h-8" />
+              </motion.div>
+              <span className="text-sm">AI is analyzing and grouping similar issues...</span>
+            </div>
+          </div>
+        ) : aggregatedIssues.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-[var(--color-slate-400)]">No aggregated patterns available</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[var(--color-navy-700)]">
+            {aggregatedIssues.map((issue, index) => (
+              <div
+                key={issue.id}
+                className="p-4 hover:bg-[var(--color-navy-800)] transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`badge ${severityClasses[issue.severity]}`}>
+                        {issue.severity}
+                      </span>
+                      <span className="text-sm font-medium text-white">
+                        {getIssueTypeLabel(issue.type)}
+                      </span>
+                    </div>
+                    <h4 className="text-base font-semibold text-white mb-1">
+                      {issue.title}
+                    </h4>
+                    <p className="text-sm text-[var(--color-slate-400)] mb-2">
+                      {issue.pattern}
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-[var(--color-slate-500)]">
+                      <span>{issue.occurrences} occurrence{issue.occurrences !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span>{issue.affectedCallIds.length} call{issue.affectedCallIds.length !== 1 ? 's' : ''} affected</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
