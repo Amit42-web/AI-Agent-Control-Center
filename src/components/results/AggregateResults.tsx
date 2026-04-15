@@ -2081,14 +2081,21 @@ export function AggregateResultsObjective() {
   const [aggregatedIssues, setAggregatedIssues] = useState<AggregatedIssue[]>([]);
   const [isAggregating, setIsAggregating] = useState(false);
 
+  console.log('[AggregateResultsObjective] Rendering with results:', results);
+  console.log('[AggregateResultsObjective] Issues count:', results?.issues?.length || 0);
+
   // LLM-based aggregation for objective flow issues
   useEffect(() => {
     const performAggregation = async () => {
+      console.log('[AggregateResultsObjective] performAggregation called');
+
       if (!results?.issues || results.issues.length === 0) {
+        console.log('[AggregateResultsObjective] No issues to aggregate');
         setAggregatedIssues([]);
         return;
       }
 
+      console.log('[AggregateResultsObjective] Starting aggregation for', results.issues.length, 'issues');
       setIsAggregating(true);
 
       try {
@@ -2119,13 +2126,16 @@ export function AggregateResultsObjective() {
             evidenceSnippets: instances.slice(0, 3).map(i => i.evidenceSnippet)
           }));
 
+          console.log('[Objective Aggregation] Fallback aggregation complete:', fallbackAggregated.length, 'patterns');
           setAggregatedIssues(fallbackAggregated);
           setIsAggregating(false);
           return;
         }
 
         // Use LLM aggregation
+        console.log('[Objective Aggregation] Using LLM aggregation');
         const aggregated = await aggregateIssuesWithLLM(apiKey, openaiConfig.model, results.issues);
+        console.log('[Objective Aggregation] LLM aggregation complete:', aggregated.length, 'patterns');
         setAggregatedIssues(aggregated);
       } catch (error) {
         console.error('[Objective Aggregation] Error:', error);
