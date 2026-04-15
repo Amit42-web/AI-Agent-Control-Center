@@ -2077,9 +2077,66 @@ function AggregatedScenariosView({ aggregated, issues }: { aggregated: Aggregate
 
 // Objective flow aggregation helper (can be extracted as a separate component if needed)
 export function AggregateResultsObjective() {
-  const { results, checks } = useAppStore();
+  const { results, checks, openaiConfig } = useAppStore();
   const [aggregatedIssues, setAggregatedIssues] = useState<AggregatedIssue[]>([]);
   const [isAggregating, setIsAggregating] = useState(false);
+
+  // LLM-based aggregation for objective flow issues
+  useEffect(() => {
+    const performAggregation = async () => {
+      if (!results?.issues || results.issues.length === 0) {
+        setAggregatedIssues([]);
+        return;
+      }
+
+      setIsAggregating(true);
+
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+
+        if (!apiKey) {
+          console.warn('[Objective Aggregation] No API key, using simple grouping');
+          // Fallback: group by exact type
+          const grouped = new Map<string, DetectedIssue[]>();
+          results.issues.forEach(issue => {
+            const key = issue.type;
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(issue);
+          });
+
+          const fallbackAggregated: AggregatedIssue[] = Array.from(grouped.entries()).map(([type, instances], index) => ({
+            id: `agg-${index}`,
+            type: type as IssueType,
+            pattern: instances[0].explanation,
+            severity: instances.reduce((max, i) =>
+              ['critical', 'high', 'medium', 'low'].indexOf(i.severity) < ['critical', 'high', 'medium', 'low'].indexOf(max) ? i.severity : max,
+              'low' as Severity
+            ),
+            avgConfidence: instances.reduce((sum, i) => sum + i.confidence, 0) / instances.length,
+            occurrences: instances.length,
+            affectedCallIds: Array.from(new Set(instances.map(i => i.callId))),
+            instances,
+            evidenceSnippets: instances.slice(0, 3).map(i => i.evidenceSnippet)
+          }));
+
+          setAggregatedIssues(fallbackAggregated);
+          setIsAggregating(false);
+          return;
+        }
+
+        // Use LLM aggregation
+        const aggregated = await aggregateIssuesWithLLM(apiKey, openaiConfig.model, results.issues);
+        setAggregatedIssues(aggregated);
+      } catch (error) {
+        console.error('[Objective Aggregation] Error:', error);
+        setAggregatedIssues([]);
+      } finally {
+        setIsAggregating(false);
+      }
+    };
+
+    performAggregation();
+  }, [results?.issues, openaiConfig.model]);
 
   const getIssueTypeLabel = (type: IssueType): string => {
     const issueTypeLabels: Record<string, string> = {
