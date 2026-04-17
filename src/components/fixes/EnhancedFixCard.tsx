@@ -144,64 +144,72 @@ ${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Sectio
           </div>
 
           {/* Root Cause Section */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Root Cause Analysis
-              </span>
+          {fix.rootCause && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  Root Cause Analysis
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-amber-500 bg-amber-500/5">
+                <p className="text-sm text-[var(--color-slate-200)]">
+                  {fix.rootCause}
+                </p>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-amber-500 bg-amber-500/5">
-              <p className="text-sm text-[var(--color-slate-200)]">
-                {fix.rootCause}
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* Suggested Solution */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Suggested Solution
-              </span>
+          {fix.suggestedSolution && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-blue-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  Suggested Solution
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-blue-500 bg-blue-500/5">
+                <p className="text-sm text-[var(--color-slate-200)]">
+                  {fix.suggestedSolution}
+                </p>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-blue-500 bg-blue-500/5">
-              <p className="text-sm text-[var(--color-slate-200)]">
-                {fix.suggestedSolution}
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* Where to Implement */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-purple-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Where to Implement
-              </span>
+          {fix.whereToImplement && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  Where to Implement
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-purple-500 bg-purple-500/5">
+                <p className="text-sm text-[var(--color-slate-200)]">
+                  {fix.whereToImplement}
+                </p>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-purple-500 bg-purple-500/5">
-              <p className="text-sm text-[var(--color-slate-200)]">
-                {fix.whereToImplement}
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* What to Implement */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                What to Implement
-              </span>
+          {fix.whatToImplement && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Code className="w-4 h-4 text-green-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  What to Implement
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
+                <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap font-mono">
+                  {fix.whatToImplement}
+                </pre>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
-              <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap font-mono">
-                {fix.whatToImplement}
-              </pre>
-            </div>
-          </div>
+          )}
 
           {/* Prompt Fix (if available) */}
           {fix.promptFix && (
@@ -231,49 +239,55 @@ ${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Sectio
           )}
 
           {/* Concrete Example */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-pink-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Concrete Example
-              </span>
+          {fix.concreteExample && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-pink-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  Concrete Example
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-pink-500 bg-pink-500/5">
+                <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap">
+                  {fix.concreteExample}
+                </pre>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-pink-500 bg-pink-500/5">
-              <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap">
-                {fix.concreteExample}
-              </pre>
-            </div>
-          </div>
+          )}
 
           {/* Success Criteria */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Success Criteria
-              </span>
+          {fix.successCriteria && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  Success Criteria
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
+                <p className="text-sm text-[var(--color-slate-200)]">
+                  {fix.successCriteria}
+                </p>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
-              <p className="text-sm text-[var(--color-slate-200)]">
-                {fix.successCriteria}
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* How to Test */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <FlaskConical className="w-4 h-4 text-orange-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                How to Test
-              </span>
+          {fix.howToTest && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-4 h-4 text-orange-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  How to Test
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-orange-500 bg-orange-500/5">
+                <p className="text-sm text-[var(--color-slate-200)]">
+                  {fix.howToTest}
+                </p>
+              </div>
             </div>
-            <div className="glass-card-subtle p-3 border-l-2 border-orange-500 bg-orange-500/5">
-              <p className="text-sm text-[var(--color-slate-200)]">
-                {fix.howToTest}
-              </p>
-            </div>
-          </div>
+          )}
         </motion.div>
       )}
     </motion.div>
