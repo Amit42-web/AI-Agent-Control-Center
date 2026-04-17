@@ -1391,10 +1391,6 @@ export async function generateEnhancedFixesByRCACategory(
 
   console.log(`[RCA Fix Generation] Grouped scenarios into ${Object.keys(scenariosByRCA).length} RCA categories`);
 
-  // Generate fixes for each RCA category in parallel
-  const allFixes: EnhancedFix[] = [];
-  let fixIdCounter = 0;
-
   // Create promises for all RCA categories to process in parallel
   const fixGenerationPromises = Object.entries(scenariosByRCA)
     .filter(([rcaType]) => rcaType !== 'unknown') // Skip scenarios without RCA type
