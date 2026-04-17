@@ -108,8 +108,8 @@ export function FixesPanel() {
 
   const exportFixes = () => {
     const content = {
-      scriptFixes: fixes.scriptFixes || [],
-      generalFixes: fixes.generalFixes || [],
+      scriptFixes: fixes?.scriptFixes || [],
+      generalFixes: fixes?.generalFixes || [],
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(content, null, 2)], {
