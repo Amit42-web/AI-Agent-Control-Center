@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   Download,
+  X,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { EnhancedFixCard } from './EnhancedFixCard';
@@ -31,6 +34,9 @@ export function EnhancedFixesList() {
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
+  const [showPreview, setShowPreview] = useState(false);
+  const [generatedDocument, setGeneratedDocument] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
 
   // Proper null/undefined checks
   if (!enhancedFixes || !enhancedFixes.fixes || enhancedFixes.fixes.length === 0) {
@@ -61,6 +67,22 @@ export function EnhancedFixesList() {
       newSelected.add(fixId);
     }
     setSelectedFixIds(newSelected);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(generatedDocument);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const downloadDocument = () => {
+    const blob = new Blob([generatedDocument], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `implementation-guide-${new Date().toISOString().split('T')[0]}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -200,19 +222,8 @@ export function EnhancedFixesList() {
                   combinedDocument += `---\n\n`;
                 });
 
-                // Copy to clipboard
-                navigator.clipboard.writeText(combinedDocument);
-
-                // Also download as file
-                const blob = new Blob([combinedDocument], { type: 'text/markdown' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `implementation-guide-${selectedFixes.length}-fixes.md`;
-                a.click();
-                URL.revokeObjectURL(url);
-
-                alert(`✅ Combined document copied to clipboard and downloaded!\n\n${selectedFixes.length} fix${selectedFixes.length !== 1 ? 'es' : ''} included.`);
+                setGeneratedDocument(combinedDocument);
+                setShowPreview(true);
               }}
               className="btn-primary flex items-center gap-2 whitespace-nowrap"
             >
@@ -247,6 +258,79 @@ export function EnhancedFixesList() {
           Export Fixes
         </button>
       </div>
+
+      {/* Preview Modal */}
+      <AnimatePresence>
+        {showPreview && (
+          <motion.div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowPreview(false)}
+          >
+            <motion.div
+              className="glass-card max-w-4xl w-full max-h-[90vh] flex flex-col"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/10">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Implementation Guide Preview</h2>
+                  <p className="text-sm text-[var(--color-slate-400)] mt-1">
+                    {selectedFixIds.size} fix{selectedFixIds.size !== 1 ? 'es' : ''} selected
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-[var(--color-slate-400)]" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="prose prose-invert max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm text-[var(--color-slate-200)] bg-black/20 p-4 rounded-lg font-mono">
+                    {generatedDocument}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
+                <button
+                  onClick={copyToClipboard}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  {isCopied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy to Clipboard
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={downloadDocument}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download as Markdown
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
