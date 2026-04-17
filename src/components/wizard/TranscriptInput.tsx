@@ -115,14 +115,54 @@ export function TranscriptInput() {
   };
 
   const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setUploadStatus({ type: 'error', message: 'No file selected. Please select a CSV file to upload.' });
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      setUploadStatus({ type: 'error', message: 'No files selected. Please select one or more CSV files to upload.' });
       return;
     }
 
     // Clear any previous status messages
     setUploadStatus({ type: null, message: '' });
+
+    console.log(`Loading ${files.length} CSV file(s)`);
+
+    const allParsedTranscripts: any[] = [];
+    let filesProcessed = 0;
+    let filesWithErrors = 0;
+    let totalTranscriptsFromAllFiles = 0;
+
+    Array.from(files).forEach((file, fileIndex) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => {
+        console.error(`Failed to read CSV file: ${file.name}`);
+        filesWithErrors++;
+        filesProcessed++;
+        if (filesProcessed === files.length) {
+          if (allParsedTranscripts.length === 0) {
+            setUploadStatus({
+              type: 'error',
+              message: `Failed to read ${filesWithErrors} CSV file${filesWithErrors !== 1 ? 's' : ''}. Please try again or select different files.`
+            });
+          } else {
+            deduplicateTranscripts(allParsedTranscripts).then((finalTranscripts) => {
+              setTranscripts(finalTranscripts);
+              setUploadStatus({
+                type: 'error',
+                message: `Loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} CSV file${files.length - filesWithErrors !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+              });
+            }).catch((error) => {
+              console.error('[CSV Upload] Deduplication failed in error handler, using original transcripts:', error);
+              setTranscripts(allParsedTranscripts);
+              setUploadStatus({
+                type: 'error',
+                message: `Loaded ${allParsedTranscripts.length} transcript${allParsedTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} CSV file${files.length - filesWithErrors !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+              });
+            });
+          }
+          event.target.value = '';
+        }
+      };
 
     const reader = new FileReader();
 
@@ -132,16 +172,41 @@ export function TranscriptInput() {
       event.target.value = '';
     };
 
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
 
-      if (!text || text.trim().length === 0) {
-        setUploadStatus({ type: 'error', message: 'The uploaded file is empty. Please select a file with valid transcript data.' });
-        event.target.value = '';
-        return;
-      }
+        if (!text || text.trim().length === 0) {
+          console.warn(`CSV file ${file.name} is empty`);
+          filesWithErrors++;
+          filesProcessed++;
+          if (filesProcessed === files.length) {
+            if (allParsedTranscripts.length === 0) {
+              setUploadStatus({
+                type: 'error',
+                message: 'All selected CSV files are empty. Please select files with valid transcript data.'
+              });
+            } else {
+              deduplicateTranscripts(allParsedTranscripts).then((finalTranscripts) => {
+                setTranscripts(finalTranscripts);
+                setUploadStatus({
+                  type: 'error',
+                  message: `Loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} file${files.length - filesWithErrors !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+                });
+              }).catch((error) => {
+                console.error('[CSV Upload] Deduplication failed in empty file handler, using original transcripts:', error);
+                setTranscripts(allParsedTranscripts);
+                setUploadStatus({
+                  type: 'error',
+                  message: `Loaded ${allParsedTranscripts.length} transcript${allParsedTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} file${files.length - filesWithErrors !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+                });
+              });
+            }
+            event.target.value = '';
+          }
+          return;
+        }
 
-      console.log('CSV file loaded, total length:', text.length);
+        console.log(`CSV file ${file.name} loaded, total length:`, text.length);
 
       // Parse CSV properly - handle quoted cells that may contain newlines
       const rows: string[] = [];
@@ -380,27 +445,40 @@ export function TranscriptInput() {
         return;
       }
 
-      // Apply deduplication if enabled
-      deduplicateTranscripts(parsedTranscripts).then((finalTranscripts) => {
-        setTranscripts(finalTranscripts);
-        setUploadStatus({
-          type: 'success',
-          message: `Successfully loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from CSV file.`
-        });
-        // Reset the file input so the same file can be uploaded again if needed
-        event.target.value = '';
-      }).catch((error) => {
-        console.error('[CSV Upload] Deduplication failed, using original transcripts:', error);
-        setTranscripts(parsedTranscripts);
-        setUploadStatus({
-          type: 'success',
-          message: `Successfully loaded ${parsedTranscripts.length} transcript${parsedTranscripts.length !== 1 ? 's' : ''} from CSV file.`
-        });
-        event.target.value = '';
-      });
-    };
+        // Add transcripts from this CSV to the collection
+        allParsedTranscripts.push(...parsedTranscripts);
+        totalTranscriptsFromAllFiles += parsedTranscripts.length;
+        filesProcessed++;
 
-    reader.readAsText(file);
+        console.log(`Processed CSV file ${fileIndex + 1}/${files.length}: ${parsedTranscripts.length} transcripts`);
+
+        // Check if all files have been processed
+        if (filesProcessed === files.length) {
+          console.log(`All ${files.length} CSV files processed. Total transcripts: ${totalTranscriptsFromAllFiles}`);
+
+          // Apply deduplication if enabled
+          deduplicateTranscripts(allParsedTranscripts).then((finalTranscripts) => {
+            setTranscripts(finalTranscripts);
+            setUploadStatus({
+              type: 'success',
+              message: `Successfully loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from ${files.length} CSV file${files.length !== 1 ? 's' : ''}.`
+            });
+            // Reset the file input so the same files can be uploaded again if needed
+            event.target.value = '';
+          }).catch((error) => {
+            console.error('[CSV Upload] Deduplication failed, using original transcripts:', error);
+            setTranscripts(allParsedTranscripts);
+            setUploadStatus({
+              type: 'success',
+              message: `Successfully loaded ${allParsedTranscripts.length} transcript${allParsedTranscripts.length !== 1 ? 's' : ''} from ${files.length} CSV file${files.length !== 1 ? 's' : ''}.`
+            });
+            event.target.value = '';
+          });
+        }
+      };
+
+      reader.readAsText(file);
+    });
   };
 
   const handleTextFilesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -796,10 +874,11 @@ export function TranscriptInput() {
               <div className="flex items-center gap-4 flex-wrap">
                 <label className="btn-primary flex items-center gap-2 cursor-pointer">
                   <Upload className="w-4 h-4" />
-                  Upload CSV File
+                  Upload CSV Files
                   <input
                     type="file"
                     accept=".csv"
+                    multiple
                     onChange={handleCSVUpload}
                     className="hidden"
                   />
