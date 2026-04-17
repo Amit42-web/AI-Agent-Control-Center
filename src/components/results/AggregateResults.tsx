@@ -469,11 +469,11 @@ export function AggregateResults() {
   // If open-ended flow, show scenario aggregation
   if (flowType === 'open-ended') {
     // If no scenario aggregation data, show empty state
-    if (!scenarioAggregation || !scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
+    if (!scenarioAggregation || !scenarioAggregation.aggregatedScenarios || scenarioAggregation.aggregatedScenarios.length === 0) {
       console.log('[AggregateResults] Showing empty state because:', {
         noAggregation: !scenarioAggregation,
-        noScenarios: !scenarioResults?.scenarios,
-        emptyScenarios: scenarioResults?.scenarios?.length === 0
+        noAggregatedScenarios: !scenarioAggregation?.aggregatedScenarios,
+        emptyAggregatedScenarios: scenarioAggregation?.aggregatedScenarios?.length === 0
       });
       return (
         <div className="space-y-6">
