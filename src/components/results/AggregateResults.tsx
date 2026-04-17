@@ -474,6 +474,22 @@ export function AggregateResults() {
 
   // If open-ended flow, show scenario aggregation
   if (isOpenEndedFlow) {
+    // Show loading state while aggregating
+    if (isAggregatingScenarios) {
+      console.log('[AggregateResults] Showing loading state - aggregation in progress');
+      return (
+        <div className="space-y-6">
+          <div className="glass-card p-12 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+            <h3 className="text-xl font-semibold text-white mb-2">Aggregating Scenarios</h3>
+            <p className="text-[var(--color-slate-400)]">
+              Analyzing and categorizing scenarios with AI...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     // If no scenario aggregation data, show empty state
     if (!scenarioAggregation || !scenarioAggregation.aggregatedScenarios || scenarioAggregation.aggregatedScenarios.length === 0) {
       console.log('[AggregateResults] Showing empty state because:', {
