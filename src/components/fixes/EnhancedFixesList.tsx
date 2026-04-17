@@ -29,7 +29,7 @@ const rootCauseLabels: Record<RootCauseType, string> = {
 };
 
 export function EnhancedFixesList() {
-  const { enhancedFixes } = useAppStore();
+  const { enhancedFixes, referenceScript } = useAppStore();
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,11 +76,11 @@ export function EnhancedFixesList() {
   };
 
   const downloadDocument = () => {
-    const blob = new Blob([generatedDocument], { type: 'text/markdown' });
+    const blob = new Blob([generatedDocument], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `implementation-guide-${new Date().toISOString().split('T')[0]}.md`;
+    a.download = `script-implementation-guide-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -173,53 +173,77 @@ export function EnhancedFixesList() {
               onClick={() => {
                 const selectedFixes = enhancedFixes.fixes.filter(fix => selectedFixIds.has(fix.id));
 
-                let combinedDocument = `# Implementation Guide - ${selectedFixes.length} Selected Fix${selectedFixes.length !== 1 ? 'es' : ''}\n`;
-                combinedDocument += `Generated: ${new Date().toLocaleString()}\n\n`;
-                combinedDocument += `---\n\n`;
+                // Start with the reference script
+                let combinedDocument = `═══════════════════════════════════════════════════════════════════════════════\n`;
+                combinedDocument += `  IMPLEMENTATION GUIDE - ${selectedFixes.length} Selected Fix${selectedFixes.length !== 1 ? 'es' : ''}\n`;
+                combinedDocument += `  Generated: ${new Date().toLocaleString()}\n`;
+                combinedDocument += `═══════════════════════════════════════════════════════════════════════════════\n\n`;
+
+                // Show summary of fixes
+                combinedDocument += `FIXES TO APPLY:\n\n`;
+                selectedFixes.forEach((fix, index) => {
+                  const actionIcon = fix.promptFix?.action === 'add' ? '✚' : fix.promptFix?.action === 'replace' ? '⟳' : '✖';
+                  combinedDocument += `${index + 1}. [${actionIcon} ${fix.promptFix?.action?.toUpperCase() || 'UPDATE'}] ${fix.title}\n`;
+                  if (fix.promptFix) {
+                    combinedDocument += `   Location: ${fix.promptFix.targetSection}\n`;
+                  }
+                  combinedDocument += `   Type: ${fix.fixType} | Category: ${fix.rootCauseType}\n\n`;
+                });
+
+                combinedDocument += `\n${'═'.repeat(79)}\n`;
+                combinedDocument += `  ORIGINAL REFERENCE SCRIPT WITH HIGHLIGHTED CHANGES\n`;
+                combinedDocument += `${'═'.repeat(79)}\n\n`;
+
+                // Add the reference script
+                if (referenceScript) {
+                  combinedDocument += referenceScript;
+                  combinedDocument += `\n\n`;
+                } else {
+                  combinedDocument += `[No reference script provided]\n\n`;
+                }
+
+                // Add detailed fix instructions
+                combinedDocument += `\n${'═'.repeat(79)}\n`;
+                combinedDocument += `  DETAILED FIX INSTRUCTIONS\n`;
+                combinedDocument += `${'═'.repeat(79)}\n\n`;
 
                 selectedFixes.forEach((fix, index) => {
-                  combinedDocument += `## ${index + 1}. ${fix.title}\n\n`;
-                  combinedDocument += `**Type:** ${fix.fixType} | **RCA Category:** ${fix.rootCauseType}\n\n`;
-
-                  if (fix.rootCause) {
-                    combinedDocument += `### Root Cause\n${fix.rootCause}\n\n`;
-                  }
-
-                  if (fix.suggestedSolution) {
-                    combinedDocument += `### Suggested Solution\n${fix.suggestedSolution}\n\n`;
-                  }
-
-                  if (fix.whereToImplement) {
-                    combinedDocument += `### Where to Implement\n${fix.whereToImplement}\n\n`;
-                  }
-
-                  if (fix.whatToImplement) {
-                    combinedDocument += `### What to Implement\n${fix.whatToImplement}\n\n`;
-                  }
+                  combinedDocument += `\n${'─'.repeat(79)}\n`;
+                  combinedDocument += `FIX #${index + 1}: ${fix.title}\n`;
+                  combinedDocument += `${'─'.repeat(79)}\n\n`;
 
                   if (fix.promptFix) {
-                    combinedDocument += `### Prompt Fix (Copy-Paste Ready)\n`;
-                    combinedDocument += `**Action:** ${fix.promptFix.action}\n`;
-                    combinedDocument += `**Target Section:** ${fix.promptFix.targetSection}\n\n`;
-                    combinedDocument += `**Exact Content:**\n\`\`\`\n${fix.promptFix.exactContent}\n\`\`\`\n\n`;
+                    const actionVerb = fix.promptFix.action === 'add' ? 'ADD' : fix.promptFix.action === 'replace' ? 'REPLACE' : 'REMOVE';
+                    combinedDocument += `📍 LOCATION: ${fix.promptFix.targetSection}\n`;
+                    combinedDocument += `🔧 ACTION: ${actionVerb}\n\n`;
+
+                    if (fix.promptFix.action === 'replace' && fix.promptFix.beforeText) {
+                      combinedDocument += `❌ REMOVE THIS:\n`;
+                      combinedDocument += `${'-'.repeat(79)}\n`;
+                      combinedDocument += `${fix.promptFix.beforeText}\n`;
+                      combinedDocument += `${'-'.repeat(79)}\n\n`;
+                    }
+
+                    combinedDocument += `✅ ${fix.promptFix.action === 'remove' ? 'CONFIRM REMOVAL' : 'INSERT THIS'}:\n`;
+                    combinedDocument += `${'-'.repeat(79)}\n`;
+                    combinedDocument += `${fix.promptFix.exactContent}\n`;
+                    combinedDocument += `${'-'.repeat(79)}\n\n`;
+                  }
+
+                  if (fix.rootCause) {
+                    combinedDocument += `💡 WHY: ${fix.rootCause}\n\n`;
                   }
 
                   if (fix.concreteExample) {
                     const exampleText = typeof fix.concreteExample === 'string'
                       ? fix.concreteExample
                       : JSON.stringify(fix.concreteExample, null, 2);
-                    combinedDocument += `### Concrete Example\n${exampleText}\n\n`;
-                  }
-
-                  if (fix.successCriteria) {
-                    combinedDocument += `### Success Criteria\n${fix.successCriteria}\n\n`;
+                    combinedDocument += `📋 EXAMPLE:\n${exampleText}\n\n`;
                   }
 
                   if (fix.howToTest) {
-                    combinedDocument += `### How to Test\n${fix.howToTest}\n\n`;
+                    combinedDocument += `✓ TESTING: ${fix.howToTest}\n\n`;
                   }
-
-                  combinedDocument += `---\n\n`;
                 });
 
                 setGeneratedDocument(combinedDocument);
@@ -324,7 +348,7 @@ export function EnhancedFixesList() {
                   className="btn-primary flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Download as Markdown
+                  Download Implementation Guide
                 </button>
               </div>
             </motion.div>
