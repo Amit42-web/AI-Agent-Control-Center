@@ -7,7 +7,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { FixCard } from './FixCard';
 import { EnhancedFixCard } from './EnhancedFixCard';
 import { determineFixPlacements } from '@/services/openai';
-import { RootCauseType } from '@/types';
+import { RootCauseType, Fix } from '@/types';
 
 const rootCauseLabels: Record<RootCauseType, string> = {
   knowledge: '📚 Knowledge Gap',
@@ -124,7 +124,7 @@ export function FixesPanel() {
   };
 
   // Apply RCA filter
-  const filterByRCA = (fixList: typeof fixes.scriptFixes) => {
+  const filterByRCA = (fixList: Fix[]) => {
     if (rcaFilter === 'all') return fixList;
     return fixList.filter(fix => fix.rootCauseType === rcaFilter);
   };
