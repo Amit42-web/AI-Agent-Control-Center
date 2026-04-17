@@ -462,10 +462,19 @@ export function AggregateResults() {
   // Early return if no data
   if (!results && !scenarioResults) return null;
 
+  console.log('[AggregateResults] flowType:', flowType);
+  console.log('[AggregateResults] scenarioAggregation:', scenarioAggregation);
+  console.log('[AggregateResults] scenarioResults?.scenarios?.length:', scenarioResults?.scenarios?.length);
+
   // If open-ended flow, show scenario aggregation
   if (flowType === 'open-ended') {
     // If no scenario aggregation data, show empty state
     if (!scenarioAggregation || !scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
+      console.log('[AggregateResults] Showing empty state because:', {
+        noAggregation: !scenarioAggregation,
+        noScenarios: !scenarioResults?.scenarios,
+        emptyScenarios: scenarioResults?.scenarios?.length === 0
+      });
       return (
         <div className="space-y-6">
           <div className="glass-card p-12 text-center">
