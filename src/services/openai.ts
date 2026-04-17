@@ -1391,30 +1391,31 @@ export async function generateEnhancedFixesByRCACategory(
 
   console.log(`[RCA Fix Generation] Grouped scenarios into ${Object.keys(scenariosByRCA).length} RCA categories`);
 
-  // Generate fixes for each RCA category
+  // Generate fixes for each RCA category in parallel
   const allFixes: EnhancedFix[] = [];
   let fixIdCounter = 0;
 
-  for (const [rcaType, aggScenarios] of Object.entries(scenariosByRCA)) {
-    if (rcaType === 'unknown') continue; // Skip scenarios without RCA type
+  // Create promises for all RCA categories to process in parallel
+  const fixGenerationPromises = Object.entries(scenariosByRCA)
+    .filter(([rcaType]) => rcaType !== 'unknown') // Skip scenarios without RCA type
+    .map(async ([rcaType, aggScenarios]) => {
+      // Prepare summary of scenarios in this RCA category
+      const scenariosSummary = aggScenarios.map(agg => ({
+        title: agg.title,
+        dimension: agg.dimension,
+        pattern: agg.pattern,
+        severity: agg.severity,
+        occurrences: agg.occurrences,
+        uniqueCalls: agg.uniqueCalls,
+        // Include sample scenarios for context
+        samples: agg.scenarios.slice(0, 3).map(s => ({
+          whatHappened: s.whatHappened,
+          impact: s.impact,
+          context: s.context
+        }))
+      }));
 
-    // Prepare summary of scenarios in this RCA category
-    const scenariosSummary = aggScenarios.map(agg => ({
-      title: agg.title,
-      dimension: agg.dimension,
-      pattern: agg.pattern,
-      severity: agg.severity,
-      occurrences: agg.occurrences,
-      uniqueCalls: agg.uniqueCalls,
-      // Include sample scenarios for context
-      samples: agg.scenarios.slice(0, 3).map(s => ({
-        whatHappened: s.whatHappened,
-        impact: s.impact,
-        context: s.context
-      }))
-    }));
-
-    const systemPrompt = `You are an expert call center operations consultant. Your task is to generate a COMPREHENSIVE, CATEGORY-LEVEL fix for a group of related issues.
+      const systemPrompt = `You are an expert call center operations consultant. Your task is to generate a COMPREHENSIVE, CATEGORY-LEVEL fix for a group of related issues.
 
 You are analyzing issues with the ROOT CAUSE: "${rcaType.toUpperCase()}"
 
@@ -1451,7 +1452,7 @@ Think holistically - address the PATTERN, not individual instances.
 
 Return ONLY a valid JSON object (not an array).`;
 
-    const userPrompt = `RCA Category: ${rcaType}
+      const userPrompt = `RCA Category: ${rcaType}
 
 Aggregated Scenarios in this category:
 ${JSON.stringify(scenariosSummary, null, 2)}
@@ -1466,52 +1467,59 @@ ${knowledgeBase ? `Current Knowledge Base:\n${knowledgeBase}\n\n` : ''}
 
 Generate ONE comprehensive fix that addresses this entire RCA category.`;
 
-    try {
-      const response = await callOpenAI(apiKey, model, [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ]);
+      try {
+        const response = await callOpenAI(apiKey, model, [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ]);
 
-      let jsonStr = response.trim();
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+        let jsonStr = response.trim();
+        if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+        }
+
+        const startIdx = jsonStr.indexOf('{');
+        const endIdx = jsonStr.lastIndexOf('}');
+
+        if (startIdx === -1 || endIdx === -1) {
+          console.error(`[RCA Fix Generation] No valid JSON for ${rcaType}`);
+          return null;
+        }
+
+        jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+        const fix = JSON.parse(jsonStr);
+
+        // Return the enhanced fix
+        const enhancedFix: EnhancedFix = {
+          id: `rca-fix-${rcaType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          scenarioId: aggScenarios.map(agg => agg.id).join(','), // Link to multiple scenarios
+          title: fix.title,
+          fixType: fix.fixType as FixType,
+          rootCauseType: rcaType as RootCauseType,
+          rootCause: fix.rootCause,
+          suggestedSolution: fix.suggestedSolution,
+          whereToImplement: fix.whereToImplement,
+          whatToImplement: fix.whatToImplement,
+          concreteExample: fix.concreteExample,
+          successCriteria: fix.successCriteria,
+          howToTest: fix.howToTest,
+          promptFix: fix.promptFix,
+        };
+
+        console.log(`[RCA Fix Generation] Generated fix for ${rcaType}: "${enhancedFix.title}"`);
+        return enhancedFix;
+      } catch (error) {
+        console.error(`[RCA Fix Generation] Error generating fix for ${rcaType}:`, error);
+        return null;
       }
+    });
 
-      const startIdx = jsonStr.indexOf('{');
-      const endIdx = jsonStr.lastIndexOf('}');
+  // Wait for all fix generation promises to complete in parallel
+  console.log(`[RCA Fix Generation] Processing ${fixGenerationPromises.length} RCA categories in parallel...`);
+  const fixResults = await Promise.all(fixGenerationPromises);
 
-      if (startIdx === -1 || endIdx === -1) {
-        console.error(`[RCA Fix Generation] No valid JSON for ${rcaType}`);
-        continue;
-      }
-
-      jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-      const fix = JSON.parse(jsonStr);
-
-      // Add to fixes with proper ID and scenarioId linking
-      const enhancedFix: EnhancedFix = {
-        id: `rca-fix-${rcaType}-${fixIdCounter++}`,
-        scenarioId: aggScenarios.map(agg => agg.id).join(','), // Link to multiple scenarios
-        title: fix.title,
-        fixType: fix.fixType as FixType,
-        rootCauseType: rcaType as RootCauseType,
-        rootCause: fix.rootCause,
-        suggestedSolution: fix.suggestedSolution,
-        whereToImplement: fix.whereToImplement,
-        whatToImplement: fix.whatToImplement,
-        concreteExample: fix.concreteExample,
-        successCriteria: fix.successCriteria,
-        howToTest: fix.howToTest,
-        promptFix: fix.promptFix,
-      };
-
-      allFixes.push(enhancedFix);
-      console.log(`[RCA Fix Generation] Generated fix for ${rcaType}: "${enhancedFix.title}"`);
-    } catch (error) {
-      console.error(`[RCA Fix Generation] Error generating fix for ${rcaType}:`, error);
-      // Continue with other categories
-    }
-  }
+  // Filter out null results (failed generations) and collect all fixes
+  const allFixes = fixResults.filter((fix): fix is EnhancedFix => fix !== null);
 
   console.log(`[RCA Fix Generation] Generated ${allFixes.length} category-level fixes`);
   return allFixes;
