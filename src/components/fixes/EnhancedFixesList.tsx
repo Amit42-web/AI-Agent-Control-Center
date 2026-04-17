@@ -131,22 +131,94 @@ export function EnhancedFixesList() {
         ))}
       </div>
 
-      {/* Generate Final Script Button */}
+      {/* Generate Combined Document Button */}
       {selectedFixIds.size > 0 && (
         <motion.div
           className="glass-card p-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-semibold text-white">
                 {selectedFixIds.size} fix{selectedFixIds.size !== 1 ? 'es' : ''} selected
               </h3>
               <p className="text-sm text-[var(--color-slate-400)]">
-                Note: RCA-categorized fixes provide implementation guidance. Use the "Copy All" button on each fix to get the exact content.
+                Generate a combined document with all selected fixes
               </p>
             </div>
+            <button
+              onClick={() => {
+                const selectedFixes = enhancedFixes.fixes.filter(fix => selectedFixIds.has(fix.id));
+
+                let combinedDocument = `# Implementation Guide - ${selectedFixes.length} Selected Fix${selectedFixes.length !== 1 ? 'es' : ''}\n`;
+                combinedDocument += `Generated: ${new Date().toLocaleString()}\n\n`;
+                combinedDocument += `---\n\n`;
+
+                selectedFixes.forEach((fix, index) => {
+                  combinedDocument += `## ${index + 1}. ${fix.title}\n\n`;
+                  combinedDocument += `**Type:** ${fix.fixType} | **RCA Category:** ${fix.rootCauseType}\n\n`;
+
+                  if (fix.rootCause) {
+                    combinedDocument += `### Root Cause\n${fix.rootCause}\n\n`;
+                  }
+
+                  if (fix.suggestedSolution) {
+                    combinedDocument += `### Suggested Solution\n${fix.suggestedSolution}\n\n`;
+                  }
+
+                  if (fix.whereToImplement) {
+                    combinedDocument += `### Where to Implement\n${fix.whereToImplement}\n\n`;
+                  }
+
+                  if (fix.whatToImplement) {
+                    combinedDocument += `### What to Implement\n${fix.whatToImplement}\n\n`;
+                  }
+
+                  if (fix.promptFix) {
+                    combinedDocument += `### Prompt Fix (Copy-Paste Ready)\n`;
+                    combinedDocument += `**Action:** ${fix.promptFix.action}\n`;
+                    combinedDocument += `**Target Section:** ${fix.promptFix.targetSection}\n\n`;
+                    combinedDocument += `**Exact Content:**\n\`\`\`\n${fix.promptFix.exactContent}\n\`\`\`\n\n`;
+                  }
+
+                  if (fix.concreteExample) {
+                    const exampleText = typeof fix.concreteExample === 'string'
+                      ? fix.concreteExample
+                      : JSON.stringify(fix.concreteExample, null, 2);
+                    combinedDocument += `### Concrete Example\n${exampleText}\n\n`;
+                  }
+
+                  if (fix.successCriteria) {
+                    combinedDocument += `### Success Criteria\n${fix.successCriteria}\n\n`;
+                  }
+
+                  if (fix.howToTest) {
+                    combinedDocument += `### How to Test\n${fix.howToTest}\n\n`;
+                  }
+
+                  combinedDocument += `---\n\n`;
+                });
+
+                // Copy to clipboard
+                navigator.clipboard.writeText(combinedDocument);
+
+                // Also download as file
+                const blob = new Blob([combinedDocument], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `implementation-guide-${selectedFixes.length}-fixes.md`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                alert(`✅ Combined document copied to clipboard and downloaded!\n\n${selectedFixes.length} fix${selectedFixes.length !== 1 ? 'es' : ''} included.`);
+              }}
+              className="btn-primary flex items-center gap-2 whitespace-nowrap"
+            >
+              <Download className="w-4 h-4" />
+              Generate Implementation Guide
+            </button>
           </div>
         </motion.div>
       )}
