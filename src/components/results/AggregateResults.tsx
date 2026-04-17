@@ -101,6 +101,11 @@ function findMatchingIssue(scenario: { callId: string; lineNumbers: number[] }, 
 export function AggregateResults() {
   const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedIssueId, setSelectedDimension } = useAppStore();
 
+  // Detect flow type early - needed for useMemo hooks
+  // If flowType is undefined but scenarioResults exists with scenarios, assume open-ended
+  const isOpenEndedFlow = flowType === 'open-ended' ||
+    (!flowType && scenarioResults?.scenarios && scenarioResults.scenarios.length > 0);
+
   // State for auto-expanding scenarios when clicking from Impact Zone
   const [autoExpandTarget, setAutoExpandTarget] = React.useState<{ scenarioId: string; timestamp: number } | null>(null);
   const rcaBreakdownRef = React.useRef<HTMLDivElement>(null);
@@ -413,7 +418,7 @@ export function AggregateResults() {
 
   // Calculate Impact Zone - unified view of top priority issues across all types
   const burningIssues = useMemo(() => {
-    if (flowType !== 'open-ended' || !scenarioAggregation) return [];
+    if (!isOpenEndedFlow || !scenarioAggregation) return [];
 
     interface BurningIssue {
       id: string;
@@ -457,17 +462,18 @@ export function AggregateResults() {
 
     // Sort by priority and take top 10
     return issues.sort((a, b) => b.priority - a.priority).slice(0, 10);
-  }, [flowType, scenarioAggregation]);
+  }, [isOpenEndedFlow, scenarioAggregation]);
 
   // Early return if no data
   if (!results && !scenarioResults) return null;
 
   console.log('[AggregateResults] flowType:', flowType);
+  console.log('[AggregateResults] isOpenEndedFlow:', isOpenEndedFlow);
   console.log('[AggregateResults] scenarioAggregation:', scenarioAggregation);
   console.log('[AggregateResults] scenarioResults?.scenarios?.length:', scenarioResults?.scenarios?.length);
 
   // If open-ended flow, show scenario aggregation
-  if (flowType === 'open-ended') {
+  if (isOpenEndedFlow) {
     // If no scenario aggregation data, show empty state
     if (!scenarioAggregation || !scenarioAggregation.aggregatedScenarios || scenarioAggregation.aggregatedScenarios.length === 0) {
       console.log('[AggregateResults] Showing empty state because:', {
