@@ -524,8 +524,8 @@ export function FixesPanel() {
 
                 {(() => {
                   const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
-                  const scriptFixes = selectedFixes.filter(f => fixes.scriptFixes.some(sf => sf.id === f.id));
-                  const generalFixes = selectedFixes.filter(f => fixes.generalFixes.some(gf => gf.id === f.id));
+                  const scriptFixes = selectedFixes.filter(f => fixes?.scriptFixes?.some(sf => sf.id === f.id));
+                  const generalFixes = selectedFixes.filter(f => fixes?.generalFixes?.some(gf => gf.id === f.id));
 
                   return (
                     <>
@@ -663,8 +663,8 @@ export function FixesPanel() {
 
                 {(() => {
                   const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
-                  const scriptFixes = selectedFixes.filter(f => fixes.scriptFixes.some(sf => sf.id === f.id));
-                  const generalFixes = selectedFixes.filter(f => fixes.generalFixes.some(gf => gf.id === f.id));
+                  const scriptFixes = selectedFixes.filter(f => fixes?.scriptFixes?.some(sf => sf.id === f.id));
+                  const generalFixes = selectedFixes.filter(f => fixes?.generalFixes?.some(gf => gf.id === f.id));
                   const addCount = selectedFixes.filter(f => !f.action || f.action === 'add').length;
                   const replaceCount = selectedFixes.filter(f => f.action === 'replace').length;
                   const removeCount = selectedFixes.filter(f => f.action === 'remove').length;
