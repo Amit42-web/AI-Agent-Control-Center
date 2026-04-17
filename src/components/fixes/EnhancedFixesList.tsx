@@ -3,49 +3,26 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  FileText,
-  GraduationCap,
-  Settings,
-  Cpu,
-  Target,
-  CheckCircle,
-  Code,
   Search,
-  Copy,
-  CheckCheck,
+  Download,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { EnhancedFixCard } from './EnhancedFixCard';
 import { FixType, RootCauseType } from '@/types';
 
-const fixTypeConfig: Record<FixType, { icon: any; color: string; label: string }> = {
-  script: {
-    icon: FileText,
-    color: 'blue',
-    label: 'Script/Prompt',
-  },
-  training: {
-    icon: GraduationCap,
-    color: 'green',
-    label: 'Training',
-  },
-  process: {
-    icon: Settings,
-    color: 'purple',
-    label: 'Process',
-  },
-  system: {
-    icon: Cpu,
-    color: 'orange',
-    label: 'System',
-  },
+const fixTypeLabels: Record<FixType, string> = {
+  script: 'Script/Prompt',
+  training: 'Training',
+  process: 'Process',
+  system: 'System',
 };
 
-const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
-  instruction: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '📋' },
-  execution: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️' },
-  conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '💬' },
-  model: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
+const rootCauseLabels: Record<RootCauseType, string> = {
+  knowledge: '📚 Knowledge Gap',
+  instruction: '📋 Instruction Gap',
+  execution: '⚠️ Execution Failure',
+  conversation: '💬 Conversation Design',
+  model: '🤖 Model Limitation',
 };
 
 export function EnhancedFixesList() {
@@ -53,8 +30,6 @@ export function EnhancedFixesList() {
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedFixes, setExpandedFixes] = useState<Set<string>>(new Set());
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Proper null/undefined checks
   if (!enhancedFixes || !enhancedFixes.fixes || enhancedFixes.fixes.length === 0) {
@@ -71,31 +46,11 @@ export function EnhancedFixesList() {
     if (
       searchTerm &&
       !fix.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      !fix.suggestedSolution.toLowerCase().includes(searchTerm.toLowerCase())
+      !fix.suggestedSolution?.toLowerCase().includes(searchTerm.toLowerCase())
     )
       return false;
     return true;
   });
-
-  const toggleExpanded = (id: string) => {
-    const newExpanded = new Set(expandedFixes);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedFixes(newExpanded);
-  };
-
-  const copyToClipboard = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -125,9 +80,9 @@ export function EnhancedFixesList() {
             onChange={(e) => setFixTypeFilter(e.target.value as FixType | 'all')}
           >
             <option value="all">All Types</option>
-            {Object.entries(fixTypeConfig).map(([key, config]) => (
+            {Object.entries(fixTypeLabels).map(([key, label]) => (
               <option key={key} value={key}>
-                {config.label}
+                {label}
               </option>
             ))}
           </select>
@@ -139,15 +94,57 @@ export function EnhancedFixesList() {
             onChange={(e) => setRcaFilter(e.target.value as RootCauseType | 'all')}
           >
             <option value="all">All Categories</option>
-            {Object.entries(rootCauseColors).map(([key, config]) => (
+            {Object.entries(rootCauseLabels).map(([key, label]) => (
               <option key={key} value={key}>
-                {config.icon} {key}
+                {label}
               </option>
             ))}
           </select>
 
           <span className="text-sm text-[var(--color-slate-400)]">
             {filteredFixes.length} fix{filteredFixes.length !== 1 ? 'es' : ''}
+          </span>
+        </div>
+      </motion.div>
+
+      {/* Fixes List */}
+      <div className="space-y-4">
+        {filteredFixes.map((fix, index) => (
+          <EnhancedFixCard
+            key={fix.id}
+            fix={fix}
+            index={index}
+          />
+        ))}
+      </div>
+
+      {/* Export Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            const content = {
+              enhancedFixes: enhancedFixes.fixes,
+              exportedAt: new Date().toISOString(),
+            };
+            const blob = new Blob([JSON.stringify(content, null, 2)], {
+              type: 'application/json',
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'rca_categorized_fixes.json';
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="btn-secondary flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Export Fixes
+        </button>
+      </div>
+    </div>
+  );
+}
           </span>
         </div>
       </motion.div>
