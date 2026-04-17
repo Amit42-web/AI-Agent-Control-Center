@@ -145,7 +145,9 @@ export function TranscriptInput() {
               message: `Failed to read ${filesWithErrors} CSV file${filesWithErrors !== 1 ? 's' : ''}. Please try again or select different files.`
             });
           } else {
-            deduplicateTranscripts(allParsedTranscripts).then((finalTranscripts) => {
+            // Combine existing transcripts with newly parsed ones
+            const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
+            deduplicateTranscripts(combinedTranscripts).then((finalTranscripts) => {
               setTranscripts(finalTranscripts);
               setUploadStatus({
                 type: 'error',
@@ -153,10 +155,11 @@ export function TranscriptInput() {
               });
             }).catch((error) => {
               console.error('[CSV Upload] Deduplication failed in error handler, using original transcripts:', error);
-              setTranscripts(allParsedTranscripts);
+              const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
+              setTranscripts(combinedTranscripts);
               setUploadStatus({
                 type: 'error',
-                message: `Loaded ${allParsedTranscripts.length} transcript${allParsedTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} CSV file${files.length - filesWithErrors !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
+                message: `Loaded ${combinedTranscripts.length} transcript${combinedTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} CSV file${files.length - filesWithErrors !== 1 ? 's' : ''}, but failed to read ${filesWithErrors} file${filesWithErrors !== 1 ? 's' : ''}.`
               });
             });
           }
@@ -178,7 +181,9 @@ export function TranscriptInput() {
                 message: 'All selected CSV files are empty. Please select files with valid transcript data.'
               });
             } else {
-              deduplicateTranscripts(allParsedTranscripts).then((finalTranscripts) => {
+              // Combine existing transcripts with newly parsed ones
+              const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
+              deduplicateTranscripts(combinedTranscripts).then((finalTranscripts) => {
                 setTranscripts(finalTranscripts);
                 setUploadStatus({
                   type: 'error',
@@ -186,10 +191,11 @@ export function TranscriptInput() {
                 });
               }).catch((error) => {
                 console.error('[CSV Upload] Deduplication failed in empty file handler, using original transcripts:', error);
-                setTranscripts(allParsedTranscripts);
+                const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
+                setTranscripts(combinedTranscripts);
                 setUploadStatus({
                   type: 'error',
-                  message: `Loaded ${allParsedTranscripts.length} transcript${allParsedTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} file${files.length - filesWithErrors !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
+                  message: `Loaded ${combinedTranscripts.length} transcript${combinedTranscripts.length !== 1 ? 's' : ''} from ${files.length - filesWithErrors} file${files.length - filesWithErrors !== 1 ? 's' : ''}, but ${filesWithErrors} file${filesWithErrors !== 1 ? 's were' : ' was'} empty.`
                 });
               });
             }
@@ -448,21 +454,25 @@ export function TranscriptInput() {
         if (filesProcessed === files.length) {
           console.log(`All ${files.length} CSV files processed. Total transcripts: ${totalTranscriptsFromAllFiles}`);
 
+          // Combine existing transcripts with newly parsed ones
+          const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
+          console.log(`Combined ${transcripts.length} existing + ${allParsedTranscripts.length} new = ${combinedTranscripts.length} total transcripts`);
+
           // Apply deduplication if enabled
-          deduplicateTranscripts(allParsedTranscripts).then((finalTranscripts) => {
+          deduplicateTranscripts(combinedTranscripts).then((finalTranscripts) => {
             setTranscripts(finalTranscripts);
             setUploadStatus({
               type: 'success',
-              message: `Successfully loaded ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''} from ${files.length} CSV file${files.length !== 1 ? 's' : ''}.`
+              message: `Successfully loaded ${allParsedTranscripts.length} new transcript${allParsedTranscripts.length !== 1 ? 's' : ''}. Total: ${finalTranscripts.length} transcript${finalTranscripts.length !== 1 ? 's' : ''}.`
             });
             // Reset the file input so the same files can be uploaded again if needed
             event.target.value = '';
           }).catch((error) => {
             console.error('[CSV Upload] Deduplication failed, using original transcripts:', error);
-            setTranscripts(allParsedTranscripts);
+            setTranscripts(combinedTranscripts);
             setUploadStatus({
               type: 'success',
-              message: `Successfully loaded ${allParsedTranscripts.length} transcript${allParsedTranscripts.length !== 1 ? 's' : ''} from ${files.length} CSV file${files.length !== 1 ? 's' : ''}.`
+              message: `Successfully loaded ${allParsedTranscripts.length} new transcript${allParsedTranscripts.length !== 1 ? 's' : ''}. Total: ${combinedTranscripts.length} transcript${combinedTranscripts.length !== 1 ? 's' : ''}.`
             });
             event.target.value = '';
           });
