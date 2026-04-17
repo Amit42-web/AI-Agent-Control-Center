@@ -129,16 +129,16 @@ export function FixesPanel() {
     return fixList.filter(fix => fix.rootCauseType === rcaFilter);
   };
 
-  const filteredScriptFixes = filterByRCA(fixes.scriptFixes || []);
-  const filteredGeneralFixes = filterByRCA(fixes.generalFixes || []);
+  const filteredScriptFixes = filterByRCA(fixes?.scriptFixes || []);
+  const filteredGeneralFixes = filterByRCA(fixes?.generalFixes || []);
 
-  const hasScriptFixes = (fixes.scriptFixes || []).length > 0;
-  const hasGeneralFixes = (fixes.generalFixes || []).length > 0;
+  const hasScriptFixes = (fixes?.scriptFixes || []).length > 0;
+  const hasGeneralFixes = (fixes?.generalFixes || []).length > 0;
   const hasFilteredScriptFixes = filteredScriptFixes.length > 0;
   const hasFilteredGeneralFixes = filteredGeneralFixes.length > 0;
-  const totalFixes = (fixes.scriptFixes || []).length + (fixes.generalFixes || []).length;
+  const totalFixes = (fixes?.scriptFixes || []).length + (fixes?.generalFixes || []).length;
   const filteredTotalFixes = filteredScriptFixes.length + filteredGeneralFixes.length;
-  const allFixes = [...(fixes.scriptFixes || []), ...(fixes.generalFixes || [])];
+  const allFixes = [...(fixes?.scriptFixes || []), ...(fixes?.generalFixes || [])];
 
   const toggleFixSelection = (fixId: string) => {
     const newSelected = new Set(selectedFixIds);
