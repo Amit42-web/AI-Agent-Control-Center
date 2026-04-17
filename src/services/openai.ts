@@ -1519,7 +1519,7 @@ Generate ONE comprehensive fix that addresses this entire RCA category.`;
   const fixResults = await Promise.all(fixGenerationPromises);
 
   // Filter out null results (failed generations) and collect all fixes
-  const allFixes = fixResults.filter((fix): fix is EnhancedFix => fix !== null);
+  const allFixes: EnhancedFix[] = fixResults.filter(fix => fix !== null) as EnhancedFix[];
 
   console.log(`[RCA Fix Generation] Generated ${allFixes.length} category-level fixes`);
   return allFixes;
