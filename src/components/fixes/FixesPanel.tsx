@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { BookOpen, Sparkles, Download, FileText, Loader2, Filter } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { FixCard } from './FixCard';
+import { EnhancedFixCard } from './EnhancedFixCard';
 import { determineFixPlacements } from '@/services/openai';
 import { RootCauseType } from '@/types';
 
@@ -25,7 +26,7 @@ interface ScriptSection {
 }
 
 export function FixesPanel() {
-  const { fixes, referenceEnabled, referenceScript, openaiConfig } = useAppStore();
+  const { fixes, enhancedFixes, referenceEnabled, referenceScript, openaiConfig, flowType } = useAppStore();
   const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showFinalScript, setShowFinalScript] = useState(false);
@@ -34,11 +35,73 @@ export function FixesPanel() {
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
 
-  // Proper null/undefined checks with fallbacks
-  if (!fixes || !fixes.scriptFixes || !fixes.generalFixes) {
+  // Check for enhanced fixes (open-ended flow) or regular fixes (objective flow)
+  const hasEnhancedFixes = enhancedFixes && enhancedFixes.fixes && enhancedFixes.fixes.length > 0;
+  const hasRegularFixes = fixes && fixes.scriptFixes && fixes.generalFixes;
+
+  if (!hasEnhancedFixes && !hasRegularFixes) {
     return (
       <div className="glass-card p-8 text-center">
         <p className="text-[var(--color-slate-400)]">No fixes available yet.</p>
+      </div>
+    );
+  }
+
+  // Render enhanced fixes for open-ended flow
+  if (hasEnhancedFixes) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+              <Sparkles className="w-6 h-6 text-purple-400" />
+              RCA-Categorized Fixes
+            </h2>
+            <p className="text-[var(--color-slate-400)] mt-1">
+              Comprehensive fixes grouped by root cause category
+            </p>
+          </div>
+          <span className="text-sm text-[var(--color-slate-400)]">
+            {enhancedFixes.fixes.length} categor{enhancedFixes.fixes.length !== 1 ? 'ies' : 'y'}
+          </span>
+        </div>
+
+        {/* Enhanced Fix Cards */}
+        <div className="space-y-4">
+          {enhancedFixes.fixes.map((fix, index) => (
+            <EnhancedFixCard
+              key={fix.id}
+              fix={fix}
+              index={index}
+            />
+          ))}
+        </div>
+
+        {/* Export Button */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => {
+              const content = {
+                enhancedFixes: enhancedFixes.fixes,
+                exportedAt: new Date().toISOString(),
+              };
+              const blob = new Blob([JSON.stringify(content, null, 2)], {
+                type: 'application/json',
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'rca_categorized_fixes.json';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export Fixes
+          </button>
+        </div>
       </div>
     );
   }
