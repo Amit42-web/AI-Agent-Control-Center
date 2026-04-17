@@ -164,14 +164,6 @@ export function TranscriptInput() {
         }
       };
 
-    const reader = new FileReader();
-
-    reader.onerror = () => {
-      setUploadStatus({ type: 'error', message: 'Failed to read the file. Please try again or select a different file.' });
-      // Reset the file input
-      event.target.value = '';
-    };
-
       reader.onload = (e) => {
         const text = e.target?.result as string;
 
