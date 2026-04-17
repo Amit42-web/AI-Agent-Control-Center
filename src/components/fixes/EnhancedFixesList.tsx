@@ -30,6 +30,7 @@ export function EnhancedFixesList() {
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
 
   // Proper null/undefined checks
   if (!enhancedFixes || !enhancedFixes.fixes || enhancedFixes.fixes.length === 0) {
@@ -51,6 +52,16 @@ export function EnhancedFixesList() {
       return false;
     return true;
   });
+
+  const toggleFixSelection = (fixId: string) => {
+    const newSelected = new Set(selectedFixIds);
+    if (newSelected.has(fixId)) {
+      newSelected.delete(fixId);
+    } else {
+      newSelected.add(fixId);
+    }
+    setSelectedFixIds(newSelected);
+  };
 
   return (
     <div className="space-y-6">
@@ -114,9 +125,31 @@ export function EnhancedFixesList() {
             key={fix.id}
             fix={fix}
             index={index}
+            isSelected={selectedFixIds.has(fix.id)}
+            onToggleSelect={() => toggleFixSelection(fix.id)}
           />
         ))}
       </div>
+
+      {/* Generate Final Script Button */}
+      {selectedFixIds.size > 0 && (
+        <motion.div
+          className="glass-card p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-white">
+                {selectedFixIds.size} fix{selectedFixIds.size !== 1 ? 'es' : ''} selected
+              </h3>
+              <p className="text-sm text-[var(--color-slate-400)]">
+                Note: RCA-categorized fixes provide implementation guidance. Use the "Copy All" button on each fix to get the exact content.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Export Button */}
       <div className="flex justify-end">
