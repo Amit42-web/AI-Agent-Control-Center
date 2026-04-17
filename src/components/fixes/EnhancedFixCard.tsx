@@ -38,22 +38,26 @@ export function EnhancedFixCard({ fix, index, isSelected = false, onToggleSelect
   };
 
   const copyAll = () => {
+    const concreteExampleText = typeof fix.concreteExample === 'string'
+      ? fix.concreteExample
+      : JSON.stringify(fix.concreteExample, null, 2);
+
     const allContent = `
-Title: ${fix.title}
+Title: ${fix.title || ''}
 
-Root Cause: ${fix.rootCause}
+Root Cause: ${fix.rootCause || ''}
 
-Suggested Solution: ${fix.suggestedSolution}
+Suggested Solution: ${fix.suggestedSolution || ''}
 
-Where to Implement: ${fix.whereToImplement}
+Where to Implement: ${fix.whereToImplement || ''}
 
-What to Implement: ${fix.whatToImplement}
+What to Implement: ${fix.whatToImplement || ''}
 
-Concrete Example: ${fix.concreteExample}
+Concrete Example: ${concreteExampleText || ''}
 
-Success Criteria: ${fix.successCriteria}
+Success Criteria: ${fix.successCriteria || ''}
 
-How to Test: ${fix.howToTest}
+How to Test: ${fix.howToTest || ''}
 ${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Section: ${fix.promptFix.targetSection}\nExact Content:\n${fix.promptFix.exactContent}` : ''}
     `.trim();
     copyToClipboard(allContent, 'all');
@@ -249,7 +253,9 @@ ${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Sectio
               </div>
               <div className="glass-card-subtle p-3 border-l-2 border-pink-500 bg-pink-500/5">
                 <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap">
-                  {fix.concreteExample}
+                  {typeof fix.concreteExample === 'string'
+                    ? fix.concreteExample
+                    : JSON.stringify(fix.concreteExample, null, 2)}
                 </pre>
               </div>
             </div>
