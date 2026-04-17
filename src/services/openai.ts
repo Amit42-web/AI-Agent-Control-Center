@@ -1395,6 +1395,8 @@ export async function generateEnhancedFixesByRCACategory(
   const fixGenerationPromises = Object.entries(scenariosByRCA)
     .filter(([rcaType]) => rcaType !== 'unknown') // Skip scenarios without RCA type
     .map(async ([rcaType, aggScenarios]) => {
+      console.log(`[RCA Fix Generation] Starting generation for ${rcaType} (${aggScenarios.length} scenario groups)`);
+
       // Prepare summary of scenarios in this RCA category
       const scenariosSummary = aggScenarios.map(agg => ({
         title: agg.title,
@@ -1464,10 +1466,12 @@ ${knowledgeBase ? `Current Knowledge Base:\n${knowledgeBase}\n\n` : ''}
 Generate ONE comprehensive fix that addresses this entire RCA category.`;
 
       try {
+        console.log(`[RCA Fix Generation] Calling OpenAI for ${rcaType}...`);
         const response = await callOpenAI(apiKey, model, [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ]);
+        console.log(`[RCA Fix Generation] Received response for ${rcaType}`);
 
         let jsonStr = response.trim();
         if (jsonStr.startsWith('```')) {
@@ -1512,7 +1516,10 @@ Generate ONE comprehensive fix that addresses this entire RCA category.`;
 
   // Wait for all fix generation promises to complete in parallel
   console.log(`[RCA Fix Generation] Processing ${fixGenerationPromises.length} RCA categories in parallel...`);
+  console.log(`[RCA Fix Generation] Categories:`, Object.keys(scenariosByRCA).filter(k => k !== 'unknown'));
+
   const fixResults = await Promise.all(fixGenerationPromises);
+  console.log(`[RCA Fix Generation] All promises completed. Results:`, fixResults.map(r => r ? 'success' : 'null'));
 
   // Filter out null results (failed generations) and collect all fixes
   const allFixes: EnhancedFix[] = fixResults.filter(fix => fix !== null) as EnhancedFix[];
