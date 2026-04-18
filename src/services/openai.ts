@@ -1507,14 +1507,14 @@ Generate ONE comprehensive fix that addresses this entire RCA category.`;
 
         if (startIdx === -1 || endIdx === -1) {
           console.error(`[RCA Fix Generation] No valid JSON for ${rcaType}`);
-          return null;
+          return [];
         }
 
         jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-        const response = JSON.parse(jsonStr);
+        const parsedResponse = JSON.parse(jsonStr);
 
         // Handle both array format (new) and single object format (backwards compatibility)
-        const fixesArray = response.fixes || [response];
+        const fixesArray = parsedResponse.fixes || [parsedResponse];
 
         // Convert to EnhancedFix objects
         const enhancedFixes: EnhancedFix[] = fixesArray.map((fix: any, idx: number) => ({
