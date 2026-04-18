@@ -1413,9 +1413,7 @@ export async function generateEnhancedFixesByRCACategory(
         }))
       }));
 
-      const systemPrompt = `You are an expert call center operations consultant. Your task is to generate a COMPREHENSIVE, CATEGORY-LEVEL fix for a group of related issues.
-
-You are analyzing issues with the ROOT CAUSE: "${rcaType.toUpperCase()}"
+      const systemPrompt = `You are an expert call center operations consultant. Your task is to generate MULTIPLE SPECIFIC PATCHES for issues with the ROOT CAUSE: "${rcaType.toUpperCase()}"
 
 Root cause types explained:
 - knowledge: Information doesn't exist anywhere - bot didn't have the information
@@ -1424,52 +1422,57 @@ Root cause types explained:
 - conversation: Technically correct but experience was poor - awkward or confusing
 - model: Task exceeds model capability despite perfect setup (rare, <5%)
 
-CRITICAL: Generate ONE comprehensive fix that addresses ALL the similar issues in this category, not individual fixes for each issue.
+CRITICAL:
+- Analyze which specific pillars/sections need patches to address these issues
+- Generate a SEPARATE patch for EACH pillar/location that needs fixing
+- DO NOT create one generic fix - create multiple targeted patches
+- Example: If issues affect Pillar 1, Pillar 3, and Pillar 5, create 3 separate patches
 
 **STRICT STRUCTURAL CONSTRAINTS:**
 - DO NOT create new pillars - work only within the existing prompt structure
 - DO NOT suggest adding new major sections or pillars
 - ONLY modify, enhance, or add to EXISTING sections/states/pillars
-- If new states are needed, add them within existing pillars (e.g., add state under Pillar 3)
+- If new states are needed, add them within existing pillars (e.g., add new state under Pillar 3)
 - Focus on fixing issues by enhancing the existing reference prompt content
 
-**LOCATION REQUIREMENTS:**
+**LOCATION REQUIREMENTS (for each patch):**
 - whereToImplement: Must specify EXACT location within EXISTING structure
-  Examples: "Pillar 3, State S2 - After line 15", "Pillar 1 - Before availability check", "System Prompt - Lines 5-8"
+  Examples: "Pillar 3, State S2", "Pillar 1, State S0 - Identity Verification", "System Prompt - Line 5"
   NOT acceptable: "New Pillar 9", "Add new section", "Create new pillar"
 
-**CONTENT REQUIREMENTS:**
-- whatToImplement: Must be EXACT, COPY-PASTE READY content that fits into existing structure
-  Examples: Additional instructions for existing state, enhanced check within current flow
-  NOT acceptable: "Create new pillar", "Add new major section" (structural changes not allowed)
+**CONTENT REQUIREMENTS (for each patch):**
+- whatToImplement: Must be EXACT, COPY-PASTE READY content for that specific location
+  Examples: Additional instructions for that specific state, enhanced check for that pillar
+  NOT acceptable: Generic descriptions, "Create new pillar", "Add new major section"
 
-For the RCA category "${rcaType}", provide a JSON object with:
-- title: Category-level title (e.g., "Enhance Identity Verification in Pillar 3", "Strengthen Usefulness Check")
-- fixType: one of [script, training, process, system] - most appropriate for this RCA type
-- rootCauseType: "${rcaType}" (use exactly this value)
-- rootCause: Comprehensive explanation of WHY all these issues happened (2-3 sentences covering the pattern)
-- suggestedSolution: Comprehensive solution addressing the category as a whole (3-4 sentences)
-- whereToImplement: EXACT location within EXISTING structure (e.g., "Pillar 3, State S2 - Line 23-25", "Pillar 1 - Before availability check")
-- whatToImplement: EXACT COPY-PASTE READY content to ADD/MODIFY within existing structure (not new pillars)
-- concreteExample: Before/after example showing the enhancement to existing content
-- successCriteria: How to measure if this category-level fix worked (observable outcomes)
-- howToTest: Specific validation method for the category
-- affectedScenarios: Count of scenarios this addresses
-
-**ALWAYS provide a "promptFix" object for script/prompt changes:**
+For the RCA category "${rcaType}", provide a JSON object with a "fixes" array:
 {
-  "action": "add" | "replace" | "remove",
-  "targetSection": "EXACT section within EXISTING structure - e.g., 'Pillar 3, State S0', 'Pillar 1 - Identity Verification'",
-  "lineNumber": number (if known from reference script),
-  "exactContent": "EXACT COPY-PASTE READY text to add/replace within the existing section",
-  "beforeText": "For replace action - exact text being replaced"
+  "fixes": [
+    {
+      "title": "Specific patch title (e.g., 'Add Identity Verification to Pillar 3, State S0')",
+      "fixType": "script" | "training" | "process" | "system",
+      "rootCauseType": "${rcaType}",
+      "rootCause": "Why this specific issue happened at this location",
+      "suggestedSolution": "What this specific patch does",
+      "whereToImplement": "EXACT location - e.g., 'Pillar 3, State S2'",
+      "whatToImplement": "EXACT COPY-PASTE READY content for this location",
+      "concreteExample": "Before/after for this specific patch",
+      "successCriteria": "How to verify this patch works",
+      "howToTest": "Testing method for this patch",
+      "promptFix": {
+        "action": "add" | "replace" | "remove",
+        "targetSection": "EXACT section - e.g., 'Pillar 3, State S0'",
+        "lineNumber": number (if known),
+        "exactContent": "EXACT text to add/replace at this location",
+        "beforeText": "For replace - exact text being replaced"
+      }
+    }
+  ]
 }
 
-Reference the existing pillars, states, and sections by their names/numbers from the reference script.
+Analyze the reference script and scenarios to identify ALL locations that need patches. Create one patch object per location.
 
-Think holistically - address the PATTERN by enhancing existing content, not creating new structure.
-
-Return ONLY a valid JSON object (not an array).`;
+Return ONLY a valid JSON object with a "fixes" array.`;
 
       const userPrompt = `RCA Category: ${rcaType}
 
@@ -1508,11 +1511,14 @@ Generate ONE comprehensive fix that addresses this entire RCA category.`;
         }
 
         jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-        const fix = JSON.parse(jsonStr);
+        const response = JSON.parse(jsonStr);
 
-        // Return the enhanced fix
-        const enhancedFix: EnhancedFix = {
-          id: `rca-fix-${rcaType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        // Handle both array format (new) and single object format (backwards compatibility)
+        const fixesArray = response.fixes || [response];
+
+        // Convert to EnhancedFix objects
+        const enhancedFixes: EnhancedFix[] = fixesArray.map((fix: any, idx: number) => ({
+          id: `rca-fix-${rcaType}-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
           scenarioId: aggScenarios.map(agg => agg.id).join(','), // Link to multiple scenarios
           title: fix.title,
           fixType: fix.fixType as FixType,
@@ -1525,13 +1531,13 @@ Generate ONE comprehensive fix that addresses this entire RCA category.`;
           successCriteria: fix.successCriteria,
           howToTest: fix.howToTest,
           promptFix: fix.promptFix,
-        };
+        }));
 
-        console.log(`[RCA Fix Generation] Generated fix for ${rcaType}: "${enhancedFix.title}"`);
-        return enhancedFix;
+        console.log(`[RCA Fix Generation] Generated ${enhancedFixes.length} fix(es) for ${rcaType}`);
+        return enhancedFixes;
       } catch (error) {
-        console.error(`[RCA Fix Generation] Error generating fix for ${rcaType}:`, error);
-        return null;
+        console.error(`[RCA Fix Generation] Error generating fixes for ${rcaType}:`, error);
+        return [];
       }
     });
 
@@ -1540,12 +1546,12 @@ Generate ONE comprehensive fix that addresses this entire RCA category.`;
   console.log(`[RCA Fix Generation] Categories:`, Object.keys(scenariosByRCA).filter(k => k !== 'unknown'));
 
   const fixResults = await Promise.all(fixGenerationPromises);
-  console.log(`[RCA Fix Generation] All promises completed. Results:`, fixResults.map(r => r ? 'success' : 'null'));
+  console.log(`[RCA Fix Generation] All promises completed. Got ${fixResults.length} result arrays`);
 
-  // Filter out null results (failed generations) and collect all fixes
-  const allFixes: EnhancedFix[] = fixResults.filter(fix => fix !== null) as EnhancedFix[];
+  // Flatten the array of arrays into a single array of all fixes
+  const allFixes: EnhancedFix[] = fixResults.flat();
 
-  console.log(`[RCA Fix Generation] Generated ${allFixes.length} category-level fixes`);
+  console.log(`[RCA Fix Generation] Generated ${allFixes.length} total fixes across all RCA categories`);
   return allFixes;
 }
 
