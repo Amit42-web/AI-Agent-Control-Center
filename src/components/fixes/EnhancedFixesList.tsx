@@ -73,17 +73,20 @@ export function EnhancedFixesList() {
     // Generate clean version: remove markers and removed content
     let cleanScript = generatedDocument;
 
-    // Remove entire REMOVED sections (including the content)
-    cleanScript = cleanScript.replace(/🔴 REMOVED \(.*?\):[\s\S]*?🔴 END REMOVAL\n*/g, '');
+    // Remove entire REMOVED sections (including the content) - handle both patterns
+    // Pattern 1: 🔴 REMOVED (title):...🔴 END REMOVAL
+    cleanScript = cleanScript.replace(/🔴 REMOVED \([^)]*\):[\s\S]*?🔴 END REMOVAL\n*/g, '');
+    // Pattern 2: 🔴 REMOVED:...🔴 END REMOVAL (without title)
+    cleanScript = cleanScript.replace(/🔴 REMOVED:[\s\S]*?🔴 END REMOVAL\n*/g, '');
 
     // Remove visual markers but keep the content
     cleanScript = cleanScript
-      .replace(/🟢 ADDED \(.*?\):\n/g, '')
-      .replace(/🟢 REPLACED WITH \(.*?\):\n/g, '')
+      .replace(/🟢 ADDED \([^)]*\):\n/g, '')
+      .replace(/🟢 REPLACED WITH \([^)]*\):\n/g, '')
       .replace(/🟢 END ADDITION\n*/g, '')
       .replace(/🟢 END REPLACEMENT\n*/g, '')
       .replace(/🟢 ADDED INSTEAD:\n/g, '')
-      .replace(/⚠️ Could not find exact text to replace for: .*?\n/g, '');
+      .replace(/⚠️ Could not find exact text to replace for: [^\n]*\n/g, '');
 
     // Remove the header sections, keep only the script
     const scriptStart = cleanScript.indexOf('MODIFIED SCRIPT WITH HIGHLIGHTED CHANGES');
