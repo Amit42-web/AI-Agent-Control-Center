@@ -173,76 +173,91 @@ export function EnhancedFixesList() {
               onClick={() => {
                 const selectedFixes = enhancedFixes.fixes.filter(fix => selectedFixIds.has(fix.id));
 
-                // Start with the reference script
-                let combinedDocument = `═══════════════════════════════════════════════════════════════════════════════\n`;
-                combinedDocument += `  IMPLEMENTATION GUIDE - ${selectedFixes.length} Selected Fix${selectedFixes.length !== 1 ? 'es' : ''}\n`;
-                combinedDocument += `  Generated: ${new Date().toLocaleString()}\n`;
-                combinedDocument += `═══════════════════════════════════════════════════════════════════════════════\n\n`;
+                // Generate the final modified script with highlighted changes
+                let finalScript = referenceScript || '[No reference script provided]';
+                const changeLog: string[] = [];
 
-                // Show summary of fixes
-                combinedDocument += `FIXES TO APPLY:\n\n`;
+                // Apply each fix to the script
                 selectedFixes.forEach((fix, index) => {
-                  const actionIcon = fix.promptFix?.action === 'add' ? '✚' : fix.promptFix?.action === 'replace' ? '⟳' : '✖';
-                  combinedDocument += `${index + 1}. [${actionIcon} ${fix.promptFix?.action?.toUpperCase() || 'UPDATE'}] ${fix.title}\n`;
-                  if (fix.promptFix) {
-                    combinedDocument += `   Location: ${fix.promptFix.targetSection}\n`;
+                  if (!fix.promptFix) return;
+
+                  const { action, targetSection, exactContent, beforeText } = fix.promptFix;
+
+                  // Log the change
+                  changeLog.push(`${index + 1}. [${action.toUpperCase()}] ${targetSection}: ${fix.title}`);
+
+                  // Apply the change with visual markers
+                  if (action === 'add') {
+                    // Find target section and add content after it
+                    const sectionMatch = targetSection.match(/Pillar\s+\d+|State\s+S\d+|System Prompt/i);
+                    if (sectionMatch) {
+                      const sectionText = sectionMatch[0];
+                      const sectionIndex = finalScript.indexOf(sectionText);
+                      if (sectionIndex !== -1) {
+                        // Find end of that section's line
+                        const lineEndIndex = finalScript.indexOf('\n', sectionIndex);
+                        const insertPosition = lineEndIndex !== -1 ? lineEndIndex + 1 : finalScript.length;
+
+                        finalScript =
+                          finalScript.slice(0, insertPosition) +
+                          `\n🟢 ADDED (${fix.title}):\n${exactContent}\n🟢 END ADDITION\n\n` +
+                          finalScript.slice(insertPosition);
+                      }
+                    }
+                  } else if (action === 'replace' && beforeText) {
+                    // Replace old content with new, showing both
+                    if (finalScript.includes(beforeText)) {
+                      finalScript = finalScript.replace(
+                        beforeText,
+                        `🔴 REMOVED:\n${beforeText}\n🔴 END REMOVAL\n\n🟢 REPLACED WITH (${fix.title}):\n${exactContent}\n🟢 END REPLACEMENT`
+                      );
+                    } else {
+                      // If exact text not found, append at the end with note
+                      finalScript += `\n\n⚠️ Could not find exact text to replace for: ${fix.title}\n🟢 ADDED INSTEAD:\n${exactContent}\n🟢 END ADDITION\n`;
+                    }
+                  } else if (action === 'remove' && beforeText) {
+                    // Mark content as removed
+                    if (finalScript.includes(beforeText)) {
+                      finalScript = finalScript.replace(
+                        beforeText,
+                        `🔴 REMOVED (${fix.title}):\n${beforeText}\n🔴 END REMOVAL`
+                      );
+                    }
                   }
-                  combinedDocument += `   Type: ${fix.fixType} | Category: ${fix.rootCauseType}\n\n`;
+                });
+
+                // Build the complete document
+                let combinedDocument = `${'═'.repeat(79)}\n`;
+                combinedDocument += `  FINAL MODIFIED SCRIPT - ${selectedFixes.length} Fix${selectedFixes.length !== 1 ? 'es' : ''} Applied\n`;
+                combinedDocument += `  Generated: ${new Date().toLocaleString()}\n`;
+                combinedDocument += `${'═'.repeat(79)}\n\n`;
+
+                combinedDocument += `CHANGES APPLIED:\n\n`;
+                changeLog.forEach(log => {
+                  combinedDocument += `${log}\n`;
                 });
 
                 combinedDocument += `\n${'═'.repeat(79)}\n`;
-                combinedDocument += `  ORIGINAL REFERENCE SCRIPT WITH HIGHLIGHTED CHANGES\n`;
+                combinedDocument += `  MODIFIED SCRIPT WITH HIGHLIGHTED CHANGES\n`;
+                combinedDocument += `  🟢 = Added/Replaced content  |  🔴 = Removed content\n`;
                 combinedDocument += `${'═'.repeat(79)}\n\n`;
 
-                // Add the reference script
-                if (referenceScript) {
-                  combinedDocument += referenceScript;
-                  combinedDocument += `\n\n`;
-                } else {
-                  combinedDocument += `[No reference script provided]\n\n`;
-                }
+                combinedDocument += finalScript;
 
-                // Add detailed fix instructions
-                combinedDocument += `\n${'═'.repeat(79)}\n`;
-                combinedDocument += `  DETAILED FIX INSTRUCTIONS\n`;
+                combinedDocument += `\n\n${'═'.repeat(79)}\n`;
+                combinedDocument += `  IMPLEMENTATION NOTES\n`;
                 combinedDocument += `${'═'.repeat(79)}\n\n`;
+
+                combinedDocument += `To apply these changes:\n`;
+                combinedDocument += `1. Copy the modified script above\n`;
+                combinedDocument += `2. Remove the visual markers (🟢 ADDED, 🔴 REMOVED, etc.)\n`;
+                combinedDocument += `3. Keep only the green (added) content\n`;
+                combinedDocument += `4. Remove the red (removed) content\n`;
+                combinedDocument += `5. Test the modified script\n\n`;
 
                 selectedFixes.forEach((fix, index) => {
-                  combinedDocument += `\n${'─'.repeat(79)}\n`;
-                  combinedDocument += `FIX #${index + 1}: ${fix.title}\n`;
-                  combinedDocument += `${'─'.repeat(79)}\n\n`;
-
-                  if (fix.promptFix) {
-                    const actionVerb = fix.promptFix.action === 'add' ? 'ADD' : fix.promptFix.action === 'replace' ? 'REPLACE' : 'REMOVE';
-                    combinedDocument += `📍 LOCATION: ${fix.promptFix.targetSection}\n`;
-                    combinedDocument += `🔧 ACTION: ${actionVerb}\n\n`;
-
-                    if (fix.promptFix.action === 'replace' && fix.promptFix.beforeText) {
-                      combinedDocument += `❌ REMOVE THIS:\n`;
-                      combinedDocument += `${'-'.repeat(79)}\n`;
-                      combinedDocument += `${fix.promptFix.beforeText}\n`;
-                      combinedDocument += `${'-'.repeat(79)}\n\n`;
-                    }
-
-                    combinedDocument += `✅ ${fix.promptFix.action === 'remove' ? 'CONFIRM REMOVAL' : 'INSERT THIS'}:\n`;
-                    combinedDocument += `${'-'.repeat(79)}\n`;
-                    combinedDocument += `${fix.promptFix.exactContent}\n`;
-                    combinedDocument += `${'-'.repeat(79)}\n\n`;
-                  }
-
-                  if (fix.rootCause) {
-                    combinedDocument += `💡 WHY: ${fix.rootCause}\n\n`;
-                  }
-
-                  if (fix.concreteExample) {
-                    const exampleText = typeof fix.concreteExample === 'string'
-                      ? fix.concreteExample
-                      : JSON.stringify(fix.concreteExample, null, 2);
-                    combinedDocument += `📋 EXAMPLE:\n${exampleText}\n\n`;
-                  }
-
                   if (fix.howToTest) {
-                    combinedDocument += `✓ TESTING: ${fix.howToTest}\n\n`;
+                    combinedDocument += `\nTest for Fix #${index + 1} (${fix.title}):\n${fix.howToTest}\n`;
                   }
                 });
 
@@ -319,9 +334,22 @@ export function EnhancedFixesList() {
               {/* Modal Content */}
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="prose prose-invert max-w-none">
-                  <pre className="whitespace-pre-wrap text-sm text-[var(--color-slate-200)] bg-black/20 p-4 rounded-lg font-mono">
-                    {generatedDocument}
-                  </pre>
+                  <div className="whitespace-pre-wrap text-sm bg-black/20 p-4 rounded-lg font-mono"
+                    dangerouslySetInnerHTML={{
+                      __html: generatedDocument
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/🟢 ADDED \((.*?)\):/g, '<span style="background-color: #065f46; color: #d1fae5; padding: 2px 6px; border-radius: 3px; font-weight: bold;">✅ ADDED ($1):</span>')
+                        .replace(/🟢 REPLACED WITH \((.*?)\):/g, '<span style="background-color: #065f46; color: #d1fae5; padding: 2px 6px; border-radius: 3px; font-weight: bold;">✅ REPLACED WITH ($1):</span>')
+                        .replace(/🟢 END ADDITION/g, '<span style="color: #4ade80;">━━━━━ END ADDITION ━━━━━</span>')
+                        .replace(/🟢 END REPLACEMENT/g, '<span style="color: #4ade80;">━━━━━ END REPLACEMENT ━━━━━</span>')
+                        .replace(/🔴 REMOVED \((.*?)\):/g, '<span style="background-color: #7f1d1d; color: #fecaca; padding: 2px 6px; border-radius: 3px; font-weight: bold; text-decoration: line-through;">❌ REMOVED ($1):</span>')
+                        .replace(/🔴 END REMOVAL/g, '<span style="color: #f87171; text-decoration: line-through;">━━━━━ END REMOVAL ━━━━━</span>')
+                        .replace(/⚠️ Could not find exact text/g, '<span style="background-color: #78350f; color: #fef3c7; padding: 2px 6px; border-radius: 3px; font-weight: bold;">⚠️ Could not find exact text</span>')
+                        .replace(/🟢 ADDED INSTEAD:/g, '<span style="background-color: #065f46; color: #d1fae5; padding: 2px 6px; border-radius: 3px; font-weight: bold;">✅ ADDED INSTEAD:</span>')
+                    }}
+                  />
                 </div>
               </div>
 
