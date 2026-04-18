@@ -181,63 +181,81 @@ ${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Sectio
             </div>
           )}
 
-          {/* Where to Implement */}
-          {fix.whereToImplement && (
+          {/* Prompt Fix - PRIORITIZED (show first if available) */}
+          {fix.promptFix && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Code className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                  📍 Exact Location & Implementation
+                </span>
+              </div>
+              <div className="glass-card-subtle p-3 border-l-2 border-cyan-500 bg-cyan-500/5">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-medium uppercase">
+                      {fix.promptFix.action}
+                    </span>
+                    <span className="text-xs text-[var(--color-slate-300)] font-medium">
+                      {fix.promptFix.targetSection}
+                    </span>
+                    {fix.promptFix.lineNumber && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                        Line {fix.promptFix.lineNumber}
+                      </span>
+                    )}
+                  </div>
+                  {fix.promptFix.beforeText && (
+                    <div>
+                      <div className="text-xs text-red-400 font-medium mb-1">❌ Remove:</div>
+                      <pre className="text-sm text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2 rounded border border-red-500/30">
+                        {fix.promptFix.beforeText}
+                      </pre>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs text-green-400 font-medium mb-1">
+                      ✅ {fix.promptFix.action === 'add' ? 'Add this' : fix.promptFix.action === 'replace' ? 'Replace with this' : 'Confirm removal'}:
+                    </div>
+                    <pre className="text-sm text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2 rounded border border-green-500/30">
+                      {fix.promptFix.exactContent}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Where to Implement - only show if no promptFix */}
+          {!fix.promptFix && fix.whereToImplement && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-purple-400" />
                 <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  Where to Implement
+                  📍 Where to Implement
                 </span>
               </div>
               <div className="glass-card-subtle p-3 border-l-2 border-purple-500 bg-purple-500/5">
-                <p className="text-sm text-[var(--color-slate-200)]">
+                <p className="text-sm text-[var(--color-slate-200)] font-mono">
                   {fix.whereToImplement}
                 </p>
               </div>
             </div>
           )}
 
-          {/* What to Implement */}
-          {fix.whatToImplement && (
+          {/* What to Implement - only show if no promptFix */}
+          {!fix.promptFix && fix.whatToImplement && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Code className="w-4 h-4 text-green-400" />
                 <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  What to Implement
+                  ✅ What to Implement
                 </span>
               </div>
               <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
                 <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap font-mono">
                   {fix.whatToImplement}
                 </pre>
-              </div>
-            </div>
-          )}
-
-          {/* Prompt Fix (if available) */}
-          {fix.promptFix && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  Exact Prompt Implementation
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-cyan-500 bg-cyan-500/5">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-medium">
-                      {fix.promptFix.action}
-                    </span>
-                    <span className="text-xs text-[var(--color-slate-400)]">
-                      Section: {fix.promptFix.targetSection}
-                    </span>
-                  </div>
-                  <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap font-mono bg-black/20 p-2 rounded">
-                    {fix.promptFix.exactContent}
-                  </pre>
-                </div>
               </div>
             </div>
           )}

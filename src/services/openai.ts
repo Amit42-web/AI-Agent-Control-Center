@@ -1426,25 +1426,39 @@ Root cause types explained:
 
 CRITICAL: Generate ONE comprehensive fix that addresses ALL the similar issues in this category, not individual fixes for each issue.
 
+**LOCATION REQUIREMENTS:**
+- whereToImplement: Must specify EXACT location with section names, line numbers, or specific landmarks
+  Examples: "System Prompt - After line 15", "State S3 - Before usefulness check", "Opening Script - Lines 5-8"
+  NOT acceptable: "in the script", "agent training", "knowledge base" (too vague)
+
+**CONTENT REQUIREMENTS:**
+- whatToImplement: Must be EXACT, COPY-PASTE READY content, not descriptions
+  Examples: The actual prompt text, the exact training script, the specific KB article text
+  NOT acceptable: "Add empathy training", "Create a module about X" (these are descriptions, not content)
+
 For the RCA category "${rcaType}", provide a JSON object with:
 - title: Category-level title (e.g., "Address Knowledge Gaps in Product Info", "Reinforce Execution of Identity Verification")
 - fixType: one of [script, training, process, system] - most appropriate for this RCA type
 - rootCauseType: "${rcaType}" (use exactly this value)
 - rootCause: Comprehensive explanation of WHY all these issues happened (2-3 sentences covering the pattern)
 - suggestedSolution: Comprehensive solution addressing the category as a whole (3-4 sentences)
-- whereToImplement: Specific locations in flow/process/script (can be multiple places)
-- whatToImplement: Detailed, comprehensive steps or content to add/change that addresses all issues in this category
-- concreteExample: Before/after example or sample dialogue showing the improvement
+- whereToImplement: EXACT location with section/line/landmark (e.g., "System Prompt - Line 23-25", "State S2 - Before availability check")
+- whatToImplement: EXACT COPY-PASTE READY content to implement (not a description - the actual text/script/content)
+- concreteExample: Before/after example showing the specific change
 - successCriteria: How to measure if this category-level fix worked (observable outcomes)
 - howToTest: Specific validation method for the category
 - affectedScenarios: Count of scenarios this addresses
 
-**For INSTRUCTION or KNOWLEDGE fixes, ALSO provide a "promptFix" object:**
+**ALWAYS provide a "promptFix" object for script/prompt changes:**
 {
   "action": "add" | "replace" | "remove",
-  "targetSection": "Specific section name",
-  "exactContent": "The EXACT text to add - make this copy-paste ready"
+  "targetSection": "EXACT section with landmark - e.g., 'State S0 - Identity Verification', 'System Prompt - Line 15'",
+  "lineNumber": number (if known from reference script),
+  "exactContent": "EXACT COPY-PASTE READY text to add/replace",
+  "beforeText": "For replace action - exact text being replaced"
 }
+
+If the reference script has clear sections/states/pillars, reference them by name and line numbers.
 
 Think holistically - address the PATTERN, not individual instances.
 
