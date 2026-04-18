@@ -329,7 +329,7 @@ export function TranscriptInput() {
             continue;
           }
 
-          // FORMAT 2: setup user HH:MM:SS (agent, message on next line)
+          // FORMAT 3: setup user HH:MM:SS (agent, message on next line)
           const format2 = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
           if (format2) {
             speaker = 'agent';
@@ -363,7 +363,7 @@ export function TranscriptInput() {
             continue;
           }
 
-          // FORMAT 3: phone number HH:MM:SS (customer, message on next line)
+          // FORMAT 4: phone number HH:MM:SS (customer, message on next line)
           const format3 = trimmedLine.match(/^\+?(\d{10,})\s+(\d{2}:\d{2}:\d{2})/);
           if (format3) {
             speaker = 'customer';
@@ -397,7 +397,7 @@ export function TranscriptInput() {
             continue;
           }
 
-          // FORMAT 4: [SPEAKER]: message or SPEAKER: message
+          // FORMAT 5: [SPEAKER]: message or SPEAKER: message
           const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
           if (format4) {
             const speakerStr = format4[1].toLowerCase();
@@ -589,7 +589,44 @@ export function TranscriptInput() {
           let timestamp: string | undefined;
           let messageText = '';
 
-          // FORMAT 1: HH:MM:SS SPEAKER message (new simple format)
+          // FORMAT 1: [HH:MM:SS] or [MM:SS] Speaker Name: message (bracketed timestamp format)
+          const format1Bracketed = trimmedLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*([^:]+):\s*(.+)$/);
+          if (format1Bracketed) {
+            timestamp = format1Bracketed[1];
+            const speakerName = format1Bracketed[2].trim().toLowerCase();
+            messageText = format1Bracketed[3].trim();
+
+            // Detect speaker type from name
+            // Agent indicators: bot, agent, meera, assistant, representative, rep, support, operator
+            // Customer indicators: customer, caller, user, client
+            if (speakerName.includes('bot') ||
+                speakerName.includes('agent') ||
+                speakerName.includes('meera') ||
+                speakerName.includes('assistant') ||
+                speakerName.includes('representative') ||
+                speakerName.includes('rep') ||
+                speakerName.includes('support') ||
+                speakerName.includes('operator') ||
+                /^[a-z]+\s*r?\d+$/i.test(speakerName)) { // Pattern like "Meera R5"
+              speaker = 'agent';
+            } else if (speakerName.includes('customer') ||
+                       speakerName.includes('caller') ||
+                       speakerName.includes('user') ||
+                       speakerName.includes('client')) {
+              speaker = 'customer';
+            } else {
+              // Default to customer if unclear
+              speaker = 'customer';
+            }
+
+            if (messageText && speaker) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[Format 1 Bracketed] Parsed ${speaker} (${speakerName}) at ${timestamp}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // FORMAT 2: HH:MM:SS SPEAKER message (simple format)
           const format1 = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(AGENT|CUSTOMER|BOT|agent|customer|bot)\s+(.+)$/i);
           if (format1) {
             timestamp = format1[1];
@@ -608,7 +645,7 @@ export function TranscriptInput() {
             continue;
           }
 
-          // FORMAT 2: setup user HH:MM:SS (agent, message on next line)
+          // FORMAT 3: setup user HH:MM:SS (agent, message on next line)
           const format2 = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
           if (format2) {
             speaker = 'agent';
@@ -642,7 +679,7 @@ export function TranscriptInput() {
             continue;
           }
 
-          // FORMAT 3: phone number HH:MM:SS (customer, message on next line)
+          // FORMAT 4: phone number HH:MM:SS (customer, message on next line)
           const format3 = trimmedLine.match(/^\+?(\d{10,})\s+(\d{2}:\d{2}:\d{2})/);
           if (format3) {
             speaker = 'customer';
@@ -676,7 +713,7 @@ export function TranscriptInput() {
             continue;
           }
 
-          // FORMAT 4: [SPEAKER]: message or SPEAKER: message
+          // FORMAT 5: [SPEAKER]: message or SPEAKER: message
           const format4 = trimmedLine.match(/^\[?(BOT|AGENT|CUSTOMER|bot|agent|customer)\]?:?\s*(.+)$/i);
           if (format4) {
             const speakerStr = format4[1].toLowerCase();
