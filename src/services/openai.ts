@@ -1426,25 +1426,32 @@ Root cause types explained:
 
 CRITICAL: Generate ONE comprehensive fix that addresses ALL the similar issues in this category, not individual fixes for each issue.
 
+**STRICT STRUCTURAL CONSTRAINTS:**
+- DO NOT create new pillars - work only within the existing prompt structure
+- DO NOT suggest adding new major sections or pillars
+- ONLY modify, enhance, or add to EXISTING sections/states/pillars
+- If new states are needed, add them within existing pillars (e.g., add state under Pillar 3)
+- Focus on fixing issues by enhancing the existing reference prompt content
+
 **LOCATION REQUIREMENTS:**
-- whereToImplement: Must specify EXACT location with section names, line numbers, or specific landmarks
-  Examples: "System Prompt - After line 15", "State S3 - Before usefulness check", "Opening Script - Lines 5-8"
-  NOT acceptable: "in the script", "agent training", "knowledge base" (too vague)
+- whereToImplement: Must specify EXACT location within EXISTING structure
+  Examples: "Pillar 3, State S2 - After line 15", "Pillar 1 - Before availability check", "System Prompt - Lines 5-8"
+  NOT acceptable: "New Pillar 9", "Add new section", "Create new pillar"
 
 **CONTENT REQUIREMENTS:**
-- whatToImplement: Must be EXACT, COPY-PASTE READY content, not descriptions
-  Examples: The actual prompt text, the exact training script, the specific KB article text
-  NOT acceptable: "Add empathy training", "Create a module about X" (these are descriptions, not content)
+- whatToImplement: Must be EXACT, COPY-PASTE READY content that fits into existing structure
+  Examples: Additional instructions for existing state, enhanced check within current flow
+  NOT acceptable: "Create new pillar", "Add new major section" (structural changes not allowed)
 
 For the RCA category "${rcaType}", provide a JSON object with:
-- title: Category-level title (e.g., "Address Knowledge Gaps in Product Info", "Reinforce Execution of Identity Verification")
+- title: Category-level title (e.g., "Enhance Identity Verification in Pillar 3", "Strengthen Usefulness Check")
 - fixType: one of [script, training, process, system] - most appropriate for this RCA type
 - rootCauseType: "${rcaType}" (use exactly this value)
 - rootCause: Comprehensive explanation of WHY all these issues happened (2-3 sentences covering the pattern)
 - suggestedSolution: Comprehensive solution addressing the category as a whole (3-4 sentences)
-- whereToImplement: EXACT location with section/line/landmark (e.g., "System Prompt - Line 23-25", "State S2 - Before availability check")
-- whatToImplement: EXACT COPY-PASTE READY content to implement (not a description - the actual text/script/content)
-- concreteExample: Before/after example showing the specific change
+- whereToImplement: EXACT location within EXISTING structure (e.g., "Pillar 3, State S2 - Line 23-25", "Pillar 1 - Before availability check")
+- whatToImplement: EXACT COPY-PASTE READY content to ADD/MODIFY within existing structure (not new pillars)
+- concreteExample: Before/after example showing the enhancement to existing content
 - successCriteria: How to measure if this category-level fix worked (observable outcomes)
 - howToTest: Specific validation method for the category
 - affectedScenarios: Count of scenarios this addresses
@@ -1452,15 +1459,15 @@ For the RCA category "${rcaType}", provide a JSON object with:
 **ALWAYS provide a "promptFix" object for script/prompt changes:**
 {
   "action": "add" | "replace" | "remove",
-  "targetSection": "EXACT section with landmark - e.g., 'State S0 - Identity Verification', 'System Prompt - Line 15'",
+  "targetSection": "EXACT section within EXISTING structure - e.g., 'Pillar 3, State S0', 'Pillar 1 - Identity Verification'",
   "lineNumber": number (if known from reference script),
-  "exactContent": "EXACT COPY-PASTE READY text to add/replace",
+  "exactContent": "EXACT COPY-PASTE READY text to add/replace within the existing section",
   "beforeText": "For replace action - exact text being replaced"
 }
 
-If the reference script has clear sections/states/pillars, reference them by name and line numbers.
+Reference the existing pillars, states, and sections by their names/numbers from the reference script.
 
-Think holistically - address the PATTERN, not individual instances.
+Think holistically - address the PATTERN by enhancing existing content, not creating new structure.
 
 Return ONLY a valid JSON object (not an array).`;
 
