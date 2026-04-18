@@ -70,7 +70,40 @@ export function EnhancedFixesList() {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedDocument);
+    // Generate clean version: remove markers and removed content
+    let cleanScript = generatedDocument;
+
+    // Remove entire REMOVED sections (including the content)
+    cleanScript = cleanScript.replace(/🔴 REMOVED \(.*?\):[\s\S]*?🔴 END REMOVAL\n*/g, '');
+
+    // Remove visual markers but keep the content
+    cleanScript = cleanScript
+      .replace(/🟢 ADDED \(.*?\):\n/g, '')
+      .replace(/🟢 REPLACED WITH \(.*?\):\n/g, '')
+      .replace(/🟢 END ADDITION\n*/g, '')
+      .replace(/🟢 END REPLACEMENT\n*/g, '')
+      .replace(/🟢 ADDED INSTEAD:\n/g, '')
+      .replace(/⚠️ Could not find exact text to replace for: .*?\n/g, '');
+
+    // Remove the header sections, keep only the script
+    const scriptStart = cleanScript.indexOf('MODIFIED SCRIPT WITH HIGHLIGHTED CHANGES');
+    if (scriptStart !== -1) {
+      const contentStart = cleanScript.indexOf('\n\n', scriptStart);
+      if (contentStart !== -1) {
+        cleanScript = cleanScript.substring(contentStart + 2);
+      }
+    }
+
+    // Remove the implementation notes section at the end
+    const notesStart = cleanScript.indexOf('═'.repeat(79) + '\n  IMPLEMENTATION NOTES');
+    if (notesStart !== -1) {
+      cleanScript = cleanScript.substring(0, notesStart);
+    }
+
+    // Clean up extra blank lines
+    cleanScript = cleanScript.replace(/\n{3,}/g, '\n\n').trim();
+
+    navigator.clipboard.writeText(cleanScript);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
