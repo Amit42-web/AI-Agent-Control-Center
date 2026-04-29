@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { RotateCcw, Zap } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { UserMenu } from '@/components/auth/UserMenu';
 
 export function Header() {
   const { currentStep, resetAllToDefaults } = useAppStore();
@@ -64,14 +65,17 @@ export function Header() {
             ))}
           </div>
 
-          {/* Reset Button */}
-          <button
-            onClick={resetAllToDefaults}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset All
-          </button>
+          {/* Actions */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={resetAllToDefaults}
+              className="btn-secondary flex items-center gap-2 text-sm"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Reset All</span>
+            </button>
+            <UserMenu />
+          </div>
         </div>
       </div>
     </header>
