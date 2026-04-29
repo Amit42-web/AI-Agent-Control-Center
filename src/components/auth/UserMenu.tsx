@@ -35,7 +35,6 @@ export function UserMenu() {
             userButtonPopoverActionButton: "hover:bg-[var(--color-navy-700)]",
           }
         }}
-        afterSignOutUrl="/sign-in"
       />
     </div>
   );
