@@ -13,7 +13,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      afterSignInUrl="/"
+      afterSignUpUrl="/"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+    >
       <html lang="en">
         <body className="antialiased min-h-screen flex flex-col">
           {children}
