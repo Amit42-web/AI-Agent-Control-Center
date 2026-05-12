@@ -43,8 +43,15 @@ export function TranscriptInput() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Reset input so same file can be re-uploaded
+    event.target.value = '';
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      alert(`Failed to read file "${file.name}". Please try again.`);
+    };
     reader.onload = (e) => {
+      try {
       const text = e.target?.result as string;
 
       console.log('CSV file loaded, total length:', text.length);
@@ -219,7 +226,23 @@ export function TranscriptInput() {
       }).filter(t => t.lines.length > 0);
 
       console.log(`\nFinal result: ${parsedTranscripts.length} valid transcripts`);
+
+      if (parsedTranscripts.length === 0) {
+        alert(
+          `No valid transcripts found in "${file.name}".\n\n` +
+          `Expected format per row:\n` +
+          `• Bot lines: "setup user  HH:MM:SS" on one line, message on the next\n` +
+          `• Customer lines: "91XXXXXXXXXX  HH:MM:SS" (phone number) on one line, message on the next\n\n` +
+          `Download the sample CSV to see the exact format.`
+        );
+        return;
+      }
+
       setTranscripts(parsedTranscripts);
+      } catch (err) {
+        console.error('CSV parse error:', err);
+        alert(`Error parsing "${file.name}": ${err instanceof Error ? err.message : String(err)}`);
+      }
     };
 
     reader.readAsText(file);
@@ -229,6 +252,9 @@ export function TranscriptInput() {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    // Reset input so same files can be re-uploaded
+    event.target.value = '';
+
     console.log(`Loading ${files.length} text file(s)`);
 
     const parsedTranscripts: any[] = [];
@@ -236,7 +262,11 @@ export function TranscriptInput() {
 
     Array.from(files).forEach((file, fileIndex) => {
       const reader = new FileReader();
+      reader.onerror = () => {
+        alert(`Failed to read file "${file.name}". Please try again.`);
+      };
       reader.onload = (e) => {
+        try {
         const transcriptText = e.target?.result as string;
 
         console.log(`\nProcessing text file: ${file.name}`);
@@ -355,7 +385,20 @@ export function TranscriptInput() {
         filesProcessed++;
         if (filesProcessed === files.length) {
           console.log(`\nAll files processed. Total transcripts: ${parsedTranscripts.length}`);
-          setTranscripts(parsedTranscripts);
+          if (parsedTranscripts.length === 0) {
+            alert(
+              `No valid transcripts found in the uploaded file(s).\n\n` +
+              `Expected format:\n` +
+              `• Bot lines: "setup user  HH:MM:SS" on one line, message on the next\n` +
+              `• Customer lines: "91XXXXXXXXXX  HH:MM:SS" (phone number) on one line, message on the next`
+            );
+          } else {
+            setTranscripts(parsedTranscripts);
+          }
+        }
+        } catch (err) {
+          console.error(`Parse error for "${file.name}":`, err);
+          alert(`Error parsing "${file.name}": ${err instanceof Error ? err.message : String(err)}`);
         }
       };
 
