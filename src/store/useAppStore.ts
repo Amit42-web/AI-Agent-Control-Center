@@ -10,6 +10,7 @@ import {
   IssueType,
   Severity,
   DetectedIssue,
+  FlowType,
 } from '@/types';
 import {
   defaultChecks,
@@ -312,10 +313,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  createNewAnalysis: (name: string) => {
-    // Reset to initial state but keep the name
+  createNewAnalysis: (name: string, flowType: FlowType) => {
     set({
       ...initialState,
+      flowType,
       currentAnalysisId: `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       currentAnalysisName: name,
       currentStep: 'input',
