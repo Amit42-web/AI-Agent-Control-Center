@@ -6,6 +6,88 @@ import { FileText, Upload, RotateCcw, Download, ChevronDown, ChevronUp } from 'l
 import { useAppStore } from '@/store/useAppStore';
 import { demoTranscript, demoCSVContent } from '@/data/demoData';
 
+type ParsedLine = { speaker: 'bot' | 'customer'; text: string; timestamp?: string };
+
+function parseTranscriptText(transcriptText: string): ParsedLine[] {
+  const lines = transcriptText.split('\n');
+  const parsedLines: ParsedLine[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const trimmedLine = lines[i].trim();
+
+    if (
+      !trimmedLine ||
+      trimmedLine.toLowerCase().includes('outbound call') ||
+      trimmedLine.toLowerCase().includes('inbound call')
+    ) {
+      i++;
+      continue;
+    }
+
+    // Format 1: [HH:MM] Speaker Name: message  (all on one line)
+    const bracketTimestamp = trimmedLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s+(.+?):\s*(.+)$/);
+    if (bracketTimestamp) {
+      const [, timestamp, speakerName, text] = bracketTimestamp;
+      const speaker = speakerName.trim().toLowerCase() === 'customer' ? 'customer' : 'bot';
+      parsedLines.push({ speaker, text: text.trim(), timestamp });
+      i++;
+      continue;
+    }
+
+    // Format 2: [BOT]: message  or  [CUSTOMER]: message  (on same line)
+    const bracketLabel = trimmedLine.match(/^\[?(BOT|CUSTOMER)\]?:?\s*(.+)$/i);
+    if (bracketLabel) {
+      parsedLines.push({
+        speaker: bracketLabel[1].toLowerCase() as 'bot' | 'customer',
+        text: bracketLabel[2].trim(),
+      });
+      i++;
+      continue;
+    }
+
+    // Format 3: "setup user HH:MM:SS" for bot  /  phone number HH:MM:SS for customer
+    // Speaker header on one line, message text on the following line(s)
+    let speaker: 'bot' | 'customer' | null = null;
+    let timestamp: string | undefined;
+
+    if (trimmedLine.toLowerCase().startsWith('setup user')) {
+      speaker = 'bot';
+      const m = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
+      if (m) timestamp = m[1];
+    } else if (/^\d{10,}/.test(trimmedLine)) {
+      speaker = 'customer';
+      const m = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})/);
+      if (m) timestamp = m[2];
+    }
+
+    if (speaker) {
+      i++;
+      const messageLines: string[] = [];
+      while (i < lines.length) {
+        const next = lines[i].trim();
+        if (!next) { i++; continue; }
+        if (
+          next.toLowerCase().startsWith('setup user') ||
+          /^\d{10,}/.test(next) ||
+          /^\[\d{1,2}:\d{2}/.test(next)
+        ) break;
+        messageLines.push(next);
+        i++;
+      }
+      const text = messageLines.join(' ').trim();
+      if (text) parsedLines.push({ speaker, text, timestamp });
+    } else {
+      if (trimmedLine.length > 0) {
+        console.warn('Line did not match any pattern:', trimmedLine.substring(0, 100));
+      }
+      i++;
+    }
+  }
+
+  return parsedLines;
+}
+
 export function TranscriptInput() {
   const { transcripts, setTranscripts } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -96,132 +178,20 @@ export function TranscriptInput() {
 
       // Skip header row and parse transcripts
       const parsedTranscripts = rows.slice(1).map((row, index) => {
-        // Remove surrounding quotes if present
         let transcriptText = row.trim();
         if (transcriptText.startsWith('"') && transcriptText.endsWith('"')) {
           transcriptText = transcriptText.slice(1, -1);
         }
 
-        console.log(`\nParsing transcript ${index + 1}:`);
-        console.log('First 200 chars:', transcriptText.substring(0, 200));
+        console.log(`\nParsing transcript ${index + 1}, first 200 chars:`, transcriptText.substring(0, 200));
 
-        // Parse transcript based on speaker indicators
-        // Format: speaker and timestamp on one line, message on next line(s)
-        // "setup user" = bot, phone number pattern = customer
-        const lines = transcriptText.split('\n');
-        const parsedLines = [];
-
-        console.log(`Split into ${lines.length} lines`);
-
-        let i = 0;
-        while (i < lines.length) {
-          const trimmedLine = lines[i].trim();
-
-          // Skip empty lines and header lines (like "outbound Call to ...")
-          if (!trimmedLine ||
-              trimmedLine.toLowerCase().includes('outbound call') ||
-              trimmedLine.toLowerCase().includes('inbound call')) {
-            i++;
-            continue;
-          }
-
-          let speaker: 'bot' | 'customer' | null = null;
-          let timestamp: string | undefined = undefined;
-
-          // Check if line starts with "setup user" (bot)
-          if (trimmedLine.toLowerCase().startsWith('setup user')) {
-            speaker = 'bot';
-            // Extract timestamp: "setup user  00:00:01"
-            const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
-            if (match) {
-              timestamp = match[1];
-            }
-          }
-          // Check if line starts with phone number (customer)
-          else if (/^\d{10,}/.test(trimmedLine)) {
-            speaker = 'customer';
-            // Extract timestamp: "919525823316  00:00:13"
-            const match = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})/);
-            if (match) {
-              timestamp = match[2];
-            }
-          }
-          // Fallback: old [BOT]/[CUSTOMER] format on same line as text
-          else if (trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i)) {
-            const m = trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
-            if (m) {
-              parsedLines.push({
-                speaker: m[1].toLowerCase() as 'bot' | 'customer',
-                text: m[2].trim(),
-              });
-              i++;
-              continue;
-            }
-          }
-
-          // If we found a speaker line, read the message from following lines
-          if (speaker) {
-            i++; // Move to next line
-            const messageLines: string[] = [];
-
-            // Collect all non-empty lines until we hit another speaker line
-            while (i < lines.length) {
-              const nextLine = lines[i].trim();
-
-              // Skip empty lines
-              if (!nextLine) {
-                i++;
-                if (messageLines.length > 0) {
-                  // Empty line after collecting text - might be end of message
-                  // But keep going to see if there's more
-                }
-                continue;
-              }
-
-              // Stop if this is a new speaker line
-              if (nextLine.toLowerCase().startsWith('setup user') || /^\d{10,}/.test(nextLine)) {
-                break;
-              }
-
-              messageLines.push(nextLine);
-              i++;
-            }
-
-            // Combine message lines into one text
-            const text = messageLines.join(' ').trim();
-
-            if (text) {
-              parsedLines.push({
-                speaker,
-                text,
-                timestamp,
-              });
-              console.log(`Parsed ${speaker} at ${timestamp}:`, text.substring(0, 50));
-            } else {
-              console.warn(`Found ${speaker} line at ${timestamp} but no message text`);
-            }
-          } else {
-            // Not a speaker line, skip it
-            if (trimmedLine.length > 0) {
-              console.warn('Line did not match any pattern:', trimmedLine.substring(0, 100));
-            }
-            i++;
-          }
-        }
-
-        if (parsedLines.length === 0) {
-          console.warn('No lines were parsed from transcript. First 200 chars:', transcriptText.substring(0, 200));
-        } else {
-          console.log(`Successfully parsed ${parsedLines.length} lines`);
-        }
+        const parsedLines = parseTranscriptText(transcriptText);
+        console.log(`Parsed ${parsedLines.length} lines from transcript ${index + 1}`);
 
         return {
           id: `csv-call-${index + 1}`,
           lines: parsedLines,
-          metadata: {
-            date: new Date().toISOString().split('T')[0],
-            source: 'csv-upload'
-          },
+          metadata: { date: new Date().toISOString().split('T')[0], source: 'csv-upload' },
         };
       }).filter(t => t.lines.length > 0);
 
@@ -230,10 +200,12 @@ export function TranscriptInput() {
       if (parsedTranscripts.length === 0) {
         alert(
           `No valid transcripts found in "${file.name}".\n\n` +
-          `Expected format per row:\n` +
-          `• Bot lines: "setup user  HH:MM:SS" on one line, message on the next\n` +
-          `• Customer lines: "91XXXXXXXXXX  HH:MM:SS" (phone number) on one line, message on the next\n\n` +
-          `Download the sample CSV to see the exact format.`
+          `Supported formats:\n` +
+          `• [HH:MM] Speaker Name: message\n` +
+          `• [BOT]: message  /  [CUSTOMER]: message\n` +
+          `• setup user HH:MM:SS (then message on next line)\n` +
+          `• 91XXXXXXXXXX HH:MM:SS (phone number, then message on next line)\n\n` +
+          `Download the sample CSV to see an example.`
         );
         return;
       }
@@ -270,102 +242,8 @@ export function TranscriptInput() {
         const transcriptText = e.target?.result as string;
 
         console.log(`\nProcessing text file: ${file.name}`);
-        console.log('First 200 chars:', transcriptText.substring(0, 200));
-
-        // Parse transcript based on speaker indicators
-        // Format: speaker and timestamp on one line, message on next line(s)
-        const lines = transcriptText.split('\n');
-        const parsedLines = [];
-
-        console.log(`Split into ${lines.length} lines`);
-
-        let i = 0;
-        while (i < lines.length) {
-          const trimmedLine = lines[i].trim();
-
-          // Skip empty lines and header lines
-          if (!trimmedLine ||
-              trimmedLine.toLowerCase().includes('outbound call') ||
-              trimmedLine.toLowerCase().includes('inbound call')) {
-            i++;
-            continue;
-          }
-
-          let speaker: 'bot' | 'customer' | null = null;
-          let timestamp: string | undefined = undefined;
-
-          // Check if line starts with "setup user" (bot)
-          if (trimmedLine.toLowerCase().startsWith('setup user')) {
-            speaker = 'bot';
-            const match = trimmedLine.match(/setup\s+user\s+(\d{2}:\d{2}:\d{2})/i);
-            if (match) {
-              timestamp = match[1];
-            }
-          }
-          // Check if line starts with phone number (customer)
-          else if (/^\d{10,}/.test(trimmedLine)) {
-            speaker = 'customer';
-            const match = trimmedLine.match(/^(\d+)\s+(\d{2}:\d{2}:\d{2})/);
-            if (match) {
-              timestamp = match[2];
-            }
-          }
-          // Fallback: old [BOT]/[CUSTOMER] format on same line as text
-          else if (trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i)) {
-            const m = trimmedLine.match(/^\[?(BOT|CUSTOMER|bot|customer)\]?:?\s*(.+)$/i);
-            if (m) {
-              parsedLines.push({
-                speaker: m[1].toLowerCase() as 'bot' | 'customer',
-                text: m[2].trim(),
-              });
-              i++;
-              continue;
-            }
-          }
-
-          // If we found a speaker line, read the message from following lines
-          if (speaker) {
-            i++; // Move to next line
-            const messageLines: string[] = [];
-
-            // Collect all non-empty lines until we hit another speaker line
-            while (i < lines.length) {
-              const nextLine = lines[i].trim();
-
-              // Skip empty lines
-              if (!nextLine) {
-                i++;
-                continue;
-              }
-
-              // Stop if this is a new speaker line
-              if (nextLine.toLowerCase().startsWith('setup user') || /^\d{10,}/.test(nextLine)) {
-                break;
-              }
-
-              messageLines.push(nextLine);
-              i++;
-            }
-
-            // Combine message lines into one text
-            const text = messageLines.join(' ').trim();
-
-            if (text) {
-              parsedLines.push({
-                speaker,
-                text,
-                timestamp,
-              });
-              console.log(`Parsed ${speaker} at ${timestamp}:`, text.substring(0, 50));
-            }
-          } else {
-            // Not a speaker line, skip it
-            if (trimmedLine.length > 0) {
-              console.warn('Line did not match any pattern:', trimmedLine.substring(0, 100));
-            }
-            i++;
-          }
-        }
+        const parsedLines = parseTranscriptText(transcriptText);
+        console.log(`Parsed ${parsedLines.length} lines from ${file.name}`);
 
         if (parsedLines.length > 0) {
           parsedTranscripts.push({
@@ -388,9 +266,11 @@ export function TranscriptInput() {
           if (parsedTranscripts.length === 0) {
             alert(
               `No valid transcripts found in the uploaded file(s).\n\n` +
-              `Expected format:\n` +
-              `• Bot lines: "setup user  HH:MM:SS" on one line, message on the next\n` +
-              `• Customer lines: "91XXXXXXXXXX  HH:MM:SS" (phone number) on one line, message on the next`
+              `Supported formats:\n` +
+              `• [HH:MM] Speaker Name: message\n` +
+              `• [BOT]: message  /  [CUSTOMER]: message\n` +
+              `• setup user HH:MM:SS (then message on next line)\n` +
+              `• 91XXXXXXXXXX HH:MM:SS (phone number, then message on next line)`
             );
           } else {
             setTranscripts(parsedTranscripts);
