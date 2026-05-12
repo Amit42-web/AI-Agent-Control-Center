@@ -1,3 +1,5 @@
+export type FlowType = 'objective' | 'open-ended';
+
 export type CheckType =
   | 'flow_compliance'
   | 'repetition'
