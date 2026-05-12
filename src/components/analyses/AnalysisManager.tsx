@@ -24,7 +24,6 @@ export function AnalysisManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [showNewAnalysisModal, setShowNewAnalysisModal] = useState(false);
   const [newAnalysisName, setNewAnalysisName] = useState('');
-  const [newAnalysisFlowType, setNewAnalysisFlowType] = useState<'objective' | 'open-ended'>('objective');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -52,10 +51,9 @@ export function AnalysisManager() {
       alert('Please enter an analysis name');
       return;
     }
-    createNewAnalysis(newAnalysisName.trim(), newAnalysisFlowType);
+    createNewAnalysis(newAnalysisName.trim());
     setShowNewAnalysisModal(false);
     setNewAnalysisName('');
-    setNewAnalysisFlowType('objective');
   };
 
   const handleLoadAnalysis = async (id: string) => {
@@ -506,35 +504,6 @@ export function AnalysisManager() {
                 className="w-full px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-white placeholder-[var(--color-slate-500)] focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
                 autoFocus
               />
-
-              <p className="text-sm text-[var(--color-slate-300)] mb-3 font-medium">Analysis Type</p>
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <button
-                  type="button"
-                  onClick={() => setNewAnalysisFlowType('objective')}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    newAnalysisFlowType === 'objective'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-[var(--color-navy-700)] bg-[var(--color-navy-800)] hover:border-[var(--color-slate-500)]'
-                  }`}
-                >
-                  <div className="font-semibold text-white text-sm mb-1">Objective</div>
-                  <div className="text-xs text-[var(--color-slate-400)]">Check against a defined script or criteria</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNewAnalysisFlowType('open-ended')}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    newAnalysisFlowType === 'open-ended'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-[var(--color-navy-700)] bg-[var(--color-navy-800)] hover:border-[var(--color-slate-500)]'
-                  }`}
-                >
-                  <div className="font-semibold text-white text-sm mb-1">Open Ended</div>
-                  <div className="text-xs text-[var(--color-slate-400)]">Free-form quality analysis without a fixed script</div>
-                </button>
-              </div>
-
               <div className="flex items-center gap-3">
                 <motion.button
                   className="flex-1 btn-primary"
