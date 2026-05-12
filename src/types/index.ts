@@ -1,5 +1,3 @@
-export type FlowType = 'objective' | 'open-ended';
-
 export type CheckType =
   | 'flow_compliance'
   | 'repetition'
@@ -118,7 +116,6 @@ export interface AnalysisState {
 
 export interface AppState {
   // Input state
-  flowType: FlowType;
   transcripts: Transcript[];
   referenceScript: string;
   referenceEnabled: boolean;
@@ -165,7 +162,7 @@ export interface AppState {
   // Analysis management
   saveAnalysis: (name: string) => Promise<void>;
   loadAnalysis: (id: string) => Promise<void>;
-  createNewAnalysis: (name: string, flowType: FlowType) => void;
+  createNewAnalysis: (name: string) => void;
   getAnalysisState: () => AnalysisState;
   restoreAnalysisState: (state: AnalysisState) => void;
 }
