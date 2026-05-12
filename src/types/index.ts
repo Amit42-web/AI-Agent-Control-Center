@@ -118,6 +118,7 @@ export interface AnalysisState {
 
 export interface AppState {
   // Input state
+  flowType: FlowType;
   transcripts: Transcript[];
   referenceScript: string;
   referenceEnabled: boolean;

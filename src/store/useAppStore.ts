@@ -22,6 +22,7 @@ import { analyzeTranscript, generateFixSuggestions } from '@/services/openai';
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
 const initialState = {
+  flowType: 'objective' as FlowType,
   transcripts: [demoTranscript],
   referenceScript: defaultReferenceScript,
   referenceEnabled: true,
