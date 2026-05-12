@@ -6,6 +6,10 @@ export type CheckType =
   | 'general_quality'
   | string; // Allow custom check IDs
 
+export type FlowType = 'objective' | 'open-ended';
+export type FixType = 'script' | 'training' | 'process' | 'system';
+export type RootCauseType = 'knowledge' | 'instruction' | 'execution' | 'conversation' | 'model';
+
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 
 export type IssueType =
@@ -73,11 +77,52 @@ export interface Fix {
   placementHint: string;
   exampleResponse: string;
   relatedIssueIds: string[];
+  rootCauseType?: RootCauseType;
+  action?: 'add' | 'remove' | 'replace';
+  targetContent?: string;
 }
 
 export interface FixSuggestions {
   scriptFixes: Fix[];
   generalFixes: Fix[];
+}
+
+export interface PromptFix {
+  action: 'add' | 'replace' | 'remove';
+  targetSection: string;
+  lineNumber?: number;
+  exactContent: string;
+  beforeText?: string;
+}
+
+export interface InstructionReference {
+  source: 'script' | 'kb' | 'policy' | 'guideline';
+  documentName?: string;
+  section: string;
+  expectedBehavior: string;
+  actualBehavior: string;
+  confidence?: number;
+}
+
+export interface EnhancedFix {
+  id: string;
+  scenarioId: string;
+  title: string;
+  fixType: FixType;
+  rootCauseType: RootCauseType;
+  rootCause: string;
+  suggestedSolution: string;
+  whereToImplement: string;
+  whatToImplement: string;
+  concreteExample: string | Record<string, unknown>;
+  successCriteria: string;
+  howToTest: string;
+  instructionReference?: InstructionReference;
+  promptFix?: PromptFix;
+}
+
+export interface EnhancedFixSuggestions {
+  fixes: EnhancedFix[];
 }
 
 export interface OpenAIConfig {
@@ -115,6 +160,9 @@ export interface AnalysisState {
 }
 
 export interface AppState {
+  // Flow type
+  flowType: FlowType;
+
   // Input state
   transcripts: Transcript[];
   referenceScript: string;
@@ -135,9 +183,13 @@ export interface AppState {
   currentAnalysisId: string | null;
   currentAnalysisName: string | null;
 
-  // Results state
+  // Results state - Objective flow
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
+
+  // Results state - Open-ended flow
+  enhancedFixes: EnhancedFixSuggestions | null;
+
   selectedCallId: string | null;
 
   // Actions
@@ -162,7 +214,7 @@ export interface AppState {
   // Analysis management
   saveAnalysis: (name: string) => Promise<void>;
   loadAnalysis: (id: string) => Promise<void>;
-  createNewAnalysis: (name: string) => void;
+  createNewAnalysis: (name: string, flowType: FlowType) => void;
   getAnalysisState: () => AnalysisState;
   restoreAnalysisState: (state: AnalysisState) => void;
 }

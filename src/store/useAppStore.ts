@@ -10,6 +10,7 @@ import {
   IssueType,
   Severity,
   DetectedIssue,
+  FlowType,
 } from '@/types';
 import {
   defaultChecks,
@@ -21,6 +22,7 @@ import { analyzeTranscript, generateFixSuggestions } from '@/services/openai';
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
 const initialState = {
+  flowType: 'objective' as FlowType,
   transcripts: [demoTranscript],
   referenceScript: defaultReferenceScript,
   referenceEnabled: true,
@@ -36,6 +38,7 @@ const initialState = {
   currentStep: 'analyses' as const,
   results: null,
   fixes: null,
+  enhancedFixes: null,
   selectedCallId: null,
   currentAnalysisId: null,
   currentAnalysisName: null,
@@ -312,10 +315,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  createNewAnalysis: (name: string) => {
-    // Reset to initial state but keep the name
+  createNewAnalysis: (name: string, flowType: FlowType) => {
     set({
       ...initialState,
+      flowType,
       currentAnalysisId: `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       currentAnalysisName: name,
       currentStep: 'input',
