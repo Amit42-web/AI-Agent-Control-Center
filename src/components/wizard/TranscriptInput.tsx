@@ -279,8 +279,18 @@ export function TranscriptInput() {
         columns.push(currentColumn.trim()); // Add last column
 
         // Extract meeting ID and transcript text
-        let meetingId = columns[0] || `csv-call-${index + 1}`;
-        let transcriptText = columns[1] || columns[0]; // Fallback to first column if no second column
+        let meetingId = `csv-call-${index + 1}`;
+        let transcriptText = '';
+
+        // Handle different CSV formats:
+        // 1. Two columns: meeting_id, transcript
+        // 2. Single column: just transcript (header is "Transcript")
+        if (columns.length >= 2) {
+          meetingId = columns[0] || meetingId;
+          transcriptText = columns[1];
+        } else if (columns.length === 1) {
+          transcriptText = columns[0];
+        }
 
         // Remove surrounding quotes if present
         meetingId = meetingId.replace(/^"(.*)"$/, '$1').trim();
@@ -288,8 +298,14 @@ export function TranscriptInput() {
           transcriptText = transcriptText.slice(1, -1);
         }
 
+        // Handle escaped newlines and quotes
+        transcriptText = transcriptText
+          .replace(/\\n/g, '\n')  // Convert \n to actual newlines
+          .replace(/""/g, '"');    // Convert "" to "
+
         console.log(`\nParsing transcript ${index + 1}:`);
         console.log('Meeting ID:', meetingId);
+        console.log('Transcript length:', transcriptText.length);
         console.log('First 200 chars:', transcriptText.substring(0, 200));
 
         // Multi-format parser supporting various transcript formats
