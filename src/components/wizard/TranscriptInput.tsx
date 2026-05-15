@@ -326,7 +326,42 @@ export function TranscriptInput() {
           let timestamp: string | undefined;
           let messageText = '';
 
-          // FORMAT 1: HH:MM:SS SPEAKER message (new simple format)
+          // FORMAT 1: [HH:MM:SS] or [MM:SS] Speaker Name: message (bracketed timestamp format)
+          const format1Bracketed = trimmedLine.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*([^:]+):\s*(.+)$/);
+          if (format1Bracketed) {
+            timestamp = format1Bracketed[1];
+            const speakerName = format1Bracketed[2].trim().toLowerCase();
+            messageText = format1Bracketed[3].trim();
+
+            // Detect speaker type from name
+            if (speakerName.includes('bot') ||
+                speakerName.includes('agent') ||
+                speakerName.includes('meera') ||
+                speakerName.includes('assistant') ||
+                speakerName.includes('representative') ||
+                speakerName.includes('rep') ||
+                speakerName.includes('support') ||
+                speakerName.includes('operator') ||
+                speakerName.includes('test') || // For "Integration Test Agent"
+                /^[a-z]+\s*r?\d+$/i.test(speakerName)) {
+              speaker = 'agent';
+            } else if (speakerName.includes('customer') ||
+                       speakerName.includes('caller') ||
+                       speakerName.includes('user') ||
+                       speakerName.includes('client')) {
+              speaker = 'customer';
+            } else {
+              speaker = 'customer'; // Default
+            }
+
+            if (messageText && speaker) {
+              parsedLines.push({ speaker, text: messageText, timestamp });
+              console.log(`[CSV Format 1 Bracketed] Parsed ${speaker} (${speakerName}) at ${timestamp}:`, messageText.substring(0, 50));
+            }
+            continue;
+          }
+
+          // FORMAT 2: HH:MM:SS SPEAKER message (simple format)
           const format1 = trimmedLine.match(/^(\d{2}:\d{2}:\d{2})\s+(AGENT|CUSTOMER|BOT|agent|customer|bot)\s+(.+)$/i);
           if (format1) {
             timestamp = format1[1];
