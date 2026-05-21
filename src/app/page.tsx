@@ -245,7 +245,7 @@ function RunningPage() {
 }
 
 function ResultsPage() {
-  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType, resultsViewMode, setResultsViewMode, scenarioResults } = useAppStore();
+  const { goToStep, generateFixes, isRunning, openaiConfig, setOpenAIConfig, flowType, resultsViewMode, setResultsViewMode, scenarioResults, transcripts, results, fixes, enhancedFixes, referenceScript } = useAppStore();
   const [showExportMenu, setShowExportMenu] = React.useState(false);
   const exportMenuRef = React.useRef<HTMLDivElement>(null);
 
