@@ -813,33 +813,65 @@ function addFixesToPDF(doc: jsPDF, fixes: EnhancedFix[]): void {
 
 export async function generateVisualPDF(data: ExportData): Promise<void> {
   try {
+    console.log('[Visual PDF] Starting export...');
+
+    // Wait a moment for any animations/rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Find the aggregate results container in the DOM
     const aggregateContainer = document.querySelector('[data-aggregate-results]') as HTMLElement;
 
     if (!aggregateContainer) {
-      console.error('Aggregate results container not found');
-      throw new Error('Cannot find results view to export');
+      console.error('[Visual PDF] Aggregate results container not found in DOM');
+      console.error('[Visual PDF] Make sure you are in the Overview/Aggregate view, not Detailed view');
+
+      // Fallback to old PDF generation
+      console.log('[Visual PDF] Falling back to chart-based PDF generation');
+      return generateComprehensivePDF(data);
     }
 
-    // Show a loading message (optional)
-    console.log('Capturing results view...');
+    console.log('[Visual PDF] Found container, dimensions:', {
+      width: aggregateContainer.offsetWidth,
+      height: aggregateContainer.offsetHeight
+    });
+
+    // Check if container has content
+    if (aggregateContainer.offsetHeight === 0 || aggregateContainer.offsetWidth === 0) {
+      console.error('[Visual PDF] Container has no dimensions');
+      return generateComprehensivePDF(data);
+    }
+
+    console.log('[Visual PDF] Capturing with html2canvas...');
 
     // Capture the rendered view with html2canvas
     const canvas = await html2canvas(aggregateContainer, {
       scale: 2, // Higher resolution
       backgroundColor: '#0f172a', // Match dark background
-      logging: false,
+      logging: true,
       useCORS: true,
       allowTaint: true,
+      windowWidth: aggregateContainer.scrollWidth,
+      windowHeight: aggregateContainer.scrollHeight,
     });
+
+    console.log('[Visual PDF] Canvas created:', { width: canvas.width, height: canvas.height });
 
     // Create PDF
     const imgData = canvas.toDataURL('image/png');
+
+    // Determine page size based on canvas aspect ratio
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const pdfWidth = 595; // A4 width in points
+    const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+
     const pdf = new jsPDF({
-      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [canvas.width, canvas.height],
+      orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
+      unit: 'pt',
+      format: [pdfWidth, Math.min(pdfHeight, 842 * 5)], // Limit to 5 pages height
     });
+
+    console.log('[Visual PDF] Adding cover page...');
 
     // Add cover page
     pdf.addPage([595, 842], 'portrait'); // A4 size
@@ -902,17 +934,32 @@ export async function generateVisualPDF(data: ExportData): Promise<void> {
     pdf.setTextColor(16, 185, 129); // green-500
     pdf.text(`Health Score: ${healthScore}%`, pageWidth / 2, yPos, { align: 'center' });
 
-    // Add captured image on next page
-    pdf.addPage([canvas.width / 2, canvas.height / 2], 'portrait');
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+    console.log('[Visual PDF] Adding captured image...');
+
+    // Add captured image on next page - fit to page width
+    pdf.addPage([pdfWidth, Math.min(pdfHeight + 40, 842 * 5)], 'portrait');
+    pdf.addImage(imgData, 'PNG', 0, 20, pdfWidth, Math.min(pdfHeight, 842 * 5 - 40));
 
     // Save PDF
     const timestamp = new Date().toISOString().split('T')[0];
+    console.log('[Visual PDF] Saving file...');
     pdf.save(`AI_Agent_Visual_Report_${timestamp}.pdf`);
 
-    console.log('PDF exported successfully');
+    console.log('[Visual PDF] Export completed successfully');
   } catch (error) {
-    console.error('Error generating visual PDF:', error);
-    throw error;
+    console.error('[Visual PDF] Error generating visual PDF:', error);
+    console.error('[Visual PDF] Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
+    // Try fallback to old method
+    console.log('[Visual PDF] Attempting fallback to chart-based PDF...');
+    try {
+      return generateComprehensivePDF(data);
+    } catch (fallbackError) {
+      console.error('[Visual PDF] Fallback also failed:', fallbackError);
+      throw new Error(`PDF export failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure you are viewing the Overview/Aggregate results.`);
+    }
   }
 }
