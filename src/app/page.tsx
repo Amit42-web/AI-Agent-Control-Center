@@ -22,6 +22,7 @@ import { FixesPanel } from '@/components/fixes/FixesPanel';
 import { EnhancedFixesList } from '@/components/fixes/EnhancedFixesList';
 import { AnalysisManager } from '@/components/analyses/AnalysisManager';
 import { AggregateResults } from '@/components/results/AggregateResults';
+import { ComprehensiveExport } from '@/components/results/ComprehensiveExport';
 import { aggregateScenarios } from '@/utils/aggregateScenarios';
 import {
   exportScenariosToCSV,
@@ -468,6 +469,7 @@ function ResultsPage() {
           ) : (
             <>
               <motion.div variants={itemVariants}><AggregateResults /></motion.div>
+              <motion.div variants={itemVariants}><ComprehensiveExport /></motion.div>
               <motion.div variants={itemVariants}><CallViewer /></motion.div>
             </>
           )}
@@ -483,6 +485,7 @@ function ResultsPage() {
           ) : (
             <>
               <motion.div variants={itemVariants}><AggregateResults /></motion.div>
+              <motion.div variants={itemVariants}><ComprehensiveExport /></motion.div>
               <motion.div variants={itemVariants}><CallViewer /></motion.div>
             </>
           )}
