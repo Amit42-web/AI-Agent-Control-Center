@@ -464,6 +464,7 @@ function ResultsPage() {
               <motion.div variants={itemVariants}><KPICards /></motion.div>
               <motion.div variants={itemVariants}><Charts /></motion.div>
               <motion.div variants={itemVariants}><IssueTable /></motion.div>
+              <motion.div variants={itemVariants}><ComprehensiveExport /></motion.div>
               <motion.div variants={itemVariants}><CallViewer /></motion.div>
             </>
           ) : (
@@ -480,6 +481,7 @@ function ResultsPage() {
           {resultsViewMode === 'detailed' ? (
             <>
               <motion.div variants={itemVariants}><ScenarioTable /></motion.div>
+              <motion.div variants={itemVariants}><ComprehensiveExport /></motion.div>
               <motion.div variants={itemVariants}><CallViewer /></motion.div>
             </>
           ) : (
