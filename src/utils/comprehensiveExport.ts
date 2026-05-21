@@ -381,6 +381,92 @@ function generateMetricsDashboard(data: ExportData): XLSX.WorkSheet {
 
 // ============= PDF EXPORT =============
 
+// Helper function to draw pie chart
+function drawPieChart(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  radius: number,
+  data: { label: string; value: number; color: string }[]
+): void {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  let startAngle = -90; // Start from top
+
+  data.forEach((item) => {
+    const sliceAngle = (item.value / total) * 360;
+    const endAngle = startAngle + sliceAngle;
+
+    // Draw slice
+    doc.setFillColor(item.color);
+    doc.circle(x, y, radius, 'F');
+
+    // Draw arc (simplified as circle for each segment)
+    const startRad = (startAngle * Math.PI) / 180;
+    const endRad = (endAngle * Math.PI) / 180;
+
+    // Create pie slice path
+    doc.setFillColor(item.color);
+    const segments = 20;
+    const angleStep = (endAngle - startAngle) / segments;
+
+    for (let i = 0; i <= segments; i++) {
+      const angle = startAngle + i * angleStep;
+      const rad = (angle * Math.PI) / 180;
+      const px = x + radius * Math.cos(rad);
+      const py = y + radius * Math.sin(rad);
+
+      if (i === 0) {
+        doc.moveTo(x, y);
+        doc.lineTo(px, py);
+      } else {
+        doc.lineTo(px, py);
+      }
+    }
+    doc.lineTo(x, y);
+
+    startAngle = endAngle;
+  });
+}
+
+// Helper function to draw bar chart
+function drawBarChart(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  data: { label: string; value: number; color: string }[],
+  maxValue?: number
+): void {
+  const max = maxValue || Math.max(...data.map((d) => d.value));
+  const barWidth = width / data.length - 5;
+  const labelHeight = 15;
+
+  data.forEach((item, index) => {
+    const barHeight = (item.value / max) * (height - labelHeight);
+    const barX = x + index * (barWidth + 5);
+    const barY = y + height - barHeight - labelHeight;
+
+    // Draw bar
+    doc.setFillColor(item.color);
+    doc.rect(barX, barY, barWidth, barHeight, 'F');
+
+    // Draw value on top
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(item.value.toString(), barX + barWidth / 2, barY - 2, { align: 'center' });
+
+    // Draw label
+    doc.setFontSize(7);
+    doc.text(item.label.substring(0, 10), barX + barWidth / 2, y + height, {
+      align: 'center',
+      maxWidth: barWidth,
+    });
+  });
+
+  doc.setTextColor(0, 0, 0); // Reset color
+}
+
 export function generateComprehensivePDF(data: ExportData): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -414,9 +500,9 @@ export function generateComprehensivePDF(data: ExportData): void {
 
   const healthScore = totalCalls > 0 ? Math.round(((totalCalls - callsWithIssues) / totalCalls) * 100) : 0;
 
-  // Executive Summary
+  // Executive Summary Box
   doc.setFillColor(240, 240, 250);
-  doc.rect(20, yPos, pageWidth - 40, 60, 'F');
+  doc.rect(20, yPos, pageWidth - 40, 70, 'F');
 
   yPos += 10;
   doc.setFontSize(10);
@@ -426,27 +512,27 @@ export function generateComprehensivePDF(data: ExportData): void {
   yPos += 8;
   doc.text(`Total Calls Analyzed: ${totalCalls}`, 25, yPos);
   yPos += 8;
-  doc.text(`Calls with Issues: ${callsWithIssues}`, 25, yPos);
+  doc.text(`Calls with Issues: ${callsWithIssues} (${Math.round((callsWithIssues / totalCalls) * 100)}%)`, 25, yPos);
+  yPos += 8;
+  doc.text(`Clean Calls: ${totalCalls - callsWithIssues} (${Math.round(((totalCalls - callsWithIssues) / totalCalls) * 100)}%)`, 25, yPos);
   yPos += 8;
   doc.text(`Total Issues/Scenarios: ${totalIssues}`, 25, yPos);
   yPos += 8;
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
   doc.text(`Overall Health Score: ${healthScore}%`, 25, yPos);
   doc.setFont('helvetica', 'normal');
 
-  // Add charts/visualizations
+  // Add charts page
   doc.addPage();
-  yPos = 20;
+  addChartsPage(doc, data);
 
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Analysis Overview', 20, yPos);
-  yPos += 15;
-
-  // Add tables for detailed data
+  // Add detailed data tables
   if (data.flowType === 'open-ended' && data.scenarioResults) {
+    doc.addPage();
     addScenariosToPDF(doc, data.scenarioResults.scenarios);
   } else if (data.flowType === 'objective' && data.results) {
+    doc.addPage();
     addIssuesToPDF(doc, data.results);
   }
 
@@ -459,6 +545,190 @@ export function generateComprehensivePDF(data: ExportData): void {
   // Save PDF
   const timestamp = new Date().toISOString().split('T')[0];
   doc.save(`AI_Agent_Analysis_Report_${timestamp}.pdf`);
+}
+
+function addChartsPage(doc: jsPDF, data: ExportData): void {
+  const pageWidth = doc.internal.pageSize.width;
+  let yPos = 20;
+
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Visual Analytics', 20, yPos);
+  yPos += 15;
+
+  if (data.flowType === 'open-ended' && data.scenarioResults) {
+    const scenarios = data.scenarioResults.scenarios;
+
+    // Severity Distribution Pie Chart
+    doc.setFontSize(12);
+    doc.text('Severity Distribution', 20, yPos);
+    const severityData = calculateSeverityDistribution(scenarios);
+    drawSimplePieChart(doc, 60, yPos + 10, severityData);
+    yPos += 60;
+
+    // RCA Category Distribution
+    doc.setFontSize(12);
+    doc.text('Root Cause Categories', 20, yPos);
+    const rcaData = calculateRCADistribution(scenarios);
+    drawSimplePieChart(doc, 60, yPos + 10, rcaData);
+    yPos += 60;
+
+    // Top Issues Bar Chart
+    if (data.aggregatedScenarios && data.aggregatedScenarios.length > 0) {
+      doc.setFontSize(12);
+      doc.text('Top Issues by Occurrence', 20, yPos);
+      const topIssues = data.aggregatedScenarios
+        .sort((a, b) => b.occurrences - a.occurrences)
+        .slice(0, 5);
+      drawHorizontalBars(doc, 20, yPos + 5, topIssues);
+    }
+  } else if (data.flowType === 'objective' && data.results) {
+    // Issue Type Distribution
+    doc.setFontSize(12);
+    doc.text('Issue Type Distribution', 20, yPos);
+    const issueTypeData = Object.entries(data.results.issuesByType).map(([type, count]) => ({
+      label: type.replace('_', ' '),
+      value: count,
+      percentage: ((count / data.results!.issues.length) * 100).toFixed(1),
+    }));
+    drawSimplePieChart(doc, 60, yPos + 10, issueTypeData);
+    yPos += 60;
+
+    // Severity Distribution
+    doc.setFontSize(12);
+    doc.text('Severity Distribution', 20, yPos);
+    const severityData = Object.entries(data.results.severityDistribution).map(([severity, count]) => ({
+      label: severity,
+      value: count,
+      percentage: ((count / data.results!.issues.length) * 100).toFixed(1),
+    }));
+    drawSimplePieChart(doc, 60, yPos + 10, severityData);
+  }
+}
+
+function calculateSeverityDistribution(scenarios: any[]): any[] {
+  const dist: Record<string, number> = {};
+  scenarios.forEach((s) => {
+    dist[s.severity] = (dist[s.severity] || 0) + 1;
+  });
+
+  const colors: Record<string, string> = {
+    critical: '#ef4444',
+    high: '#f97316',
+    medium: '#eab308',
+    low: '#22c55e',
+  };
+
+  return Object.entries(dist).map(([severity, count]) => ({
+    label: severity,
+    value: count,
+    percentage: ((count / scenarios.length) * 100).toFixed(1),
+    color: colors[severity] || '#6b7280',
+  }));
+}
+
+function calculateRCADistribution(scenarios: any[]): any[] {
+  const dist: Record<string, number> = {};
+  scenarios.forEach((s) => {
+    const rca = s.rootCauseType || 'Unknown';
+    dist[rca] = (dist[rca] || 0) + 1;
+  });
+
+  const colors: Record<string, string> = {
+    knowledge: '#eab308',
+    instruction: '#06b6d4',
+    execution: '#f97316',
+    conversation: '#8b5cf6',
+    model: '#10b981',
+    Unknown: '#6b7280',
+  };
+
+  return Object.entries(dist).map(([rca, count]) => ({
+    label: rca,
+    value: count,
+    percentage: ((count / scenarios.length) * 100).toFixed(1),
+    color: colors[rca] || '#6b7280',
+  }));
+}
+
+function drawSimplePieChart(doc: jsPDF, centerX: number, centerY: number, data: any[]): void {
+  const radius = 25;
+  const legendX = centerX + radius + 15;
+  let legendY = centerY - radius;
+
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  let startAngle = 0;
+
+  // Draw pie slices
+  data.forEach((item) => {
+    const sliceAngle = (item.value / total) * 360;
+    const endAngle = startAngle + sliceAngle;
+
+    // Convert hex color to RGB
+    const r = parseInt(item.color.slice(1, 3), 16);
+    const g = parseInt(item.color.slice(3, 5), 16);
+    const b = parseInt(item.color.slice(5, 7), 16);
+
+    doc.setFillColor(r, g, b);
+
+    // Draw arc as a series of triangles
+    const segments = Math.max(2, Math.ceil(sliceAngle / 10));
+    for (let i = 0; i < segments; i++) {
+      const angle1 = startAngle + (i * sliceAngle) / segments;
+      const angle2 = startAngle + ((i + 1) * sliceAngle) / segments;
+
+      const x1 = centerX + radius * Math.cos((angle1 * Math.PI) / 180);
+      const y1 = centerY + radius * Math.sin((angle1 * Math.PI) / 180);
+      const x2 = centerX + radius * Math.cos((angle2 * Math.PI) / 180);
+      const y2 = centerY + radius * Math.sin((angle2 * Math.PI) / 180);
+
+      doc.triangle(centerX, centerY, x1, y1, x2, y2, 'F');
+    }
+
+    startAngle = endAngle;
+  });
+
+  // Draw legend
+  data.forEach((item, index) => {
+    const y = legendY + index * 8;
+
+    // Color box
+    const r = parseInt(item.color.slice(1, 3), 16);
+    const g = parseInt(item.color.slice(3, 5), 16);
+    const b = parseInt(item.color.slice(5, 7), 16);
+    doc.setFillColor(r, g, b);
+    doc.rect(legendX, y - 3, 4, 4, 'F');
+
+    // Label
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${item.label}: ${item.value} (${item.percentage}%)`, legendX + 6, y);
+  });
+}
+
+function drawHorizontalBars(doc: jsPDF, x: number, y: number, data: any[]): void {
+  const maxWidth = 120;
+  const barHeight = 8;
+  const spacing = 12;
+  const maxValue = Math.max(...data.map((d) => d.occurrences));
+
+  data.forEach((item, index) => {
+    const barY = y + index * spacing;
+    const barWidth = (item.occurrences / maxValue) * maxWidth;
+
+    // Draw bar
+    doc.setFillColor(100, 150, 230);
+    doc.rect(x + 60, barY, barWidth, barHeight, 'F');
+
+    // Draw label
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    const label = item.title.substring(0, 25) + (item.title.length > 25 ? '...' : '');
+    doc.text(label, x, barY + 5);
+
+    // Draw value
+    doc.text(item.occurrences.toString(), x + 62 + barWidth, barY + 5);
+  });
 }
 
 function addScenariosToPDF(doc: jsPDF, scenarios: Scenario[]): void {
