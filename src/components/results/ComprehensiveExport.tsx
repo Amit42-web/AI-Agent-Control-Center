@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { generateComprehensiveExcel, generateComprehensivePDF } from '@/utils/comprehensiveExport';
+import { generateComprehensiveExcel, generateVisualPDF } from '@/utils/comprehensiveExport';
 import { AggregatedScenario } from '@/utils/aggregateScenarios';
 
 interface ComprehensiveExportProps {
@@ -48,7 +48,7 @@ export function ComprehensiveExport({ aggregatedScenarios }: ComprehensiveExport
   const handlePDFExport = async () => {
     setIsExporting(true);
     try {
-      generateComprehensivePDF({
+      await generateVisualPDF({
         flowType,
         transcripts,
         results,

@@ -270,23 +270,28 @@ function ResultsPage() {
     generateFixes();
   };
 
-  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (format === 'pdf') {
-      // Use comprehensive PDF export
-      const { generateComprehensivePDF } = require('@/utils/comprehensiveExport');
+      // Use visual PDF export (captures rendered view)
+      const { generateVisualPDF } = require('@/utils/comprehensiveExport');
       const aggregated = scenarioResults ? aggregateScenarios(scenarioResults.scenarios) : [];
 
-      generateComprehensivePDF({
-        flowType,
-        transcripts,
-        results,
-        fixes,
-        scenarioResults,
-        enhancedFixes,
-        aggregatedScenarios: aggregated,
-        analysisDate: new Date().toLocaleString(),
-        referenceScript,
-      });
+      try {
+        await generateVisualPDF({
+          flowType,
+          transcripts,
+          results,
+          fixes,
+          scenarioResults,
+          enhancedFixes,
+          aggregatedScenarios: aggregated,
+          analysisDate: new Date().toLocaleString(),
+          referenceScript,
+        });
+      } catch (error) {
+        console.error('PDF export failed:', error);
+        alert('Failed to export PDF. Please try again.');
+      }
       setShowExportMenu(false);
       return;
     }

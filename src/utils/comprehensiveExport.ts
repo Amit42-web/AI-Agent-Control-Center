@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import {
   AnalysisResult,
   Scenario,
@@ -806,4 +807,112 @@ function addFixesToPDF(doc: jsPDF, fixes: EnhancedFix[]): void {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Showing top 15 of ${fixes.length} recommendations`, 20, finalY + 10);
+}
+
+// ============= NEW VISUAL PDF EXPORT (HTML to PDF) =============
+
+export async function generateVisualPDF(data: ExportData): Promise<void> {
+  try {
+    // Find the aggregate results container in the DOM
+    const aggregateContainer = document.querySelector('[data-aggregate-results]') as HTMLElement;
+
+    if (!aggregateContainer) {
+      console.error('Aggregate results container not found');
+      throw new Error('Cannot find results view to export');
+    }
+
+    // Show a loading message (optional)
+    console.log('Capturing results view...');
+
+    // Capture the rendered view with html2canvas
+    const canvas = await html2canvas(aggregateContainer, {
+      scale: 2, // Higher resolution
+      backgroundColor: '#0f172a', // Match dark background
+      logging: false,
+      useCORS: true,
+      allowTaint: true,
+    });
+
+    // Create PDF
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [canvas.width, canvas.height],
+    });
+
+    // Add cover page
+    pdf.addPage([595, 842], 'portrait'); // A4 size
+    pdf.setPage(1);
+
+    const pageWidth = pdf.internal.pageSize.width;
+    let yPos = 100;
+
+    // Title
+    pdf.setFontSize(32);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('AI Agent Control Center', pageWidth / 2, yPos, { align: 'center' });
+
+    yPos += 25;
+    pdf.setFontSize(20);
+    pdf.text('Visual Analysis Report', pageWidth / 2, yPos, { align: 'center' });
+
+    // Executive Summary Box
+    yPos += 40;
+    const boxWidth = 400;
+    const boxX = (pageWidth - boxWidth) / 2;
+
+    pdf.setFillColor(30, 41, 59); // slate-800
+    pdf.roundedRect(boxX, yPos, boxWidth, 200, 8, 8, 'F');
+
+    yPos += 25;
+    pdf.setFontSize(14);
+    pdf.setTextColor(148, 163, 184); // slate-400
+
+    const totalCalls = data.transcripts.length;
+    let totalIssues = 0;
+    let callsWithIssues = 0;
+
+    if (data.flowType === 'open-ended' && data.scenarioResults) {
+      totalIssues = data.scenarioResults.scenarios.length;
+      callsWithIssues = new Set(data.scenarioResults.scenarios.map(s => s.callId)).size;
+    } else if (data.flowType === 'objective' && data.results) {
+      totalIssues = data.results.issues.length;
+      callsWithIssues = data.results.callsWithIssues;
+    }
+
+    const healthScore = totalCalls > 0 ? Math.round(((totalCalls - callsWithIssues) / totalCalls) * 100) : 0;
+
+    pdf.text(`Date: ${data.analysisDate || new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 20;
+    pdf.text(`Flow Type: ${data.flowType === 'open-ended' ? 'Open-Ended Analysis' : 'Objective Checks'}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 25;
+
+    pdf.setFontSize(16);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(`Total Calls: ${totalCalls}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 20;
+    pdf.text(`Calls with Issues: ${callsWithIssues}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 20;
+    pdf.text(`Total Scenarios: ${totalIssues}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 30;
+
+    pdf.setFontSize(24);
+    pdf.setTextColor(16, 185, 129); // green-500
+    pdf.text(`Health Score: ${healthScore}%`, pageWidth / 2, yPos, { align: 'center' });
+
+    // Add captured image on next page
+    pdf.addPage([canvas.width / 2, canvas.height / 2], 'portrait');
+    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+
+    // Save PDF
+    const timestamp = new Date().toISOString().split('T')[0];
+    pdf.save(`AI_Agent_Visual_Report_${timestamp}.pdf`);
+
+    console.log('PDF exported successfully');
+  } catch (error) {
+    console.error('Error generating visual PDF:', error);
+    throw error;
+  }
 }
