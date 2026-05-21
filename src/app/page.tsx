@@ -272,6 +272,14 @@ function ResultsPage() {
 
   const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (format === 'pdf') {
+      // For visual PDF export, ensure we're in overview mode
+      if (resultsViewMode !== 'overview') {
+        console.log('[PDF Export] Switching to overview mode for visual capture');
+        setResultsViewMode('overview');
+        // Wait for the view to render
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       // Use visual PDF export (captures rendered view)
       const { generateVisualPDF } = require('@/utils/comprehensiveExport');
       const aggregated = scenarioResults ? aggregateScenarios(scenarioResults.scenarios) : [];
