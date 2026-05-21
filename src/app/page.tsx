@@ -270,7 +270,27 @@ function ResultsPage() {
     generateFixes();
   };
 
-  const handleExport = (format: 'csv' | 'excel') => {
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+    if (format === 'pdf') {
+      // Use comprehensive PDF export
+      const { generateComprehensivePDF } = require('@/utils/comprehensiveExport');
+      const aggregated = scenarioResults ? aggregateScenarios(scenarioResults.scenarios) : [];
+
+      generateComprehensivePDF({
+        flowType,
+        transcripts,
+        results,
+        fixes,
+        scenarioResults,
+        enhancedFixes,
+        aggregatedScenarios: aggregated,
+        analysisDate: new Date().toLocaleString(),
+        referenceScript,
+      });
+      setShowExportMenu(false);
+      return;
+    }
+
     if (!scenarioResults || !scenarioResults.scenarios) return;
 
     const scenarios = scenarioResults.scenarios;
@@ -422,6 +442,13 @@ function ResultsPage() {
                     >
                       <Download className="w-4 h-4" />
                       Download Excel
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-[var(--color-navy-700)] transition-colors flex items-center gap-2"
+                      onClick={() => handleExport('pdf')}
+                    >
+                      <Download className="w-4 h-4" />
+                      Download PDF
                     </button>
                   </div>
                 </motion.div>
