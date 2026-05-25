@@ -145,8 +145,8 @@ export function TranscriptInput() {
               message: `Failed to read ${filesWithErrors} CSV file${filesWithErrors !== 1 ? 's' : ''}. Please try again or select different files.`
             });
           } else {
-            // Combine existing transcripts with newly parsed ones
-            const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
+            // Replace existing transcripts with newly parsed ones
+            const combinedTranscripts = [...allParsedTranscripts];
             deduplicateTranscripts(combinedTranscripts).then((finalTranscripts) => {
               setTranscripts(finalTranscripts);
               setUploadStatus({
