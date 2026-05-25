@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Upload, RotateCcw, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Upload, RotateCcw, Download, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { demoTranscript, demoCSVContent } from '@/data/demoData';
 import { deduplicateTranscriptLines } from '@/services/openai';
@@ -145,8 +145,8 @@ export function TranscriptInput() {
               message: `Failed to read ${filesWithErrors} CSV file${filesWithErrors !== 1 ? 's' : ''}. Please try again or select different files.`
             });
           } else {
-            // Replace existing transcripts with newly parsed ones
-            const combinedTranscripts = [...allParsedTranscripts];
+            // Combine existing transcripts with newly parsed ones
+            const combinedTranscripts = [...transcripts, ...allParsedTranscripts];
             deduplicateTranscripts(combinedTranscripts).then((finalTranscripts) => {
               setTranscripts(finalTranscripts);
               setUploadStatus({
@@ -1037,23 +1037,48 @@ export function TranscriptInput() {
 
               {transcripts.length > 0 && (
                 <div className="glass-card-subtle p-4">
-                  <p className="text-sm text-green-400 mb-2">
-                    Loaded {transcripts.length} calls
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {transcripts.slice(0, 5).map((t) => (
-                      <span
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-green-400">
+                      Loaded {transcripts.length} call{transcripts.length !== 1 ? 's' : ''}
+                    </p>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to remove all transcripts?')) {
+                          setTranscripts([]);
+                          setUploadStatus({ type: 'success', message: 'All transcripts removed' });
+                        }
+                      }}
+                      className="text-xs text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" />
+                      Remove All
+                    </button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {transcripts.map((t) => (
+                      <div
                         key={t.id}
-                        className="px-3 py-1 bg-[var(--color-navy-700)] rounded-full text-xs text-[var(--color-slate-300)]"
+                        className="flex items-center justify-between px-3 py-2 bg-[var(--color-navy-700)] rounded-lg hover:bg-[var(--color-navy-600)] transition-colors group"
                       >
-                        {t.id}
-                      </span>
+                        <span className="text-xs text-[var(--color-slate-300)] truncate flex-1">
+                          {t.id}
+                        </span>
+                        <button
+                          onClick={() => {
+                            const updated = transcripts.filter(transcript => transcript.id !== t.id);
+                            setTranscripts(updated);
+                            setUploadStatus({
+                              type: 'success',
+                              message: `Removed transcript: ${t.id}. ${updated.length} transcript${updated.length !== 1 ? 's' : ''} remaining.`
+                            });
+                          }}
+                          className="ml-2 p-1 rounded hover:bg-rose-500/20 text-[var(--color-slate-400)] hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Remove this transcript"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     ))}
-                    {transcripts.length > 5 && (
-                      <span className="px-3 py-1 bg-[var(--color-navy-700)] rounded-full text-xs text-[var(--color-slate-400)]">
-                        +{transcripts.length - 5} more
-                      </span>
-                    )}
                   </div>
                 </div>
               )}
