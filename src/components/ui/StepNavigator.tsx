@@ -9,6 +9,7 @@ const steps = [
   { id: 'input', label: 'Configure', icon: FileText },
   { id: 'results', label: 'Results', icon: BarChart3 },
   { id: 'fixes', label: 'Fixes', icon: Wrench },
+  { id: 'progress', label: 'Progress', icon: TrendingUp },
 ] as const;
 
 export function StepNavigator() {
@@ -21,6 +22,7 @@ export function StepNavigator() {
     if (stepId === 'input') return 'accessible';
     if (stepId === 'results') return (results || scenarioResults) ? 'accessible' : 'locked';
     if (stepId === 'fixes') return (fixes || enhancedFixes) ? 'accessible' : 'locked';
+    if (stepId === 'progress') return (fixes || enhancedFixes) ? 'accessible' : 'locked';
     return 'locked';
   };
 
@@ -85,7 +87,8 @@ export function StepNavigator() {
           const isAccessible = status === 'accessible';
           const isCompleted =
             (step.id === 'input' && (results || scenarioResults)) ||
-            (step.id === 'results' && (fixes || enhancedFixes));
+            (step.id === 'results' && (fixes || enhancedFixes)) ||
+            (step.id === 'fixes' && currentStep === 'progress');
 
           return (
             <div key={step.id} className="flex items-center flex-1">
@@ -123,6 +126,7 @@ export function StepNavigator() {
                     {step.id === 'input' && 'Setup analysis'}
                     {step.id === 'results' && 'View insights'}
                     {step.id === 'fixes' && 'Get solutions'}
+                    {step.id === 'progress' && 'Track improvement'}
                   </p>
                 </div>
               </button>

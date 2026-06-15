@@ -102,6 +102,7 @@ const initialState = {
   selectedDimension: null,
   currentAnalysisId: null,
   currentAnalysisName: null,
+  fixesApplied: false,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -460,6 +461,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedDimension: (dimension: string | null) => set({ selectedDimension: dimension }),
 
+  markFixesApplied: async () => {
+    set({ fixesApplied: true });
+    const state = get();
+    // Auto-save so the flag is persisted in the DB
+    if (state.currentAnalysisName) {
+      await get().saveAnalysis(state.currentAnalysisName);
+    }
+    get().goToStep('progress');
+  },
+
   goToStep: (step) => {
     // Update the state
     set({ currentStep: step });
@@ -494,6 +505,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       scenarioResults: state.scenarioResults,
       enhancedFixes: state.enhancedFixes,
       selectedCallId: state.selectedCallId,
+      fixesApplied: state.fixesApplied,
     };
   },
 
@@ -514,6 +526,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       scenarioResults: analysisState.scenarioResults,
       enhancedFixes: analysisState.enhancedFixes,
       selectedCallId: analysisState.selectedCallId,
+      fixesApplied: analysisState.fixesApplied || false,
       currentStep: analysisState.enhancedFixes || analysisState.consolidatedFixes || analysisState.fixes
         ? 'fixes'
         : analysisState.scenarioResults || analysisState.results
@@ -523,15 +536,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createNewAnalysis: (name: string, flowType, auditPrompt?: string) => {
-    // Reset to initial state but keep the name and flowType
     set({
       ...initialState,
       flowType,
       currentAnalysisId: `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       currentAnalysisName: name,
       currentStep: 'input',
-      // If auditPrompt is provided, use it; otherwise use initialState's auditPrompt
       auditPrompt: auditPrompt !== undefined ? auditPrompt : initialState.auditPrompt,
+      fixesApplied: false,
     });
   },
 

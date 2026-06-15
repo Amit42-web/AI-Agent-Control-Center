@@ -20,6 +20,7 @@ import { ScenarioTable } from '@/components/results/ScenarioTable';
 import { CallViewer } from '@/components/results/CallViewer';
 import { FixesPanel } from '@/components/fixes/FixesPanel';
 import { EnhancedFixesList } from '@/components/fixes/EnhancedFixesList';
+import { ProgressPanel } from '@/components/progress/ProgressPanel';
 import { AnalysisManager } from '@/components/analyses/AnalysisManager';
 import { AggregateResults } from '@/components/results/AggregateResults';
 import { ComprehensiveExport } from '@/components/results/ComprehensiveExport';
@@ -33,7 +34,7 @@ import {
   downloadExcel,
   generateExportFilename
 } from '@/utils/exportUtils';
-import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid, Download, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid, Download, ChevronDown, CheckCircle2, TrendingUp } from 'lucide-react';
 
 function RunWizardPage() {
   const { flowType, goToStep } = useAppStore();
@@ -538,7 +539,102 @@ function ResultsPage() {
 }
 
 function FixesPage() {
-  const { goToStep, flowType } = useAppStore();
+  const { goToStep, flowType, fixesApplied, markFixesApplied, isRunning, currentAnalysisName, saveAnalysis } = useAppStore();
+  const [isMarkingApplied, setIsMarkingApplied] = React.useState(false);
+
+  const handleMarkApplied = async () => {
+    setIsMarkingApplied(true);
+    try {
+      await markFixesApplied();
+    } finally {
+      setIsMarkingApplied(false);
+    }
+  };
+
+  return (
+    <motion.div
+      className="space-y-8"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ type: 'spring', damping: 20 }}
+    >
+      <motion.div
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <div className="flex items-center gap-3">
+          <motion.button
+            className="btn-secondary flex items-center gap-2"
+            onClick={() => goToStep('results')}
+            whileHover={{ scale: 1.05, x: -5 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Results
+          </motion.button>
+          <motion.button
+            className="btn-secondary flex items-center gap-2"
+            onClick={() => goToStep('input')}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Start New Run
+          </motion.button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {fixesApplied ? (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+              <CheckCircle2 className="w-4 h-4" />
+              Fixes marked as applied
+            </div>
+          ) : (
+            <motion.button
+              className="btn-secondary flex items-center gap-2 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              onClick={handleMarkApplied}
+              disabled={isMarkingApplied}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              title="Mark these fixes as applied and save this run as a baseline for future comparisons"
+            >
+              {isMarkingApplied ? (
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                  <Sparkles className="w-4 h-4" />
+                </motion.div>
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Mark as Applied
+            </motion.button>
+          )}
+          <motion.button
+            className="btn-primary flex items-center gap-2"
+            onClick={() => goToStep('progress')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <TrendingUp className="w-4 h-4" />
+            View Progress
+          </motion.button>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        {flowType === 'objective' ? <FixesPanel /> : <EnhancedFixesList />}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ProgressPage() {
+  const { goToStep } = useAppStore();
 
   return (
     <motion.div
@@ -556,20 +652,12 @@ function FixesPage() {
       >
         <motion.button
           className="btn-secondary flex items-center gap-2"
-          onClick={() => goToStep('results')}
+          onClick={() => goToStep('fixes')}
           whileHover={{ scale: 1.05, x: -5 }}
           whileTap={{ scale: 0.95 }}
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Results
-        </motion.button>
-        <motion.button
-          className="btn-secondary flex items-center gap-2"
-          onClick={() => goToStep('input')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Start New Run
+          Back to Fixes
         </motion.button>
       </motion.div>
 
@@ -578,7 +666,7 @@ function FixesPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        {flowType === 'objective' ? <FixesPanel /> : <EnhancedFixesList />}
+        <ProgressPanel />
       </motion.div>
     </motion.div>
   );
@@ -623,6 +711,7 @@ export default function Home() {
             {currentStep === 'running' && <RunningPage key="running" />}
             {currentStep === 'results' && <ResultsPage key="results" />}
             {currentStep === 'fixes' && <FixesPage key="fixes" />}
+            {currentStep === 'progress' && <ProgressPage key="progress" />}
           </AnimatePresence>
         </div>
       </main>

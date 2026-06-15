@@ -248,6 +248,7 @@ export interface AnalysisState {
   scenarioResults: ScenarioResults | null; // For open-ended flow
   enhancedFixes: EnhancedFixSuggestions | null; // For open-ended flow
   selectedCallId: string | null;
+  fixesApplied?: boolean; // Whether fixes from this run have been applied
 }
 
 export type ResultsViewMode = 'detailed' | 'overview';
@@ -279,7 +280,7 @@ export interface AppState {
   // Run state
   isRunning: boolean;
   runProgress: number;
-  currentStep: 'analyses' | 'input' | 'running' | 'results' | 'fixes';
+  currentStep: 'analyses' | 'input' | 'running' | 'results' | 'fixes' | 'progress';
 
   // Analysis management
   currentAnalysisId: string | null;
@@ -297,6 +298,7 @@ export interface AppState {
   selectedCallId: string | null;
   selectedIssueId: string | null; // For highlighting specific issue in CallViewer
   selectedDimension: string | null; // For filtering scenarios by dimension
+  fixesApplied: boolean; // Whether fixes from this run have been marked as applied
 
   // Actions
   setFlowType: (flowType: FlowType) => void;
@@ -321,7 +323,9 @@ export interface AppState {
   generateFixes: () => void;
   setSelectedCallId: (id: string | null) => void;
   setSelectedIssueId: (id: string | null) => void;
-  goToStep: (step: 'analyses' | 'input' | 'running' | 'results' | 'fixes') => void;
+  goToStep: (step: 'analyses' | 'input' | 'running' | 'results' | 'fixes' | 'progress') => void;
+
+  markFixesApplied: () => Promise<void>;
 
   // Analysis management
   saveAnalysis: (name: string) => Promise<void>;
