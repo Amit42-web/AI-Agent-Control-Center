@@ -8,10 +8,13 @@ import {
   X,
   Copy,
   Check,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { EnhancedFixCard } from './EnhancedFixCard';
 import { FixType, RootCauseType } from '@/types';
+import { generateFixesExcel, generateFixesPDF } from '@/utils/fixesExport';
 
 const fixTypeLabels: Record<FixType, string> = {
   script: 'Script/Prompt',
@@ -173,6 +176,75 @@ export function EnhancedFixesList() {
           <span className="text-sm text-[var(--color-slate-400)]">
             {filteredFixes.length} fix{filteredFixes.length !== 1 ? 'es' : ''}
           </span>
+        </div>
+      </motion.div>
+
+      {/* Comprehensive Report Download */}
+      <motion.div
+        className="glass-card p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Download Comprehensive Fixes Report
+            </h3>
+            <p className="text-sm text-[var(--color-slate-400)] mt-1">
+              Complete report with all {enhancedFixes.fixes.length} fixes, implementation details, and action plan
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Excel Report */}
+          <button
+            onClick={() => {
+              generateFixesExcel({
+                fixes: enhancedFixes.fixes,
+                analysisDate: new Date().toLocaleString(),
+                referenceScript,
+              });
+            }}
+            className="btn-primary flex items-center justify-center gap-3 p-4"
+          >
+            <FileSpreadsheet className="w-5 h-5" />
+            <div className="text-left flex-1">
+              <div className="font-semibold">Excel Report (.xlsx)</div>
+              <div className="text-xs opacity-80">
+                5 sheets: Summary, Detailed Fixes, By RCA, By Type, Implementation Plan
+              </div>
+            </div>
+          </button>
+
+          {/* PDF Report */}
+          <button
+            onClick={() => {
+              generateFixesPDF({
+                fixes: enhancedFixes.fixes,
+                analysisDate: new Date().toLocaleString(),
+                referenceScript,
+              });
+            }}
+            className="btn-secondary flex items-center justify-center gap-3 p-4"
+          >
+            <FileText className="w-5 h-5" />
+            <div className="text-left flex-1">
+              <div className="font-semibold">PDF Report (.pdf)</div>
+              <div className="text-xs opacity-80">
+                Printable report with detailed fixes and implementation plan
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <p className="text-xs text-blue-300">
+            <strong>What's included:</strong> Root cause analysis, suggested solutions, implementation locations,
+            concrete examples, success criteria, testing methods, and prioritized action plan.
+          </p>
         </div>
       </motion.div>
 
