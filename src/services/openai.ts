@@ -825,6 +825,7 @@ Return a JSON array — one object per RCA category that has issues:
 - context = reference the actual transcript evidence (e.g. "Bot said X when script requires Y")
 - Match the script's exact language, alphabet, and formatting style
 - Do NOT repeat the same change across categories
+- 🚫 DO NOT add generic or structural improvements that are not backed by specific evidence in the issues list. Every single change must map to at least one issue ID in relatedIssueIds. If you cannot point to a specific transcript failure for a change, do not include it.
 
 ⚠️ ALPHABET: Match the reference script's writing system exactly (Latin/Roman or Devanagari — do not mix or translate).
 
