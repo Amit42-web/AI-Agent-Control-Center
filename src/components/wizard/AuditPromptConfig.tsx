@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, ChevronDown, ChevronUp, RotateCcw, Lock, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { DimensionPrompt } from '@/types';
 
 const BADGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   blue:   { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/30' },
@@ -19,7 +20,7 @@ export function AuditPromptConfig() {
   const { dimensionPrompts, updateDimensionPrompt, resetDimensionPrompt, toggleDimensionPrompt } = useAppStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const enabledCount = dimensionPrompts.filter(d => d.enabled).length;
+  const enabledCount = dimensionPrompts.filter((d: DimensionPrompt) => d.enabled).length;
 
   return (
     <motion.div
@@ -53,7 +54,7 @@ export function AuditPromptConfig() {
 
       {/* Dimension accordions */}
       <div className="space-y-2">
-        {dimensionPrompts.map((dim) => {
+        {dimensionPrompts.map((dim: DimensionPrompt) => {
           const colors = BADGE_COLORS[dim.color] || BADGE_COLORS.blue;
           const isExpanded = expandedId === dim.id;
           const isModified = dim.prompt !== dim.defaultPrompt;
