@@ -1,4 +1,5 @@
-import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType, AggregatedIssue, AggregatedScenario, RootCauseType } from '@/types';
+import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType, AggregatedIssue, AggregatedScenario, RootCauseType, DimensionPrompt } from '@/types';
+import { FIXED_SYSTEM_PROMPT } from '@/data/systemPrompt';
 
 export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -895,7 +896,7 @@ export async function analyzeTranscriptScenarios(
   apiKey: string,
   model: string,
   transcript: Transcript,
-  auditPrompt: string,
+  dimensionPrompts: DimensionPrompt[],
   referenceScript: string | null,
   knowledgeBase: string | null = null
 ): Promise<Scenario[]> {
@@ -912,129 +913,29 @@ export async function analyzeTranscriptScenarios(
 
   console.log(`Analyzing transcript ${transcript.id} for scenarios with ${transcript.lines.length} lines`);
 
-  const systemPrompt = `You are an expert call center quality analyst conducting holistic, open-ended audits of agent performance.
+  const enabledDimensions = dimensionPrompts.filter(d => d.enabled);
+  const dimensionSection = enabledDimensions
+    .map(d => `## DIMENSION ${d.id} — ${d.label.toUpperCase()}\n\n${d.prompt}`)
+    .join('\n\n---\n\n');
 
-Your task is to identify SCENARIOS where the agent underperformed or could improve.
+  const systemPrompt = `${FIXED_SYSTEM_PROMPT}
 
-## Audit Dimensions & Framework:
-${auditPrompt}
+---
 
-CRITICAL CATEGORIZATION RULES:
-1. For each scenario, you MUST assign it to ONE of the primary audit dimensions (A-G) defined above
-2. Use dimensions A-F for known issue types that fit those categories
-3. Use dimension G (Novel & Emerging Issues) for patterns that DON'T fit A-F clearly
-4. When using dimension G, explain why it's novel and which dimension it's closest to
-5. Look for nuanced, specific issues within each dimension - not just surface-level problems
-6. Think deeply about conversation dynamics, timing, empathy, control, and emerging patterns
+## DIMENSIONS TO EVALUATE (${enabledDimensions.length} active)
 
-${referenceScript ? `\n## Reference Script/Flow:\n${referenceScript}\n` : ''}
-${knowledgeBase ? `\n## Knowledge Base:\n${knowledgeBase}\n` : ''}
+Evaluate ALL dimensions listed below. For each finding, assign exactly ONE dimension using the Tiebreaker in your instructions above.
 
-## Output Format:
-For each scenario, provide a JSON object with:
-- title: Compelling, specific title (e.g., "Lost Conversation Control - Customer Dictated Flow", "Cultural Insensitivity in Product Explanation")
-- dimension: The PRIMARY dimension label this fits into. Use EXACTLY ONE of:
-  * "Conversation Control & Flow Management" (A)
-  * "Temporal Dynamics & Turn-Taking" (B)
-  * "Context Tracking & Intent Alignment" (C)
-  * "Language Quality & Human-Likeness" (D)
-  * "Knowledge & Accuracy" (E)
-  * "Process & Policy Adherence" (F)
-  * "Novel & Emerging Issues" (G) - only if it truly doesn't fit A-F
-- rootCauseType: The PRIMARY root cause of the agent failure. You MUST classify into EXACTLY ONE of these 5 categories (DO NOT use "N/A", "unknown", or any other value):
+${dimensionSection}
 
-  1️⃣ "knowledge" - KNOWLEDGE GAP
-  Use this ONLY if required factual or domain information was NOT available to the agent anywhere.
-  Criteria:
-  - The information does not exist in the prompt, knowledge base, tools, or references
-  - Even a perfectly instructed agent could not answer correctly
-  Examples: Missing product pricing/specs/policies, unknown escalation contacts, missing regulatory facts
-  Fix location: Knowledge base / documentation
-  User-friendly meaning: "The bot didn't have the information."
-
-  2️⃣ "instruction" - INSTRUCTION GAP
-  Use this if the information EXISTS, but the agent was NOT instructed on HOW or WHEN to use it.
-  Criteria:
-  - Data or facts are present
-  - But rules, logic, triggers, or flow instructions are missing or unclear
-  - Agent behavior is undefined or underspecified
-  Examples: Refund policy exists but no instruction on when to offer it, bot not told to ask for order number, KB exists but no instruction to consult it
-  Fix location: System prompt / conversation design
-  User-friendly meaning: "The bot wasn't told how to handle this situation."
-
-  3️⃣ "execution" - EXECUTION FAILURE
-  Use this if BOTH the information AND the instructions EXIST, but the agent FAILED to apply them.
-  Criteria:
-  - Clear instructions are present
-  - Required knowledge is present
-  - Expected behavior is unambiguous
-  - Agent ignored, skipped, or misapplied the rule
-  Examples: Identity confirmation rule exists but bot skips it, refund logic defined but wrong branch used, instruction to consult KB exists but bot answers from memory
-  Fix location: Prompt reinforcement, constraints, examples, guardrails
-  User-friendly meaning: "The bot knew what to do, but didn't do it."
-
-  4️⃣ "conversation" - CONVERSATION DESIGN ISSUE
-  Use this if the agent technically followed instructions but the experience was poor or unnatural.
-  Criteria:
-  - Steps are correct
-  - Information is correct
-  - But conversation quality is degraded
-  Examples: Interrupting the customer, asking multiple questions at once, robotic phrasing, poor turn-taking or abrupt transitions
-  Fix location: Conversation design, tone rules, phrasing guidance
-  User-friendly meaning: "The conversation felt awkward or confusing."
-
-  5️⃣ "model" - MODEL LIMITATION (USE RARELY, expected <5% of cases)
-  Use this RARELY when all other categories are ruled out.
-  Criteria:
-  - Knowledge is complete
-  - Instructions are clear
-  - Prompt is well-designed
-  - Failure persists due to fundamental model capability limits
-  Examples: Long multi-step reasoning consistently fails, complex judgment beyond model class, persistent memory breakdown across turns
-  Fix location: Model upgrade or architectural change
-  User-friendly meaning: "This task exceeds the model's capability."
-
-  CLASSIFICATION RULES (NON-NEGOTIABLE):
-  - Choose ONLY ONE primary category per issue
-  - If multiple seem applicable, select the EARLIEST root cause: Knowledge > Instruction > Execution > Conversation > Model
-  - NEVER label as Knowledge Gap if the information exists but was unused
-  - NEVER label as Model Limitation unless all other categories are ruled out
-  - DO NOT invent missing information or instructions
-  - When uncertain, choose the closest match from these 5 options. Never use any value other than these exact 5 strings.
-- context: Rich contextual details - what was happening, what led to this moment (e.g., "Lines 45-67, during pricing discussion, agent made assumption about customer's budget based on accent")
-- whatHappened: Detailed, specific description of what the agent did or didn't do - be observant and nuanced
-- impact: Clear explanation of how this affected customer experience, trust, satisfaction, or call outcome - be specific
-- severity: one of [low, medium, high, critical] - based on actual impact to customer and business
-- confidence: number between 0-100 - how confident you are this is a genuine issue worth addressing
-- lineNumbers: array of line numbers where this scenario occurs (e.g., [19, 20, 21, 22] for lines 19-22)
-- instructionReference (REQUIRED for rootCauseType="execution", optional otherwise): {
-    source: "script" | "kb" | "policy" | "guideline",
-    documentName: optional string (e.g., "Sales Call Script v2.1"),
-    section: string (e.g., "Section 2.3: Pricing Objections", "Lines 15-20", "Payment Confirmation Step"),
-    expectedBehavior: string (what the instruction says the agent should do),
-    actualBehavior: string (what the agent actually did instead),
-    confidence: optional number 0-100 (how confident you are about this specific instruction reference)
-  }
-  NOTE: When classifying as "execution", you MUST identify which specific script/KB/policy instruction was not followed. If you cannot identify a specific instruction, reconsider whether this is truly an execution failure or an instruction gap.
-
-IMPORTANT GUIDELINES:
-- Do NOT include evidence snippets or transcript excerpts in the JSON - just provide line numbers
-- Think like an experienced call center trainer who notices subtle patterns and missed opportunities
-- Be constructive, specific, and actionable - not just critical
-- Look for both OBVIOUS issues and SUBTLE patterns that manual reviews often miss
-- Consider the customer's emotional journey and experience
-- Identify moments where the agent could have been more effective
-- **ADAPTIVE MINDSET**: Stay alert for novel issue types (bias, privacy, AI-specific problems, emerging customer needs)
-
-Quality over quantity - each scenario should be meaningful and tied to a specific dimension.
-
-Return ONLY a valid JSON array of scenarios. If no concerning scenarios are found, return an empty array [].`;
+${referenceScript ? `\n---\n## Reference Script/Flow:\n${referenceScript}\n` : ''}
+${knowledgeBase ? `\n---\n## Knowledge Base:\n${knowledgeBase}\n` : ''}`;
 
   const userPrompt = `Transcript to analyze:\n${transcriptText}`;
 
   try {
     console.log(`[SCENARIO ANALYSIS] Starting for ${transcript.id}`);
-    console.log(`[SCENARIO ANALYSIS] Audit prompt length: ${auditPrompt.length} chars`);
+    console.log(`[SCENARIO ANALYSIS] Active dimensions: ${enabledDimensions.length}`);
     console.log(`[SCENARIO ANALYSIS] Transcript lines: ${transcript.lines.length}`);
 
     const response = await callOpenAI(apiKey, model, [

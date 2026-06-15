@@ -142,6 +142,15 @@ export interface ConsolidatedFix {
   relatedIssueIds: string[];
 }
 
+export interface DimensionPrompt {
+  id: string;
+  label: string;
+  color: string;
+  prompt: string;
+  defaultPrompt: string;
+  enabled: boolean;
+}
+
 // Open-ended flow types
 export interface Scenario {
   id: string;
@@ -241,6 +250,7 @@ export interface AnalysisState {
   knowledgeBaseEnabled: boolean;
   checks: CheckConfig[];
   auditPrompt: string; // For open-ended flow
+  dimensionPrompts?: DimensionPrompt[]; // optional for backward compat
   openaiConfig: OpenAIConfig;
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
@@ -270,6 +280,9 @@ export interface AppState {
 
   // Open-ended flow audit prompt
   auditPrompt: string;
+
+  // Per-dimension editable prompts (open-ended flow)
+  dimensionPrompts: DimensionPrompt[];
 
   // OpenAI configuration
   openaiConfig: OpenAIConfig;
@@ -310,6 +323,9 @@ export interface AppState {
   setKnowledgeBase: (kb: string) => void;
   setKnowledgeBaseEnabled: (enabled: boolean) => void;
   setAuditPrompt: (prompt: string) => void;
+  updateDimensionPrompt: (id: string, prompt: string) => void;
+  resetDimensionPrompt: (id: string) => void;
+  toggleDimensionPrompt: (id: string) => void;
   setOpenAIConfig: (config: Partial<OpenAIConfig>) => void;
   setDeduplicationEnabled: (enabled: boolean) => void;
   toggleCheck: (checkId: CheckType) => void;

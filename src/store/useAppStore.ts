@@ -18,6 +18,7 @@ import {
   defaultReferenceScript,
 } from '@/data/demoData';
 import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
+import { DEFAULT_DIMENSION_PROMPTS } from '@/data/dimensionPrompts';
 import {
   analyzeTranscript,
   generateFixSuggestions,
@@ -84,6 +85,11 @@ const initialState = {
   knowledgeBaseEnabled: false,
   checks: defaultChecks,
   auditPrompt: defaultAuditPrompt,
+  dimensionPrompts: DEFAULT_DIMENSION_PROMPTS.map(d => ({
+    ...d,
+    prompt: d.defaultPrompt,
+    enabled: true,
+  })),
   openaiConfig: {
     apiKey: '',
     model: 'gpt-4.1-mini',
@@ -132,6 +138,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   setKnowledgeBaseEnabled: (enabled: boolean) => set({ knowledgeBaseEnabled: enabled }),
 
   setAuditPrompt: (prompt: string) => set({ auditPrompt: prompt }),
+
+  updateDimensionPrompt: (id, prompt) => {
+    set({ dimensionPrompts: get().dimensionPrompts.map(d => d.id === id ? { ...d, prompt } : d) });
+  },
+
+  resetDimensionPrompt: (id) => {
+    set({ dimensionPrompts: get().dimensionPrompts.map(d => d.id === id ? { ...d, prompt: d.defaultPrompt } : d) });
+  },
+
+  toggleDimensionPrompt: (id) => {
+    set({ dimensionPrompts: get().dimensionPrompts.map(d => d.id === id ? { ...d, enabled: !d.enabled } : d) });
+  },
 
   setOpenAIConfig: (config) => {
     const currentConfig = get().openaiConfig;
@@ -208,7 +226,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysis: async () => {
-    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig, flowType, auditPrompt } = get();
+    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig, flowType, auditPrompt, dimensionPrompts } = get();
 
     // Get API key from environment variable - check both possible names
     const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
@@ -322,7 +340,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               apiKey,
               openaiConfig.model,
               transcript,
-              auditPrompt,
+              dimensionPrompts,
               referenceEnabled ? referenceScript : null,
               knowledgeBaseEnabled ? knowledgeBase : null
             );
@@ -498,6 +516,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       knowledgeBaseEnabled: state.knowledgeBaseEnabled,
       checks: state.checks,
       auditPrompt: state.auditPrompt,
+      dimensionPrompts: state.dimensionPrompts,
       openaiConfig: state.openaiConfig,
       results: state.results,
       fixes: state.fixes,
@@ -519,6 +538,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       knowledgeBaseEnabled: analysisState.knowledgeBaseEnabled,
       checks: analysisState.checks,
       auditPrompt: analysisState.auditPrompt || defaultAuditPrompt,
+      dimensionPrompts: analysisState.dimensionPrompts || DEFAULT_DIMENSION_PROMPTS.map(d => ({ ...d, prompt: d.defaultPrompt, enabled: true })),
       openaiConfig: analysisState.openaiConfig,
       results: analysisState.results,
       fixes: analysisState.fixes,
@@ -543,6 +563,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentAnalysisName: name,
       currentStep: 'input',
       auditPrompt: auditPrompt !== undefined ? auditPrompt : initialState.auditPrompt,
+      dimensionPrompts: DEFAULT_DIMENSION_PROMPTS.map(d => ({ ...d, prompt: d.defaultPrompt, enabled: true })),
       fixesApplied: false,
     });
   },

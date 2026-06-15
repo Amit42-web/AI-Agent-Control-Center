@@ -1,74 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, RotateCcw, Edit3, Eye, EyeOff, Save, BookOpen, RefreshCw } from 'lucide-react';
+import { Brain, ChevronDown, ChevronUp, RotateCcw, Lock, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
-import { useSaveLoadTemplates } from '@/hooks/useSaveLoadTemplates';
+
+const BADGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  blue:   { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/30' },
+  cyan:   { bg: 'bg-cyan-500/20',   text: 'text-cyan-300',   border: 'border-cyan-500/30' },
+  green:  { bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/30' },
+  purple: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30' },
+  orange: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30' },
+  pink:   { bg: 'bg-pink-500/20',   text: 'text-pink-300',   border: 'border-pink-500/30' },
+  yellow: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30' },
+};
 
 export function AuditPromptConfig() {
-  const { auditPrompt, setAuditPrompt } = useAppStore();
-  const [isEditing, setIsEditing] = useState(false);
-  const [showFullPrompt, setShowFullPrompt] = useState(false);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [showLoadModal, setShowLoadModal] = useState(false);
-  const [templateName, setTemplateName] = useState('');
+  const { dimensionPrompts, updateDimensionPrompt, resetDimensionPrompt, toggleDimensionPrompt } = useAppStore();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Use the proper template management hook
-  const {
-    templates: savedTemplates,
-    saveTemplate,
-    deleteTemplate,
-    isUsingDatabase,
-    isLoading: templatesLoading,
-  } = useSaveLoadTemplates('auditPromptTemplates');
-
-  const handleReset = () => {
-    if (confirm('Reset to default comprehensive audit prompt?')) {
-      setAuditPrompt(defaultAuditPrompt);
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    if (!templateName.trim()) {
-      alert('Please enter a template name');
-      return;
-    }
-
-    try {
-      await saveTemplate(templateName.trim(), auditPrompt);
-      console.log('✅ Template saved successfully:', templateName.trim());
-      setTemplateName('');
-      setShowSaveModal(false);
-      alert(`Template "${templateName.trim()}" saved successfully!${isUsingDatabase ? ' (Stored in database)' : ' (Stored locally - set up database for persistence)'}`);
-    } catch (error) {
-      console.error('Failed to save template:', error);
-      alert('Failed to save template. Check console for details.');
-    }
-  };
-
-  const handleLoadTemplate = (template: typeof savedTemplates[0]) => {
-    if (confirm(`Load template "${template.name}"? Your current prompt will be replaced.`)) {
-      setAuditPrompt(template.content);
-      setShowLoadModal(false);
-    }
-  };
-
-  const handleDeleteTemplate = async (templateId: string) => {
-    const template = savedTemplates.find(t => t.id === templateId);
-    if (template && confirm(`Delete template "${template.name}"?`)) {
-      try {
-        await deleteTemplate(templateId);
-        console.log('✅ Template deleted successfully');
-      } catch (error) {
-        console.error('Failed to delete template:', error);
-        alert('Failed to delete template. Check console for details.');
-      }
-    }
-  };
-
-  const isCustomized = auditPrompt !== defaultAuditPrompt;
+  const enabledCount = dimensionPrompts.filter(d => d.enabled).length;
 
   return (
     <motion.div
@@ -84,344 +35,138 @@ export function AuditPromptConfig() {
             <Brain className="w-5 h-5 text-purple-400" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white mb-1">
-              Audit Instructions
-            </h3>
+            <h3 className="text-lg font-semibold text-white mb-1">Audit Dimensions</h3>
             <p className="text-sm text-[var(--color-slate-400)]">
-              Comprehensive evaluation criteria for open-ended analysis
+              {enabledCount} of {dimensionPrompts.length} dimensions active
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {isCustomized && (
-            <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
-              Customized
-            </span>
-          )}
-          <motion.button
-            className="p-2 rounded-lg hover:bg-[var(--color-navy-700)] transition-colors"
-            onClick={() => setShowFullPrompt(!showFullPrompt)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            title={showFullPrompt ? 'Hide full prompt' : 'Show full prompt'}
-          >
-            {showFullPrompt ? (
-              <EyeOff className="w-4 h-4 text-[var(--color-slate-400)]" />
-            ) : (
-              <Eye className="w-4 h-4 text-[var(--color-slate-400)]" />
-            )}
-          </motion.button>
-        </div>
       </div>
 
-      {/* Prompt Summary */}
-      {!showFullPrompt && (
-        <div className="bg-[var(--color-navy-800)] rounded-lg p-4 mb-4">
-          <p className="text-sm text-[var(--color-slate-300)] mb-3">
-            <span className="font-semibold text-purple-400">Primary Audit Dimensions (A-G):</span>
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-[var(--color-slate-400)]">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-              <span><strong>A.</strong> Conversation Control & Flow</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
-              <span><strong>B.</strong> Temporal Dynamics & Turn-Taking</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
-              <span><strong>C.</strong> Context Tracking & Intent</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-              <span><strong>D.</strong> Language Quality & Human-Likeness</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-              <span><strong>E.</strong> Knowledge & Accuracy</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-pink-400"></div>
-              <span><strong>F.</strong> Process & Policy Adherence</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
-              <span><strong>G.</strong> Novel & Emerging Issues ✨</span>
-            </div>
-          </div>
-          <p className="text-xs text-[var(--color-slate-500)] mt-3 italic">
-            ✨ Category G enables adaptive discovery of new issue types not covered by A-F
-          </p>
-        </div>
-      )}
-
-      {/* Full Prompt Display/Edit */}
-      <AnimatePresence>
-        {showFullPrompt && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-4"
-          >
-            {isEditing ? (
-              <textarea
-                value={auditPrompt}
-                onChange={(e) => setAuditPrompt(e.target.value)}
-                className="w-full h-96 px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-sm text-[var(--color-slate-200)] font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                placeholder="Enter your custom audit instructions..."
-              />
-            ) : (
-              <div className="bg-[var(--color-navy-800)] rounded-lg p-4 max-h-96 overflow-y-auto">
-                <pre className="text-xs text-[var(--color-slate-300)] whitespace-pre-wrap font-mono leading-relaxed">
-                  {auditPrompt}
-                </pre>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap">
-          <motion.button
-            className="btn-secondary text-sm flex items-center gap-2"
-            onClick={() => {
-              if (!isEditing) {
-                // When enabling editing, automatically show the prompt
-                setShowFullPrompt(true);
-              }
-              setIsEditing(!isEditing);
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Edit3 className="w-4 h-4" />
-            {isEditing ? 'Done Editing' : 'Customize Prompt'}
-          </motion.button>
-
-          <motion.button
-            className="btn-secondary text-sm flex items-center gap-2"
-            onClick={() => setShowSaveModal(true)}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Save className="w-4 h-4" />
-            Save as Template
-          </motion.button>
-
-          <motion.button
-            className={`btn-secondary text-sm flex items-center gap-2 ${
-              savedTemplates.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            onClick={() => {
-              console.log('Load Template button clicked. Current templates:', savedTemplates);
-              console.log('savedTemplates.length:', savedTemplates.length);
-              if (savedTemplates.length > 0) {
-                setShowLoadModal(true);
-              }
-            }}
-            whileHover={savedTemplates.length > 0 ? { scale: 1.02 } : {}}
-            whileTap={savedTemplates.length > 0 ? { scale: 0.98 } : {}}
-            disabled={savedTemplates.length === 0 || templatesLoading}
-          >
-            <BookOpen className="w-4 h-4" />
-            {templatesLoading ? 'Loading...' : `Load Template ${savedTemplates.length > 0 ? `(${savedTemplates.length})` : ''}`}
-          </motion.button>
-
-          {isCustomized && (
-            <motion.button
-              className="btn-secondary text-sm flex items-center gap-2"
-              onClick={handleReset}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset to Default
-            </motion.button>
-          )}
-        </div>
-
-        <div className="text-xs text-[var(--color-slate-400)]">
-          {auditPrompt.length} characters
-        </div>
-      </div>
-
-      {/* Info Box */}
-      <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-        <p className="text-xs text-[var(--color-slate-300)] leading-relaxed">
-          <span className="font-semibold text-purple-400">💡 Tip:</span>{' '}
-          The default prompt covers comprehensive quality dimensions. You can customize it to:
-          add domain-specific criteria, emphasize certain aspects, or save as a template for reuse.
+      {/* System prompt info banner */}
+      <div className="flex items-start gap-3 p-3 mb-5 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg">
+        <Lock className="w-4 h-4 text-[var(--color-slate-500)] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-[var(--color-slate-400)] leading-relaxed">
+          <span className="font-medium text-[var(--color-slate-300)]">System rules are managed automatically</span> — evidence gates, materiality thresholds, root cause classification, severity definitions, and output format are fixed. Edit only the evaluation criteria per dimension below.
         </p>
       </div>
 
-      {/* Save Template Modal */}
-      {showSaveModal && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowSaveModal(false)}
-          />
-          <motion.div
-            className="glass-card max-w-md w-full p-6 relative z-10"
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-          >
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Save Audit Prompt Template
-            </h2>
-            <p className="text-[var(--color-slate-400)] mb-6">
-              Save your current audit prompt as a template for future use.
-            </p>
-            <input
-              type="text"
-              placeholder="e.g., 8-Pillar Quality Audit"
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveTemplate();
-                if (e.key === 'Escape') setShowSaveModal(false);
-              }}
-              className="w-full px-4 py-3 bg-[var(--color-navy-800)] border border-[var(--color-navy-700)] rounded-lg text-white placeholder-[var(--color-slate-500)] focus:outline-none focus:ring-2 focus:ring-purple-500 mb-6"
-              autoFocus
-            />
-            <div className="flex items-center gap-3">
-              <motion.button
-                className="flex-1 btn-primary flex items-center justify-center gap-2"
-                onClick={handleSaveTemplate}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Save className="w-4 h-4" />
-                Save Template
-              </motion.button>
-              <motion.button
-                className="flex-1 btn-secondary"
-                onClick={() => setShowSaveModal(false)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Cancel
-              </motion.button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+      {/* Dimension accordions */}
+      <div className="space-y-2">
+        {dimensionPrompts.map((dim) => {
+          const colors = BADGE_COLORS[dim.color] || BADGE_COLORS.blue;
+          const isExpanded = expandedId === dim.id;
+          const isModified = dim.prompt !== dim.defaultPrompt;
 
-      {/* Load Template Modal */}
-      {showLoadModal && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowLoadModal(false)}
-          />
-          <motion.div
-            className="glass-card max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col relative z-10"
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-          >
-            <div className="p-6 border-b border-[var(--color-navy-700)]">
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-white mb-2">
-                    Load Audit Prompt Template
-                  </h2>
-                  <p className="text-[var(--color-slate-400)]">
-                    Select a saved template to load. Your current prompt will be replaced.
-                  </p>
-                  {isUsingDatabase && (
-                    <p className="text-xs text-green-400 mt-1">
-                      ✓ Using database storage (templates persist across sessions)
-                    </p>
-                  )}
-                  {!isUsingDatabase && (
-                    <p className="text-xs text-yellow-400 mt-1">
-                      ⚠ Using local storage (templates may be lost if browser data is cleared)
-                    </p>
-                  )}
-                </div>
+          return (
+            <div
+              key={dim.id}
+              className={`rounded-lg border transition-colors ${
+                dim.enabled
+                  ? 'border-[var(--color-navy-600)] bg-[var(--color-navy-800)]'
+                  : 'border-[var(--color-navy-700)] bg-[var(--color-navy-900)] opacity-60'
+              }`}
+            >
+              {/* Accordion header */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                {/* Letter badge */}
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 border ${colors.bg} ${colors.text} ${colors.border}`}>
+                  {dim.id}
+                </span>
+
+                {/* Label — clickable to expand */}
+                <button
+                  className="flex-1 text-left"
+                  onClick={() => setExpandedId(isExpanded ? null : dim.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${dim.enabled ? 'text-white' : 'text-[var(--color-slate-500)]'}`}>
+                      {dim.label}
+                    </span>
+                    {isModified && dim.enabled && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        Modified
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-[var(--color-slate-500)] mt-0.5">
+                    {dim.prompt.length} chars
+                  </div>
+                </button>
+
+                {/* Enable toggle */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleDimensionPrompt(dim.id); }}
+                  className="p-1 rounded hover:bg-[var(--color-navy-700)] transition-colors"
+                  title={dim.enabled ? 'Disable this dimension' : 'Enable this dimension'}
+                >
+                  {dim.enabled
+                    ? <ToggleRight className="w-5 h-5 text-blue-400" />
+                    : <ToggleLeft className="w-5 h-5 text-[var(--color-slate-600)]" />
+                  }
+                </button>
+
+                {/* Expand chevron */}
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : dim.id)}
+                  className="p-1 rounded hover:bg-[var(--color-navy-700)] transition-colors"
+                >
+                  {isExpanded
+                    ? <ChevronUp className="w-4 h-4 text-[var(--color-slate-400)]" />
+                    : <ChevronDown className="w-4 h-4 text-[var(--color-slate-400)]" />
+                  }
+                </button>
               </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
-              {savedTemplates.length === 0 ? (
-                <div className="text-center py-12">
-                  <BookOpen className="w-12 h-12 text-[var(--color-slate-600)] mx-auto mb-4" />
-                  <p className="text-[var(--color-slate-400)] mb-2">No saved templates found</p>
-                  <p className="text-xs text-[var(--color-slate-500)]">
-                    Save your current audit prompt as a template to see it here
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {savedTemplates.map(template => (
-                    <div
-                      key={template.id}
-                      className="glass-card p-4 hover:bg-[var(--color-navy-700)] transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="text-white font-semibold mb-1">
-                            {template.name}
-                          </h3>
-                          <p className="text-xs text-[var(--color-slate-400)]">
-                            Saved on {new Date(template.createdAt).toLocaleString()}
-                          </p>
-                          <p className="text-xs text-[var(--color-slate-500)] mt-1">
-                            {template.content.length} characters
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <motion.button
-                            className="btn-primary text-sm px-3 py-1.5"
-                            onClick={() => handleLoadTemplate(template)}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+
+              {/* Expanded content */}
+              <AnimatePresence initial={false}>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-4 border-t border-[var(--color-navy-700)] pt-3">
+                      <textarea
+                        value={dim.prompt}
+                        onChange={(e) => updateDimensionPrompt(dim.id, e.target.value)}
+                        disabled={!dim.enabled}
+                        rows={12}
+                        className="w-full px-3 py-2.5 bg-[var(--color-navy-900)] border border-[var(--color-navy-600)] rounded-lg text-sm text-[var(--color-slate-200)] font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y disabled:opacity-40 disabled:cursor-not-allowed leading-relaxed"
+                        placeholder="Enter evaluation criteria for this dimension..."
+                      />
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-[var(--color-slate-500)]">
+                          {dim.prompt.length} characters
+                        </span>
+                        {isModified && (
+                          <button
+                            onClick={() => resetDimensionPrompt(dim.id)}
+                            className="flex items-center gap-1.5 text-xs text-[var(--color-slate-400)] hover:text-white transition-colors"
                           >
-                            Load
-                          </motion.button>
-                          <motion.button
-                            className="btn-secondary text-sm px-3 py-1.5 text-red-400"
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            Delete
-                          </motion.button>
-                        </div>
+                            <RotateCcw className="w-3 h-3" />
+                            Reset to default
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <div className="p-6 border-t border-[var(--color-navy-700)]">
-              <motion.button
-                className="btn-secondary w-full"
-                onClick={() => setShowLoadModal(false)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Close
-              </motion.button>
-            </div>
-          </motion.div>
-        </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      {enabledCount === 0 && (
+        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-xs text-red-400">
+            No dimensions are enabled. Enable at least one dimension before running the analysis.
+          </p>
+        </div>
       )}
     </motion.div>
   );
