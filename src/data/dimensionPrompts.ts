@@ -160,10 +160,27 @@ SEVERITY: High = security/identity gate bypassed before account access; unauthor
     id: 'G',
     label: 'Novel & Emerging Issues',
     color: 'yellow',
-    tags: ['AI hallucinations', 'Bias / insensitivity', 'Privacy concerns', 'Emerging patterns', 'Uncategorized'],
+    tags: ['Blank call', 'AI hallucinations', 'Bias / insensitivity', 'Privacy concerns', 'Emerging patterns', 'Uncategorized'],
     defaultPrompt: `Use this dimension ONLY for behavior that does not clearly fit dimensions A–F, is not explicitly covered by KB, Script, or the 8-Pillar framework, but a senior human QA would still consider noteworthy.
 
-WHEN TO USE:
+BLANK CALL (flag first, before other categories):
+A blank call is when the customer spoke but the bot produced no meaningful response and no real conversation took place.
+
+FLAG as blank call if:
+- Customer uttered one or more turns and the bot returned no reply, an empty response, or only a system-level failure message
+- The entire call consists of one or a few customer utterances with zero bot turns in response
+- Call transcript shows customer speech followed immediately by call end with no bot engagement
+
+DO NOT FLAG as blank call if:
+- A genuine conversation was underway (multiple exchanges occurred) and the bot then stopped responding — that is a flow failure (Dimension A) or system dropout, not a blank call
+- Customer disconnected immediately without speaking (no utterance to respond to)
+- Call was correctly ended by the bot after a resolved interaction
+
+BLANK CALL SEVERITY: High = customer spoke and received no response at all | Medium = minimal bot output (one filler turn then silence) | Low = near-blank with partial acknowledgment but no substantive engagement
+
+---
+
+WHEN TO USE FOR OTHER NOVEL ISSUES:
 - Behavior that is genuinely new or unprecedented in your evaluation framework
 - Patterns that suggest a needed update to dimensions A–F
 - AI-specific problems: hallucinations, contradictions, memory breakdown
