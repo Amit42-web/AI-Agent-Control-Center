@@ -207,7 +207,7 @@ export function FixesPanel() {
           </div>
         </div>
         <div className="space-y-4">
-          {enhancedFixes.fixes.map((fix: any, index: number) => (
+          {(enhancedFixes?.fixes ?? []).map((fix: any, index: number) => (
             <EnhancedFixCard key={fix.id} fix={fix} index={index} />
           ))}
         </div>
@@ -216,8 +216,8 @@ export function FixesPanel() {
   }
 
   // Objective flow — consolidated fixes
-  const totalChanges = consolidatedFixes!.reduce((sum: number, f: ConsolidatedFix) => sum + f.changes.length, 0);
-  const selectedFixes = consolidatedFixes!.filter((f: ConsolidatedFix) => selectedFixIds.has(f.id));
+  const totalChanges = (consolidatedFixes ?? []).reduce((sum: number, f: ConsolidatedFix) => sum + f.changes.length, 0);
+  const selectedFixes = (consolidatedFixes ?? []).filter((f: ConsolidatedFix) => selectedFixIds.has(f.id));
 
   const toggleSelect = (id: string) => {
     setSelectedFixIds(prev => {
@@ -323,7 +323,7 @@ export function FixesPanel() {
         <div>
           <h2 className="text-2xl font-bold text-white">Fix Suggestions</h2>
           <p className="text-[var(--color-slate-400)] mt-1">
-            {consolidatedFixes!.length} root cause{consolidatedFixes!.length !== 1 ? 's' : ''} · {totalChanges} specific change{totalChanges !== 1 ? 's' : ''}
+            {(consolidatedFixes ?? []).length} root cause{(consolidatedFixes ?? []).length !== 1 ? 's' : ''} · {totalChanges} specific change{totalChanges !== 1 ? 's' : ''}
             {selectedFixIds.size > 0 && <span className="text-blue-400 ml-2">· {selectedFixIds.size} selected</span>}
           </p>
         </div>
@@ -343,7 +343,7 @@ export function FixesPanel() {
 
       {/* Consolidated fix cards */}
       <div className="space-y-4">
-        {consolidatedFixes!.map((fix: ConsolidatedFix, i: number) => (
+        {(consolidatedFixes ?? []).map((fix: ConsolidatedFix, i: number) => (
           <ConsolidatedFixCard
             key={fix.id}
             fix={fix}
