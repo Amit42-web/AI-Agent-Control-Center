@@ -486,27 +486,41 @@ For each fix, provide a JSON object with these SEPARATE fields:
 - exampleResponse field = What bot SAYS to customers (can be Hindi/Hinglish/native language)
 
 🚨 CRITICAL - SUGGESTION FIELD RULES:
-- "suggestion" = The EXACT text to add to the prompt (copy-paste ready)
+- "suggestion" = The EXACT single line/instruction to add to the prompt (copy-paste ready)
+- ONE LINE ONLY: Return only the new line being added. Do NOT return the entire section or block. If State S1 has 5 lines and you are adding 1 new line, return only that 1 new line — not all 5.
 - DO NOT write descriptions like "Add explicit guidance to politely acknowledge..."
-- DO write the actual instruction: "When a customer interrupts during plan explanation, politely acknowledge immediately: 'I understand. Let me finish explaining this key benefit, then I'll address your question.' Then continue with the plan details."
+- DO write the actual instruction: "When a customer interrupts during plan explanation, acknowledge immediately and redirect."
 - DO NOT start with "In State X" or "Add to..." or any location phrases
 - DO NOT include where to add it - that goes in "placementHint"
-- The suggestion should be EXACTLY what gets added to the prompt, word-for-word
+- The suggestion should be EXACTLY the new line/text that gets inserted, nothing more
+
+🚨 CRITICAL - TARGETCONTENT FIELD RULES (for remove/replace):
+- "targetContent" = The EXACT single line/sentence to remove or replace — nothing more
+- If only 1 line in a block is wrong, return only that 1 line as targetContent, not the entire block
+- Do NOT include surrounding context lines that are staying the same
 
 CRITICAL SEPARATION:
-- "suggestion" field = WHAT to add/replace (the actual prompt/instruction text ONLY)
+- "suggestion" field = ONLY the new line/text being added (not the whole section)
+- "targetContent" field = ONLY the specific line being removed/replaced (not the whole section)
 - "placementHint" field = WHERE to make the change (location description ONLY)
-- DO NOT mix these two! Keep them completely separate.
+- DO NOT mix these. Keep each field minimal and precise.
 
 Example for LATIN/ROMAN script reference (CORRECT - DO THIS):
 Reference script format: "State S0 - Availability & Readiness Check / Confirm customer availability"
-Scenario: Bot failed to follow instruction to ask availability clearly (rootCauseType: "execution")
+Scenario: Bot failed to ask availability as a single uninterrupted sentence (rootCauseType: "execution")
 {
   "action": "add",
   "rootCauseType": "execution",
-  "suggestion": "Ask the availability question in one complete, uninterrupted sentence. Do not break it into fragments or pause mid-sentence. Example: 'Namaste, kya abhi aap baat karna aapke liye theek rahega? Yeh call sirf 2 minute ka hai.' The question must flow naturally as a single unit.",
+  "suggestion": "Ask availability in one complete uninterrupted sentence without mid-sentence pauses.",
   "exampleResponse": "Namaste, kya abhi aap baat karna aapke liye theek rahega? Yeh call sirf 2 minute ka hai.",
-  "placementHint": "Add under State S0 - Availability & Readiness Check as explicit phrasing guidance"
+  "placementHint": "Add under State S0 - Availability & Readiness Check"
+}
+
+WRONG Example 5 (DO NOT DO THIS - returns entire section when only 1 line is new):
+{
+  "action": "add",
+  "suggestion": "State S0 - Availability Check\n- Greet customer\n- Ask availability\n- NEW LINE: Ask in one sentence\n- Confirm readiness",  ← WRONG - includes existing lines, only the NEW LINE should be in suggestion
+  "placementHint": "Add to State S0"
 }
 
 WRONG Example 1 (DO NOT DO THIS - meta-description instead of exact text):
@@ -564,8 +578,9 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
 3. LOCATION: DO NOT include location/placement info in "suggestion" - that goes in "placementHint"
 4. RCA ALIGNMENT: Set rootCauseType based on the ROOT CAUSE of the issue, not the solution type (execution failure fix should be tagged "execution" even if solution adds instructions)
 5. EXACT TEXT: Write the literal instruction to add, NOT a description like "Add guidance to..." - it must be copy-paste ready
+6. ONE LINE ONLY: suggestion = only the single new line being added. targetContent = only the single line being removed/replaced. Never return an entire section/block when only 1 line is changing.
 
-Think: "suggestion" = Exact prompt text to add | "exampleResponse" = What bot says to customers`;
+Think: "suggestion" = Only the new line to insert | "targetContent" = Only the line to remove | "exampleResponse" = What bot says to customers`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
