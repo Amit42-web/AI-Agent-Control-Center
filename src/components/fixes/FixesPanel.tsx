@@ -1,21 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { BookOpen, Sparkles, Download, FileText, Loader2, Filter } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Download, FileText, Loader2, ChevronDown, ChevronUp, ChevronRight, Copy, Check } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { FixCard } from './FixCard';
 import { EnhancedFixCard } from './EnhancedFixCard';
 import { determineFixPlacements } from '@/services/openai';
 import { RootCauseType, Fix } from '@/types';
 
-const rootCauseLabels: Record<RootCauseType, string> = {
-  knowledge: '📚 Knowledge Gap',
-  instruction: '📋 Instruction Gap',
-  execution: '⚠️ Execution Failure',
-  conversation: '💬 Conversation Design',
-  model: '🤖 Model Limitation',
+const rcaConfig: Record<RootCauseType, { label: string; icon: string; bg: string; text: string; border: string; headerBg: string }> = {
+  execution:    { label: 'Execution Failure',   icon: '⚠️', bg: 'bg-orange-500/10', text: 'text-orange-300', border: 'border-orange-500/30', headerBg: 'bg-orange-500/15' },
+  instruction:  { label: 'Instruction Gap',     icon: '📋', bg: 'bg-cyan-500/10',   text: 'text-cyan-300',   border: 'border-cyan-500/30',   headerBg: 'bg-cyan-500/15'   },
+  knowledge:    { label: 'Knowledge Gap',       icon: '📚', bg: 'bg-yellow-500/10', text: 'text-yellow-300', border: 'border-yellow-500/30', headerBg: 'bg-yellow-500/15' },
+  conversation: { label: 'Conversation Design', icon: '💬', bg: 'bg-purple-500/10', text: 'text-purple-300', border: 'border-purple-500/30', headerBg: 'bg-purple-500/15' },
+  model:        { label: 'Model Limitation',    icon: '🤖', bg: 'bg-green-500/10',  text: 'text-green-300',  border: 'border-green-500/30',  headerBg: 'bg-green-500/15'  },
 };
+
+const RCA_ORDER: RootCauseType[] = ['execution', 'instruction', 'knowledge', 'conversation', 'model'];
 
 interface ScriptSection {
   text: string;
@@ -25,17 +26,233 @@ interface ScriptSection {
   reasoning?: string;
 }
 
+function FixRow({
+  fix,
+  isSelected,
+  onToggleSelect,
+}: {
+  fix: Fix;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const displayLine = fix.lineToAdd || fix.targetContent || fix.suggestion;
+  const copyLine = () => {
+    navigator.clipboard.writeText(displayLine);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="border-b border-[var(--color-navy-700)] last:border-0">
+      {/* Compact row */}
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          className="w-4 h-4 rounded border-2 border-[var(--color-navy-600)] bg-[var(--color-navy-800)] checked:bg-blue-500 checked:border-blue-500 cursor-pointer shrink-0"
+        />
+        <span className={`text-xs px-2 py-0.5 rounded shrink-0 font-medium ${
+          fix.action === 'remove' ? 'bg-red-500/20 text-red-400' :
+          fix.action === 'replace' ? 'bg-yellow-500/20 text-yellow-400' :
+          'bg-green-500/20 text-green-400'
+        }`}>
+          {fix.action === 'remove' ? '− Remove' : fix.action === 'replace' ? '~ Replace' : '+ Add'}
+        </span>
+        <code className="text-sm text-[var(--color-slate-200)] font-mono flex-1 truncate">
+          {displayLine}
+        </code>
+        <span className="text-xs text-[var(--color-slate-500)] shrink-0 hidden sm:block max-w-[180px] truncate">
+          {fix.placementHint}
+        </span>
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
+        >
+          {expanded
+            ? <ChevronUp className="w-4 h-4 text-[var(--color-slate-400)]" />
+            : <ChevronRight className="w-4 h-4 text-[var(--color-slate-400)]" />
+          }
+        </button>
+      </div>
+
+      {/* Expanded detail */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-1 space-y-3 bg-[var(--color-navy-900)]/50">
+              {/* Problem */}
+              <div>
+                <p className="text-xs text-[var(--color-slate-500)] mb-1">Issue</p>
+                <p className="text-sm text-[var(--color-slate-300)]">{fix.problem}</p>
+              </div>
+
+              {/* Line to add/remove */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-[var(--color-slate-500)]">
+                    {fix.action === 'remove' ? 'Line to remove' : fix.action === 'replace' ? 'Replace this' : 'Line to add'}
+                  </p>
+                  <button
+                    onClick={copyLine}
+                    className="flex items-center gap-1 text-xs text-[var(--color-slate-400)] hover:text-white transition-colors"
+                  >
+                    {copied ? <><Check className="w-3 h-3 text-green-400" />Copied</> : <><Copy className="w-3 h-3" />Copy</>}
+                  </button>
+                </div>
+                <div className={`flex items-start gap-2 rounded px-3 py-2 ${
+                  fix.action === 'remove' ? 'bg-red-500/10 border border-red-500/25' : 'bg-green-500/10 border border-green-500/25'
+                }`}>
+                  <span className={`font-mono font-bold text-sm select-none ${fix.action === 'remove' ? 'text-red-400' : 'text-green-400'}`}>
+                    {fix.action === 'remove' ? '−' : '+'}
+                  </span>
+                  <code className={`text-sm font-mono break-all ${fix.action === 'remove' ? 'text-red-300 line-through' : 'text-green-300'}`}>
+                    {displayLine}
+                  </code>
+                </div>
+              </div>
+
+              {/* Replacement line (for replace action) */}
+              {fix.action === 'replace' && fix.suggestion && (
+                <div>
+                  <p className="text-xs text-[var(--color-slate-500)] mb-1">Replace with</p>
+                  <div className="flex items-start gap-2 rounded px-3 py-2 bg-green-500/10 border border-green-500/25">
+                    <span className="font-mono font-bold text-sm text-green-400 select-none">+</span>
+                    <code className="text-sm font-mono text-green-300 break-all">{fix.lineToAdd || fix.suggestion}</code>
+                  </div>
+                </div>
+              )}
+
+              {/* Placement */}
+              <div>
+                <p className="text-xs text-[var(--color-slate-500)] mb-1">Placement</p>
+                <p className="text-sm text-[var(--color-slate-300)]">{fix.placementHint}</p>
+              </div>
+
+              {/* Context */}
+              {fix.context && (
+                <div>
+                  <p className="text-xs text-[var(--color-slate-500)] mb-1">Why this helps</p>
+                  <p className="text-sm text-[var(--color-slate-400)] leading-relaxed">{fix.context}</p>
+                </div>
+              )}
+
+              {/* Example response */}
+              {fix.exampleResponse && (
+                <div>
+                  <p className="text-xs text-[var(--color-slate-500)] mb-1">Example bot response</p>
+                  <p className="text-sm text-teal-300 italic border-l-2 border-teal-500 pl-3">{fix.exampleResponse}</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function RcaGroup({
+  rca,
+  fixes,
+  selectedFixIds,
+  onToggleFix,
+  onToggleAll,
+}: {
+  rca: RootCauseType;
+  fixes: Fix[];
+  selectedFixIds: Set<string>;
+  onToggleFix: (id: string) => void;
+  onToggleAll: (ids: string[], select: boolean) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const cfg = rcaConfig[rca];
+  const allSelected = fixes.every(f => selectedFixIds.has(f.id));
+  const someSelected = fixes.some(f => selectedFixIds.has(f.id));
+
+  return (
+    <motion.div
+      className={`rounded-xl border ${cfg.border} overflow-hidden`}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      {/* Accordion header */}
+      <div
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${cfg.headerBg} select-none`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <input
+          type="checkbox"
+          checked={allSelected}
+          ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+          onChange={(e) => {
+            e.stopPropagation();
+            onToggleAll(fixes.map(f => f.id), !allSelected);
+          }}
+          onClick={e => e.stopPropagation()}
+          className="w-4 h-4 rounded border-2 border-[var(--color-navy-600)] bg-[var(--color-navy-800)] checked:bg-blue-500 checked:border-blue-500 cursor-pointer shrink-0"
+        />
+        <span className="text-lg">{cfg.icon}</span>
+        <span className={`font-semibold text-sm ${cfg.text}`}>{cfg.label}</span>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text} border ${cfg.border} ml-1`}>
+          {fixes.length} fix{fixes.length !== 1 ? 'es' : ''}
+        </span>
+        {someSelected && (
+          <span className="text-xs text-blue-400 ml-1">
+            {fixes.filter(f => selectedFixIds.has(f.id)).length} selected
+          </span>
+        )}
+        <div className="ml-auto">
+          {open
+            ? <ChevronDown className="w-4 h-4 text-[var(--color-slate-400)]" />
+            : <ChevronRight className="w-4 h-4 text-[var(--color-slate-400)]" />
+          }
+        </div>
+      </div>
+
+      {/* Fix rows */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            {fixes.map(fix => (
+              <FixRow
+                key={fix.id}
+                fix={fix}
+                isSelected={selectedFixIds.has(fix.id)}
+                onToggleSelect={() => onToggleFix(fix.id)}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 export function FixesPanel() {
-  const { fixes, enhancedFixes, referenceEnabled, referenceScript, openaiConfig, flowType } = useAppStore();
+  const { fixes, enhancedFixes, referenceEnabled, referenceScript, openaiConfig } = useAppStore();
   const [selectedFixIds, setSelectedFixIds] = useState<Set<string>>(new Set());
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showFinalScript, setShowFinalScript] = useState(false);
   const [finalScript, setFinalScript] = useState('');
   const [scriptSections, setScriptSections] = useState<ScriptSection[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
 
-  // Check for enhanced fixes (open-ended flow) or regular fixes (objective flow)
   const hasEnhancedFixes = enhancedFixes && enhancedFixes.fixes && enhancedFixes.fixes.length > 0;
   const hasRegularFixes = fixes && fixes.scriptFixes && fixes.generalFixes;
 
@@ -47,272 +264,149 @@ export function FixesPanel() {
     );
   }
 
-  // Render enhanced fixes for open-ended flow
+  // Open-ended flow — enhanced fixes
   if (hasEnhancedFixes) {
     return (
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-purple-400" />
               RCA-Categorized Fixes
             </h2>
-            <p className="text-[var(--color-slate-400)] mt-1">
-              Comprehensive fixes grouped by root cause category
-            </p>
+            <p className="text-[var(--color-slate-400)] mt-1">Comprehensive fixes grouped by root cause category</p>
           </div>
           <span className="text-sm text-[var(--color-slate-400)]">
             {enhancedFixes.fixes.length} categor{enhancedFixes.fixes.length !== 1 ? 'ies' : 'y'}
           </span>
         </div>
-
-        {/* Enhanced Fix Cards */}
         <div className="space-y-4">
-          {enhancedFixes.fixes.map((fix, index) => (
-            <EnhancedFixCard
-              key={fix.id}
-              fix={fix}
-              index={index}
-            />
+          {enhancedFixes.fixes.map((fix: any, index: number) => (
+            <EnhancedFixCard key={fix.id} fix={fix} index={index} />
           ))}
         </div>
-
-        {/* Export Button */}
         <div className="flex justify-end">
           <button
             onClick={() => {
-              const content = {
-                enhancedFixes: enhancedFixes.fixes,
-                exportedAt: new Date().toISOString(),
-              };
-              const blob = new Blob([JSON.stringify(content, null, 2)], {
-                type: 'application/json',
-              });
+              const blob = new Blob([JSON.stringify({ enhancedFixes: enhancedFixes.fixes, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
-              a.href = url;
-              a.download = 'rca_categorized_fixes.json';
-              a.click();
+              a.href = url; a.download = 'rca_categorized_fixes.json'; a.click();
               URL.revokeObjectURL(url);
             }}
             className="btn-secondary flex items-center gap-2"
           >
-            <Download className="w-4 h-4" />
-            Export Fixes
+            <Download className="w-4 h-4" />Export Fixes
           </button>
         </div>
       </div>
     );
   }
 
-  const exportFixes = () => {
-    const content = {
-      scriptFixes: fixes?.scriptFixes || [],
-      generalFixes: fixes?.generalFixes || [],
-      exportedAt: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(content, null, 2)], {
-      type: 'application/json',
+  // Objective flow — group all fixes by RCA category
+  const allFixes = [...(fixes?.scriptFixes || []), ...(fixes?.generalFixes || [])];
+  const totalFixes = allFixes.length;
+
+  const rcaGroups = RCA_ORDER.reduce<Record<RootCauseType, Fix[]>>((acc, rca) => {
+    acc[rca] = allFixes.filter(f => f.rootCauseType === rca);
+    return acc;
+  }, {} as Record<RootCauseType, Fix[]>);
+
+  const ungrouped = allFixes.filter(f => !f.rootCauseType || !(f.rootCauseType in rcaConfig));
+
+  const toggleFix = (id: string) => {
+    setSelectedFixIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
+  };
+
+  const toggleAll = (ids: string[], select: boolean) => {
+    setSelectedFixIds(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => select ? next.add(id) : next.delete(id));
+      return next;
+    });
+  };
+
+  const exportFixes = () => {
+    const blob = new Blob([JSON.stringify({ scriptFixes: fixes?.scriptFixes || [], generalFixes: fixes?.generalFixes || [], exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'fix_suggestions.json';
-    a.click();
+    a.href = url; a.download = 'fix_suggestions.json'; a.click();
     URL.revokeObjectURL(url);
-  };
-
-  // Apply RCA filter
-  const filterByRCA = (fixList: Fix[]) => {
-    if (rcaFilter === 'all') return fixList;
-    return fixList.filter(fix => fix.rootCauseType === rcaFilter);
-  };
-
-  const filteredScriptFixes = filterByRCA(fixes?.scriptFixes || []);
-  const filteredGeneralFixes = filterByRCA(fixes?.generalFixes || []);
-
-  const hasScriptFixes = (fixes?.scriptFixes || []).length > 0;
-  const hasGeneralFixes = (fixes?.generalFixes || []).length > 0;
-  const hasFilteredScriptFixes = filteredScriptFixes.length > 0;
-  const hasFilteredGeneralFixes = filteredGeneralFixes.length > 0;
-  const totalFixes = (fixes?.scriptFixes || []).length + (fixes?.generalFixes || []).length;
-  const filteredTotalFixes = filteredScriptFixes.length + filteredGeneralFixes.length;
-  const allFixes = [...(fixes?.scriptFixes || []), ...(fixes?.generalFixes || [])];
-
-  const toggleFixSelection = (fixId: string) => {
-    const newSelected = new Set(selectedFixIds);
-    if (newSelected.has(fixId)) {
-      newSelected.delete(fixId);
-    } else {
-      newSelected.add(fixId);
-    }
-    setSelectedFixIds(newSelected);
   };
 
   const generateFinalScript = async () => {
     setIsGeneratingScript(true);
-
     try {
       const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
-
-      if (!referenceScript) {
-        alert('No reference script available');
-        setIsGeneratingScript(false);
-        return;
-      }
-
-      // Get API key from environment
+      if (!referenceScript) { alert('No reference script available'); setIsGeneratingScript(false); return; }
       const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
+      if (!apiKey.trim()) { alert('OpenAI API key is not configured.'); setIsGeneratingScript(false); return; }
 
-      if (!apiKey.trim()) {
-        alert('OpenAI API key is not configured. Please set OPENAI_API_KEY or NEXT_PUBLIC_OPENAI_API_KEY in your environment variables.');
-        setIsGeneratingScript(false);
-        return;
-      }
-
-      // Build sections array with metadata
       const sections: ScriptSection[] = [];
-
-      // Group fixes by action type
       const addFixes = selectedFixes.filter(f => !f.action || f.action === 'add');
       const removeFixes = selectedFixes.filter(f => f.action === 'remove');
       const replaceFixes = selectedFixes.filter(f => f.action === 'replace');
 
-      // Apply removals and replacements to script text first
       let modifiedScript = referenceScript;
+      const removedSections: { text: string; fix: Fix }[] = [];
+      const replacedSections: { oldText: string; newText: string; fix: Fix }[] = [];
 
-      // Track removed and replaced content for display
-      const removedSections: { text: string; fix: any }[] = [];
-      const replacedSections: { oldText: string; newText: string; fix: any }[] = [];
-
-      // Apply removals
       removeFixes.forEach(fix => {
         if (fix.targetContent) {
-          // Remove all occurrences of the target content
           const lines = modifiedScript.split('\n');
           const removedLines: string[] = [];
-          const filteredLines = lines.filter(line => {
-            if (line.includes(fix.targetContent!)) {
-              removedLines.push(line);
-              return false;
-            }
+          const filteredLines = lines.filter((line: string) => {
+            if (line.includes(fix.targetContent!)) { removedLines.push(line); return false; }
             return true;
           });
-
-          if (removedLines.length > 0) {
-            removedSections.push({ text: removedLines.join('\n'), fix });
-          }
-
+          if (removedLines.length > 0) removedSections.push({ text: removedLines.join('\n'), fix });
           modifiedScript = filteredLines.join('\n');
-          console.log(`Removed lines containing: ${fix.targetContent.substring(0, 50)}...`);
         }
       });
 
-      // Apply replacements
       replaceFixes.forEach(fix => {
         if (fix.targetContent && fix.suggestion) {
           if (modifiedScript.includes(fix.targetContent)) {
-            replacedSections.push({
-              oldText: fix.targetContent,
-              newText: fix.suggestion,
-              fix
-            });
+            replacedSections.push({ oldText: fix.targetContent, newText: fix.suggestion, fix });
             modifiedScript = modifiedScript.replace(fix.targetContent, fix.suggestion);
-            console.log(`Replaced: ${fix.targetContent.substring(0, 50)}... with ${fix.suggestion.substring(0, 50)}...`);
           }
         }
       });
 
-      // Now handle additions with placement logic
-      const addPlacements = await determineFixPlacements(
-        apiKey,
-        openaiConfig.model,
-        modifiedScript,
-        addFixes
-      );
-
+      const addPlacements = await determineFixPlacements(apiKey, openaiConfig.model, modifiedScript, addFixes);
       const scriptLinesAfterModifications = modifiedScript.split('\n');
-
-      // Sort placements by line number ascending
       const sortedPlacements = [...addPlacements].sort((a, b) => a.lineNumber - b.lineNumber);
-
       let currentLineIndex = 0;
 
-      // Process each insertion placement
       sortedPlacements.forEach(placement => {
         const fix = addFixes.find(f => f.id === placement.fixId);
         if (!fix) return;
-
-        // Add original lines before this insertion
         if (currentLineIndex < placement.lineNumber) {
           const originalLines = scriptLinesAfterModifications.slice(currentLineIndex, placement.lineNumber).join('\n');
-          if (originalLines.trim()) {
-            sections.push({
-              text: originalLines,
-              isNew: false,
-            });
-          }
+          if (originalLines.trim()) sections.push({ text: originalLines, isNew: false });
         }
-
-        // Add the new suggestion (clean, no markers)
-        sections.push({
-          text: fix.suggestion,
-          isNew: true,
-          reasoning: placement.reasoning,
-        });
-
+        sections.push({ text: fix.suggestion, isNew: true, reasoning: placement.reasoning });
         currentLineIndex = placement.lineNumber;
       });
 
-      // Add remaining original lines
       if (currentLineIndex < scriptLinesAfterModifications.length) {
         const remainingLines = scriptLinesAfterModifications.slice(currentLineIndex).join('\n');
-        if (remainingLines.trim()) {
-          sections.push({
-            text: remainingLines,
-            isNew: false,
-          });
-        }
+        if (remainingLines.trim()) sections.push({ text: remainingLines, isNew: false });
       }
-
-      // Add removed sections at the top with strikethrough indicator
-      if (removedSections.length > 0) {
-        removedSections.forEach(removed => {
-          sections.unshift({
-            text: removed.text,
-            isNew: false,
-            isRemoved: true,
-            reasoning: `Removed: ${removed.fix.problem}`
-          });
-        });
-      }
-
-      // Add replaced sections indicator
-      if (replacedSections.length > 0) {
-        replacedSections.forEach(replaced => {
-          // Find the section with the new text and mark it as replaced
-          const sectionIndex = sections.findIndex(s => s.text.includes(replaced.newText));
-          if (sectionIndex !== -1) {
-            // Insert the old text before the new text
-            sections.splice(sectionIndex, 0, {
-              text: replaced.oldText,
-              isNew: false,
-              isReplaced: true,
-              reasoning: `Replaced: ${replaced.fix.problem}`
-            });
-          }
-        });
-      }
-
-      // Generate clean final script (for copying) - exclude removed sections
-      const cleanScript = sections.filter(s => !s.isRemoved && !s.isReplaced).map(s => s.text).join('\n');
+      removedSections.forEach(r => sections.unshift({ text: r.text, isNew: false, isRemoved: true, reasoning: `Removed: ${r.fix.problem}` }));
+      replacedSections.forEach(r => {
+        const idx = sections.findIndex(s => s.text.includes(r.newText));
+        if (idx !== -1) sections.splice(idx, 0, { text: r.oldText, isNew: false, isReplaced: true, reasoning: `Replaced: ${r.fix.problem}` });
+      });
 
       setScriptSections(sections);
-      setFinalScript(cleanScript);
+      setFinalScript(sections.filter(s => !s.isRemoved && !s.isReplaced).map(s => s.text).join('\n'));
       setShowFinalScript(true);
     } catch (error) {
-      console.error('Error generating final script:', error);
       alert(`Failed to generate script: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsGeneratingScript(false);
@@ -320,187 +414,69 @@ export function FixesPanel() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <motion.div
-        className="flex items-center justify-between"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <motion.div className="flex items-center justify-between" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div>
           <h2 className="text-2xl font-bold text-white">Fix Suggestions</h2>
           <p className="text-[var(--color-slate-400)] mt-1">
-            {totalFixes} actionable fix{totalFixes !== 1 ? 'es' : ''} based on detected issues
+            {totalFixes} fix{totalFixes !== 1 ? 'es' : ''} grouped by root cause
+            {selectedFixIds.size > 0 && <span className="text-blue-400 ml-2">· {selectedFixIds.size} selected</span>}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {selectedFixIds.size > 0 && (
-            <button
-              className="btn-primary flex items-center gap-2"
-              onClick={() => setShowReviewModal(true)}
-            >
+            <button className="btn-primary flex items-center gap-2" onClick={() => setShowReviewModal(true)}>
               <FileText className="w-4 h-4" />
               Review & Generate Script ({selectedFixIds.size})
             </button>
           )}
           <button className="btn-secondary flex items-center gap-2" onClick={exportFixes}>
-            <Download className="w-4 h-4" />
-            Export Fixes
+            <Download className="w-4 h-4" />Export
           </button>
         </div>
       </motion.div>
 
-      {/* Filters */}
-      <motion.div
-        className="glass-card p-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-      >
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[var(--color-slate-400)]" />
-            <span className="text-sm font-medium text-[var(--color-slate-300)]">Filter by Category:</span>
-          </div>
-          <select
-            className="input-field w-auto"
-            value={rcaFilter}
-            onChange={(e) => setRcaFilter(e.target.value as RootCauseType | 'all')}
-          >
-            <option value="all">All Categories</option>
-            {Object.entries(rootCauseLabels).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-[var(--color-slate-400)]">
-            {rcaFilter === 'all'
-              ? `${totalFixes} total fix${totalFixes !== 1 ? 'es' : ''}`
-              : `${filteredTotalFixes} fix${filteredTotalFixes !== 1 ? 'es' : ''} in this category`
-            }
-          </span>
-        </div>
-      </motion.div>
-
-      {/* Script/Prompt Fixes (Reference-aware) */}
-      {referenceEnabled && (
-        <motion.div
-          className="space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-purple-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">
-                Script/Prompt Fixes
-              </h3>
-              <p className="text-sm text-[var(--color-slate-400)]">
-                Reference-aware improvements based on Flow Compliance check
-              </p>
-            </div>
-          </div>
-
-          {hasFilteredScriptFixes ? (
-            <div className="space-y-4">
-              {filteredScriptFixes.map((fix, index) => (
-                <FixCard
-                  key={fix.id}
-                  fix={fix}
-                  index={index}
-                  isSelected={selectedFixIds.has(fix.id)}
-                  onToggleSelect={() => toggleFixSelection(fix.id)}
-                />
-              ))}
-            </div>
-          ) : hasScriptFixes && rcaFilter !== 'all' ? (
-            <div className="glass-card p-6 text-center">
-              <p className="text-[var(--color-slate-400)]">
-                No script fixes found for this category. Try a different filter.
-              </p>
-            </div>
-          ) : (
-            <div className="glass-card p-6 text-center">
-              <p className="text-[var(--color-slate-400)]">
-                No script-specific fixes needed. Flow compliance looks good!
-              </p>
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {/* General Quality Fixes (Transcript-only) */}
-      <motion.div
-        className="space-y-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-teal-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white">
-              General Quality Fixes
-            </h3>
-            <p className="text-sm text-[var(--color-slate-400)]">
-              Transcript-only improvements (no reference script required)
-            </p>
-          </div>
-        </div>
-
-        {hasFilteredGeneralFixes ? (
-          <div className="space-y-4">
-            {filteredGeneralFixes.map((fix, index) => (
-              <FixCard
-                key={fix.id}
-                fix={fix}
-                index={filteredScriptFixes.length + index}
-                isSelected={selectedFixIds.has(fix.id)}
-                onToggleSelect={() => toggleFixSelection(fix.id)}
+      {/* RCA groups */}
+      <div className="space-y-3">
+        {RCA_ORDER.map((rca, i) => {
+          const group = rcaGroups[rca];
+          if (!group.length) return null;
+          return (
+            <motion.div key={rca} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <RcaGroup
+                rca={rca}
+                fixes={group}
+                selectedFixIds={selectedFixIds}
+                onToggleFix={toggleFix}
+                onToggleAll={toggleAll}
               />
+            </motion.div>
+          );
+        })}
+
+        {/* Ungrouped fallback */}
+        {ungrouped.length > 0 && (
+          <div className="rounded-xl border border-[var(--color-navy-600)] overflow-hidden">
+            <div className="px-4 py-3 bg-[var(--color-navy-700)]">
+              <span className="text-sm font-semibold text-[var(--color-slate-300)]">Other Fixes ({ungrouped.length})</span>
+            </div>
+            {ungrouped.map(fix => (
+              <FixRow key={fix.id} fix={fix} isSelected={selectedFixIds.has(fix.id)} onToggleSelect={() => toggleFix(fix.id)} />
             ))}
-          </div>
-        ) : hasGeneralFixes && rcaFilter !== 'all' ? (
-          <div className="glass-card p-6 text-center">
-            <p className="text-[var(--color-slate-400)]">
-              No general quality fixes found for this category. Try a different filter.
-            </p>
-          </div>
-        ) : (
-          <div className="glass-card p-6 text-center">
-            <p className="text-[var(--color-slate-400)]">
-              No general quality fixes needed. Transcript quality looks good!
-            </p>
           </div>
         )}
-      </motion.div>
 
-      {/* No fixes at all */}
-      {!hasScriptFixes && !hasGeneralFixes && (
-        <motion.div
-          className="glass-card p-8 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-            <Sparkles className="w-8 h-8 text-green-400" />
+        {totalFixes === 0 && (
+          <div className="glass-card p-8 text-center">
+            <Sparkles className="w-8 h-8 text-green-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-white mb-1">No Fixes Required</h3>
+            <p className="text-[var(--color-slate-400)]">No significant issues were found that require fixes.</p>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">
-            No Fixes Required
-          </h3>
-          <p className="text-[var(--color-slate-400)]">
-            Based on the enabled checks, no significant issues were found that require fixes.
-          </p>
-        </motion.div>
-      )}
+        )}
+      </div>
 
-      {/* Two-Column Review Modal */}
+      {/* Review Modal */}
       {showReviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <motion.div
@@ -509,270 +485,93 @@ export function FixesPanel() {
             animate={{ opacity: 1, scale: 1 }}
           >
             <div className="p-6 border-b border-[var(--color-navy-700)]">
-              <h3 className="text-2xl font-semibold text-white mb-2">Review Selected Fixes</h3>
+              <h3 className="text-2xl font-semibold text-white mb-1">Review Selected Fixes</h3>
               <p className="text-sm text-[var(--color-slate-400)]">
-                Review the {selectedFixIds.size} selected fix{selectedFixIds.size !== 1 ? 'es' : ''} organized by category before generating the final script
+                {selectedFixIds.size} fix{selectedFixIds.size !== 1 ? 'es' : ''} selected across {
+                  RCA_ORDER.filter(r => rcaGroups[r].some(f => selectedFixIds.has(f.id))).length
+                } categories
               </p>
             </div>
 
             <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-              {/* Left Column: Organized Fixes */}
-              <div className="space-y-6 overflow-y-auto pr-4">
-                <h4 className="text-lg font-semibold text-white sticky top-0 bg-[var(--color-navy-800)] py-2 z-10">
-                  📋 Fixes by Category
-                </h4>
-
-                {(() => {
-                  const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
-                  const scriptFixes = selectedFixes.filter(f => fixes?.scriptFixes?.some(sf => sf.id === f.id));
-                  const generalFixes = selectedFixes.filter(f => fixes?.generalFixes?.some(gf => gf.id === f.id));
-
+              {/* Left: fixes by RCA */}
+              <div className="space-y-4 overflow-y-auto pr-2">
+                <h4 className="text-sm font-semibold text-[var(--color-slate-300)] sticky top-0 bg-[var(--color-navy-800)] py-2">Fixes by Category</h4>
+                {RCA_ORDER.map(rca => {
+                  const selected = rcaGroups[rca].filter(f => selectedFixIds.has(f.id));
+                  if (!selected.length) return null;
+                  const cfg = rcaConfig[rca];
                   return (
-                    <>
-                      {/* Script/Prompt Fixes */}
-                      {scriptFixes.length > 0 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="w-5 h-5 text-purple-400" />
-                            <h5 className="font-semibold text-purple-300">
-                              Script/Prompt Fixes ({scriptFixes.length})
-                            </h5>
-                          </div>
-                          <div className="space-y-2 pl-7">
-                            {(() => {
-                              const adds = scriptFixes.filter(f => !f.action || f.action === 'add');
-                              const replaces = scriptFixes.filter(f => f.action === 'replace');
-                              const removes = scriptFixes.filter(f => f.action === 'remove');
-
-                              return (
-                                <>
-                                  {adds.length > 0 && (
-                                    <div>
-                                      <p className="text-xs text-green-400 font-semibold mb-2">✅ Additions ({adds.length})</p>
-                                      {adds.map(fix => (
-                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-green-500">
-                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
-                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {replaces.length > 0 && (
-                                    <div>
-                                      <p className="text-xs text-yellow-400 font-semibold mb-2">✏️ Replacements ({replaces.length})</p>
-                                      {replaces.map(fix => (
-                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-yellow-500">
-                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
-                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {removes.length > 0 && (
-                                    <div>
-                                      <p className="text-xs text-red-400 font-semibold mb-2">🗑️ Removals ({removes.length})</p>
-                                      {removes.map(fix => (
-                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-red-500">
-                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
-                                          {fix.targetContent && (
-                                            <p className="text-xs text-[var(--color-slate-400)] line-clamp-2 line-through">
-                                              {fix.targetContent}
-                                            </p>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
+                    <div key={rca} className={`rounded-lg border ${cfg.border} overflow-hidden`}>
+                      <div className={`px-3 py-2 ${cfg.headerBg} flex items-center gap-2`}>
+                        <span>{cfg.icon}</span>
+                        <span className={`text-xs font-semibold ${cfg.text}`}>{cfg.label}</span>
+                        <span className={`text-xs px-1.5 rounded-full ${cfg.bg} ${cfg.text} ml-auto`}>{selected.length}</span>
+                      </div>
+                      {selected.map(fix => (
+                        <div key={fix.id} className="px-3 py-2 border-t border-[var(--color-navy-700)] flex items-start gap-2">
+                          <span className={`text-xs shrink-0 mt-0.5 ${fix.action === 'remove' ? 'text-red-400' : 'text-green-400'}`}>
+                            {fix.action === 'remove' ? '−' : '+'}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs text-[var(--color-slate-300)] truncate">{fix.lineToAdd || fix.targetContent || fix.suggestion}</p>
+                            <p className="text-xs text-[var(--color-slate-500)] mt-0.5">{fix.placementHint}</p>
                           </div>
                         </div>
-                      )}
-
-                      {/* General Quality Fixes */}
-                      {generalFixes.length > 0 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-teal-400" />
-                            <h5 className="font-semibold text-teal-300">
-                              General Quality Fixes ({generalFixes.length})
-                            </h5>
-                          </div>
-                          <div className="space-y-2 pl-7">
-                            {(() => {
-                              const adds = generalFixes.filter(f => !f.action || f.action === 'add');
-                              const replaces = generalFixes.filter(f => f.action === 'replace');
-                              const removes = generalFixes.filter(f => f.action === 'remove');
-
-                              return (
-                                <>
-                                  {adds.length > 0 && (
-                                    <div>
-                                      <p className="text-xs text-green-400 font-semibold mb-2">✅ Additions ({adds.length})</p>
-                                      {adds.map(fix => (
-                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-green-500">
-                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
-                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {replaces.length > 0 && (
-                                    <div>
-                                      <p className="text-xs text-yellow-400 font-semibold mb-2">✏️ Replacements ({replaces.length})</p>
-                                      {replaces.map(fix => (
-                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-yellow-500">
-                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
-                                          <p className="text-xs text-[var(--color-slate-400)] line-clamp-2">{fix.suggestion}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {removes.length > 0 && (
-                                    <div>
-                                      <p className="text-xs text-red-400 font-semibold mb-2">🗑️ Removals ({removes.length})</p>
-                                      {removes.map(fix => (
-                                        <div key={fix.id} className="glass-card p-3 mb-2 border-l-2 border-red-500">
-                                          <p className="text-sm text-white font-medium mb-1">{fix.problem}</p>
-                                          {fix.targetContent && (
-                                            <p className="text-xs text-[var(--color-slate-400)] line-clamp-2 line-through">
-                                              {fix.targetContent}
-                                            </p>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      )}
-                    </>
+                      ))}
+                    </div>
                   );
-                })()}
+                })}
               </div>
 
-              {/* Right Column: Summary and Stats */}
-              <div className="space-y-6 overflow-y-auto pl-4 border-l border-[var(--color-navy-700)]">
-                <h4 className="text-lg font-semibold text-white sticky top-0 bg-[var(--color-navy-800)] py-2 z-10">
-                  📊 Summary & Impact
-                </h4>
-
-                {(() => {
-                  const selectedFixes = allFixes.filter(fix => selectedFixIds.has(fix.id));
-                  const scriptFixes = selectedFixes.filter(f => fixes?.scriptFixes?.some(sf => sf.id === f.id));
-                  const generalFixes = selectedFixes.filter(f => fixes?.generalFixes?.some(gf => gf.id === f.id));
-                  const addCount = selectedFixes.filter(f => !f.action || f.action === 'add').length;
-                  const replaceCount = selectedFixes.filter(f => f.action === 'replace').length;
-                  const removeCount = selectedFixes.filter(f => f.action === 'remove').length;
-
-                  return (
-                    <>
-                      {/* Overall Statistics */}
-                      <div className="glass-card p-4 space-y-3">
-                        <h6 className="text-sm font-semibold text-white mb-3">Overall Statistics</h6>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="text-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                            <div className="text-2xl font-bold text-purple-300">{scriptFixes.length}</div>
-                            <div className="text-xs text-[var(--color-slate-400)] mt-1">Script Fixes</div>
-                          </div>
-                          <div className="text-center p-3 rounded-lg bg-teal-500/10 border border-teal-500/30">
-                            <div className="text-2xl font-bold text-teal-300">{generalFixes.length}</div>
-                            <div className="text-xs text-[var(--color-slate-400)] mt-1">Quality Fixes</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action Breakdown */}
-                      <div className="glass-card p-4 space-y-3">
-                        <h6 className="text-sm font-semibold text-white mb-3">Actions Breakdown</h6>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between p-2 rounded bg-green-500/10">
-                            <span className="text-sm text-green-300">✅ Additions</span>
-                            <span className="text-sm font-bold text-green-200">{addCount}</span>
-                          </div>
-                          <div className="flex items-center justify-between p-2 rounded bg-yellow-500/10">
-                            <span className="text-sm text-yellow-300">✏️ Replacements</span>
-                            <span className="text-sm font-bold text-yellow-200">{replaceCount}</span>
-                          </div>
-                          <div className="flex items-center justify-between p-2 rounded bg-red-500/10">
-                            <span className="text-sm text-red-300">🗑️ Removals</span>
-                            <span className="text-sm font-bold text-red-200">{removeCount}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Impact Preview */}
-                      <div className="glass-card p-4 space-y-3">
-                        <h6 className="text-sm font-semibold text-white mb-3">What Happens Next</h6>
-                        <ul className="space-y-2 text-sm text-[var(--color-slate-300)]">
-                          <li className="flex items-start gap-2">
-                            <span className="text-blue-400 mt-0.5">1.</span>
-                            <span>AI will analyze optimal placement for additions in your script</span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <span className="text-blue-400 mt-0.5">2.</span>
-                            <span>Replacements and removals will be applied to the reference script</span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <span className="text-blue-400 mt-0.5">3.</span>
-                            <span>Final script will show visual diff with green bars for new content</span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <span className="text-blue-400 mt-0.5">4.</span>
-                            <span>You'll be able to copy the clean final script to clipboard</span>
-                          </li>
-                        </ul>
-                      </div>
-                    </>
-                  );
-                })()}
+              {/* Right: summary */}
+              <div className="space-y-4 overflow-y-auto pl-4 border-l border-[var(--color-navy-700)]">
+                <h4 className="text-sm font-semibold text-[var(--color-slate-300)] sticky top-0 bg-[var(--color-navy-800)] py-2">Summary</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Additions', count: allFixes.filter(f => selectedFixIds.has(f.id) && (!f.action || f.action === 'add')).length, color: 'text-green-300', bg: 'bg-green-500/10', border: 'border-green-500/30' },
+                    { label: 'Replacements', count: allFixes.filter(f => selectedFixIds.has(f.id) && f.action === 'replace').length, color: 'text-yellow-300', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' },
+                    { label: 'Removals', count: allFixes.filter(f => selectedFixIds.has(f.id) && f.action === 'remove').length, color: 'text-red-300', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+                  ].map(s => (
+                    <div key={s.label} className={`text-center p-3 rounded-lg ${s.bg} border ${s.border}`}>
+                      <div className={`text-xl font-bold ${s.color}`}>{s.count}</div>
+                      <div className="text-xs text-[var(--color-slate-400)] mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="glass-card p-4 space-y-2 text-sm text-[var(--color-slate-300)]">
+                  <p className="font-medium text-white mb-2">What happens next</p>
+                  {['AI determines optimal placement for additions', 'Replacements and removals applied to script', 'Final script shown with visual diff', 'Copy clean script to clipboard'].map((s, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-blue-400 shrink-0">{i + 1}.</span>
+                      <span>{s}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="p-6 border-t border-[var(--color-navy-700)] flex items-center justify-between bg-[var(--color-navy-900)]">
-              <button
-                className="btn-secondary"
-                onClick={() => setShowReviewModal(false)}
-                disabled={isGeneratingScript}
-              >
-                Cancel
-              </button>
+              <button className="btn-secondary" onClick={() => setShowReviewModal(false)} disabled={isGeneratingScript}>Cancel</button>
               <button
                 className="btn-primary flex items-center gap-2"
-                onClick={async () => {
-                  await generateFinalScript();
-                  setShowReviewModal(false);
-                }}
+                onClick={async () => { await generateFinalScript(); setShowReviewModal(false); }}
                 disabled={isGeneratingScript}
               >
-                {isGeneratingScript ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Confirm & Generate Final Script
-                  </>
-                )}
+                {isGeneratingScript
+                  ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
+                  : <><Sparkles className="w-4 h-4" />Confirm & Generate Final Script</>
+                }
               </button>
             </div>
 
-            {/* Loading Overlay */}
             {isGeneratingScript && (
               <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-10">
                 <div className="glass-card p-8 flex flex-col items-center gap-4">
                   <Loader2 className="w-12 h-12 animate-spin text-blue-400" />
                   <div className="text-center">
                     <h4 className="text-lg font-semibold text-white mb-2">Generating Final Script</h4>
-                    <p className="text-sm text-[var(--color-slate-400)]">
-                      AI is analyzing optimal placement and applying fixes...
-                    </p>
+                    <p className="text-sm text-[var(--color-slate-400)]">AI is analyzing optimal placement and applying fixes...</p>
                   </div>
                 </div>
               </div>
@@ -792,27 +591,16 @@ export function FixesPanel() {
             <div className="p-4 border-b border-[var(--color-navy-700)] flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-white">Final Updated Script</h3>
-                <p className="text-xs text-[var(--color-slate-400)] mt-1">
-                  New additions are marked with green bar on the left. Copy button copies clean text.
-                </p>
+                <p className="text-xs text-[var(--color-slate-400)] mt-1">Green bar = new addition. Copy button copies clean text.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   className="btn-primary flex items-center gap-2 text-sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(finalScript);
-                    alert('Script copied to clipboard!');
-                  }}
+                  onClick={() => { navigator.clipboard.writeText(finalScript); alert('Script copied to clipboard!'); }}
                 >
-                  <Download className="w-4 h-4" />
-                  Copy to Clipboard
+                  <Download className="w-4 h-4" />Copy to Clipboard
                 </button>
-                <button
-                  className="btn-secondary text-sm"
-                  onClick={() => setShowFinalScript(false)}
-                >
-                  Close
-                </button>
+                <button className="btn-secondary text-sm" onClick={() => setShowFinalScript(false)}>Close</button>
               </div>
             </div>
             <div className="p-4 overflow-y-auto flex-1 bg-[var(--color-navy-900)]">
@@ -824,13 +612,10 @@ export function FixesPanel() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                     className={`${
-                      section.isNew
-                        ? 'border-l-4 border-green-500 pl-4 py-2 bg-green-500/5'
-                        : section.isRemoved
-                        ? 'border-l-4 border-red-500 pl-4 py-2 bg-red-500/5 line-through opacity-60'
-                        : section.isReplaced
-                        ? 'border-l-4 border-yellow-500 pl-4 py-2 bg-yellow-500/5 line-through opacity-60'
-                        : ''
+                      section.isNew ? 'border-l-4 border-green-500 pl-4 py-2 bg-green-500/5'
+                      : section.isRemoved ? 'border-l-4 border-red-500 pl-4 py-2 bg-red-500/5 line-through opacity-60'
+                      : section.isReplaced ? 'border-l-4 border-yellow-500 pl-4 py-2 bg-yellow-500/5 line-through opacity-60'
+                      : ''
                     }`}
                   >
                     {(section.isRemoved || section.isReplaced) && (
@@ -840,9 +625,7 @@ export function FixesPanel() {
                         </span>
                       </div>
                     )}
-                    <pre className={`text-sm whitespace-pre-wrap font-mono ${
-                      section.isRemoved || section.isReplaced ? 'text-[var(--color-slate-400)]' : 'text-[var(--color-slate-200)]'
-                    }`}>
+                    <pre className={`text-sm whitespace-pre-wrap font-mono ${section.isRemoved || section.isReplaced ? 'text-[var(--color-slate-400)]' : 'text-[var(--color-slate-200)]'}`}>
 {section.text}
                     </pre>
                   </motion.div>
