@@ -744,6 +744,110 @@ Think: "lineToAdd" = the 1 new line | "context" = why/how | "exampleResponse" = 
   }
 }
 
+// Objective flow: Generate one consolidated fix per RCA category
+export async function generateConsolidatedFixes(
+  apiKey: string,
+  model: string,
+  issues: any[],
+  referenceScript?: string,
+  knowledgeBase?: string
+): Promise<import('@/types').ConsolidatedFix[]> {
+  const systemPrompt = `You are an expert AI voice bot prompt engineer. Given a list of detected issues, group them by root cause category and produce ONE consolidated fix per category.
+
+Each consolidated fix covers ALL issues of that root cause type with a list of specific line-level changes to the script/prompt.
+
+RESPONSE FORMAT — return a JSON array:
+[
+  {
+    "rootCauseType": "execution",
+    "summary": "1-2 sentence description of the overall pattern causing these failures",
+    "relatedIssueIds": ["id1", "id2"],
+    "changes": [
+      {
+        "action": "add",
+        "lineToAdd": "The exact single line/instruction to insert",
+        "placementHint": "Where in the script to add it (e.g. State S1 - Availability Check)",
+        "context": "Why this specific change is needed"
+      },
+      {
+        "action": "replace",
+        "targetContent": "Exact verbatim line from script to replace",
+        "lineToAdd": "The replacement line",
+        "placementHint": "Where this line lives in the script",
+        "context": "Why replacing this fixes the issue"
+      },
+      {
+        "action": "remove",
+        "targetContent": "Exact verbatim line from script to remove",
+        "placementHint": "Where this line lives in the script",
+        "context": "Why removing this helps"
+      }
+    ]
+  }
+]
+
+RULES:
+- Only include RCA categories that have actual issues. Do not invent categories.
+- rootCauseType must be one of: "knowledge", "instruction", "execution", "conversation", "model"
+- summary: 1-2 sentences — the common pattern across all issues in this category
+- Each change.lineToAdd = ONLY the single new line to insert, nothing else
+- Each change.targetContent = verbatim line copied from the script, nothing else
+- Each change.placementHint = location only (e.g. "State S2 - Objection Handling")
+- Each change.context = 1 sentence explaining why this specific change fixes the issue
+- DO NOT repeat the same change across categories
+- Match the script's language and formatting style
+
+⚠️ SCRIPT/ALPHABET PRESERVATION: Match the exact writing system of the reference script (Latin/Roman or Devanagari).
+
+Return ONLY valid JSON — no markdown, no comments.`;
+
+  const issuesSummary = issues
+    .map(i => `Issue ID: ${i.id}\nType: ${i.type}\nSeverity: ${i.severity}\nExplanation: ${sanitizeText(i.explanation)}\nEvidence: ${sanitizeText(i.evidenceSnippet)}`)
+    .join('\n\n---\n\n');
+
+  const userPrompt = `Issues detected:\n\n${issuesSummary}\n\n${
+    referenceScript ? `Reference Script:\n${referenceScript}\n\n` : ''
+  }${
+    knowledgeBase ? `Knowledge Base:\n${knowledgeBase}\n\n` : ''
+  }Group these issues by root cause and return one consolidated fix per category. Each fix should have all the specific line changes needed to resolve every issue in that category.`;
+
+  try {
+    const response = await callOpenAI(apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ]);
+
+    let jsonStr = response.trim();
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+    const startIdx = jsonStr.indexOf('[');
+    const endIdx = jsonStr.lastIndexOf(']');
+    if (startIdx === -1 || endIdx === -1) return [];
+    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+
+    const parsed = JSON.parse(jsonStr);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((item: any, idx: number) => ({
+      id: `consolidated-${item.rootCauseType || idx}`,
+      rootCauseType: item.rootCauseType,
+      summary: item.summary || '',
+      relatedIssueIds: Array.isArray(item.relatedIssueIds) ? item.relatedIssueIds : [],
+      changes: Array.isArray(item.changes) ? item.changes.map((c: any) => ({
+        action: c.action || 'add',
+        lineToAdd: c.lineToAdd || '',
+        targetContent: c.targetContent || undefined,
+        placementHint: c.placementHint || '',
+        context: c.context || '',
+      })) : [],
+    }));
+  } catch (error) {
+    console.error('Error generating consolidated fixes:', error);
+    throw error;
+  }
+}
+
 // Open-ended flow: Scenario-based analysis
 export async function analyzeTranscriptScenarios(
   apiKey: string,

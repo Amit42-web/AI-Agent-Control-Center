@@ -126,6 +126,22 @@ export interface FixSuggestions {
   generalFixes: Fix[];
 }
 
+export interface FixChange {
+  action: 'add' | 'remove' | 'replace';
+  lineToAdd?: string;
+  targetContent?: string;
+  placementHint: string;
+  context?: string;
+}
+
+export interface ConsolidatedFix {
+  id: string;
+  rootCauseType: RootCauseType;
+  summary: string;
+  changes: FixChange[];
+  relatedIssueIds: string[];
+}
+
 // Open-ended flow types
 export interface Scenario {
   id: string;

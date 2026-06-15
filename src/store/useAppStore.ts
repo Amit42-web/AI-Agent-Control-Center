@@ -21,6 +21,7 @@ import { defaultAuditPrompt } from '@/data/defaultAuditPrompt';
 import {
   analyzeTranscript,
   generateFixSuggestions,
+  generateConsolidatedFixes,
   analyzeTranscriptScenarios,
   generateEnhancedFixSuggestions,
   generateEnhancedFixesByRCACategory,
@@ -93,6 +94,7 @@ const initialState = {
   currentStep: 'analyses' as const,
   results: null,
   fixes: null,
+  consolidatedFixes: null,
   scenarioResults: null,
   enhancedFixes: null,
   selectedCallId: null,
@@ -401,23 +403,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       if (flowType === 'objective' && results) {
-        // Objective flow: Generate standard fixes
-        const fixes = await generateFixSuggestions(
+        // Objective flow: Generate one consolidated fix per RCA category
+        const consolidatedFixes = await generateConsolidatedFixes(
           apiKey,
           openaiConfig.model,
           results.issues,
-          transcripts,
-          referenceEnabled ? referenceScript : null,
-          knowledgeBaseEnabled ? knowledgeBase : null
+          referenceEnabled ? referenceScript : undefined,
+          knowledgeBaseEnabled ? knowledgeBase : undefined
         );
 
-        // Ensure fixes have the proper structure
-        const validatedFixes = {
-          scriptFixes: Array.isArray(fixes?.scriptFixes) ? fixes.scriptFixes : [],
-          generalFixes: Array.isArray(fixes?.generalFixes) ? fixes.generalFixes : []
-        };
-
-        set({ fixes: validatedFixes, currentStep: 'fixes', isRunning: false });
+        set({ consolidatedFixes, currentStep: 'fixes', isRunning: false });
       } else if (flowType === 'open-ended' && scenarioResults) {
         // Open-ended flow: Generate RCA-categorized fixes
         console.log(`Aggregating ${scenarioResults.scenarios.length} scenarios...`);
@@ -495,6 +490,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       openaiConfig: state.openaiConfig,
       results: state.results,
       fixes: state.fixes,
+      consolidatedFixes: state.consolidatedFixes,
       scenarioResults: state.scenarioResults,
       enhancedFixes: state.enhancedFixes,
       selectedCallId: state.selectedCallId,
@@ -514,11 +510,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       openaiConfig: analysisState.openaiConfig,
       results: analysisState.results,
       fixes: analysisState.fixes,
+      consolidatedFixes: analysisState.consolidatedFixes || null,
       scenarioResults: analysisState.scenarioResults,
       enhancedFixes: analysisState.enhancedFixes,
       selectedCallId: analysisState.selectedCallId,
-      // Determine which step to show based on available data and flow type
-      currentStep: analysisState.enhancedFixes || analysisState.fixes
+      currentStep: analysisState.enhancedFixes || analysisState.consolidatedFixes || analysisState.fixes
         ? 'fixes'
         : analysisState.scenarioResults || analysisState.results
         ? 'results'
