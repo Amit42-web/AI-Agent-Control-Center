@@ -30,11 +30,6 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const copyAll = () => {
-    // Only copy suggestion, not the example
-    copyToClipboard(fix.suggestion, 'all');
-  };
-
   return (
     <motion.div
       className="glass-card overflow-hidden"
@@ -98,29 +93,6 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
         >
-          {/* Copy All Button */}
-          <div className="flex justify-end">
-            <button
-              className="btn-primary flex items-center gap-2 text-xs py-1.5 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                copyAll();
-              }}
-            >
-              {copiedField === 'all' ? (
-                <>
-                  <Check className="w-3 h-3" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  Copy All
-                </>
-              )}
-            </button>
-          </div>
-
           {/* Issue/Problem Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -139,16 +111,32 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
           {/* Target Content (for remove/replace) */}
           {fix.action && (fix.action === 'remove' || fix.action === 'replace') && fix.targetContent && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-red-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  {fix.action === 'remove' ? 'Content to Remove' : 'Content to Replace'}
-                </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-red-400" />
+                  <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                    {fix.action === 'remove' ? 'Line to Remove' : 'Line to Replace'}
+                  </span>
+                </div>
+                <button
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] text-[var(--color-slate-300)] transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(fix.targetContent!, 'target');
+                  }}
+                >
+                  {copiedField === 'target' ? (
+                    <><Check className="w-3 h-3 text-green-400" />Copied</>
+                  ) : (
+                    <><Copy className="w-3 h-3" />Copy line</>
+                  )}
+                </button>
               </div>
-              <div className="glass-card-subtle p-3 bg-red-500/10 border border-red-500/30">
-                <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono line-through">
+              <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2.5">
+                <span className="text-red-400 font-mono font-bold text-sm select-none mt-0.5">-</span>
+                <code className="text-sm text-red-300 font-mono leading-relaxed break-all line-through">
                   {fix.targetContent}
-                </pre>
+                </code>
               </div>
             </div>
           )}
@@ -156,45 +144,57 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
           {/* Suggestion (for add/replace) */}
           {fix.action !== 'remove' && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  {fix.action === 'replace' ? 'Replacement Content' : 'Suggested Fix'}
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 relative group bg-[var(--color-navy-900)] border border-[var(--color-navy-700)]">
-                <pre className="text-sm text-[var(--color-slate-200)] pr-8 whitespace-pre-wrap font-mono">
-                  {fix.suggestion}
-                </pre>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-medium text-[var(--color-slate-300)]">
+                    {fix.action === 'replace' ? 'Replacement Line' : 'Line to Add'}
+                  </span>
+                </div>
                 <button
-                  className="absolute top-2 right-2 p-1.5 hover:bg-[var(--color-navy-600)] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] text-[var(--color-slate-300)] transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     copyToClipboard(fix.suggestion, 'suggestion');
                   }}
                 >
                   {copiedField === 'suggestion' ? (
-                    <Check className="w-4 h-4 text-green-400" />
+                    <><Check className="w-3 h-3 text-green-400" />Copied</>
                   ) : (
-                    <Copy className="w-4 h-4 text-[var(--color-slate-400)]" />
+                    <><Copy className="w-3 h-3" />Copy line</>
                   )}
                 </button>
+              </div>
+              <div className="flex items-start gap-2 bg-green-500/10 border border-green-500/25 rounded-lg px-3 py-2.5">
+                <span className="text-green-400 font-mono font-bold text-sm select-none mt-0.5">+</span>
+                <code className="text-sm text-green-300 font-mono leading-relaxed break-all">
+                  {fix.suggestion}
+                </code>
               </div>
             </div>
           )}
 
-          {/* Placement Hint */}
+          {/* Placement — after which line + under which pillar */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-purple-400" />
-              <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                Where to Add
-              </span>
+              <span className="text-xs font-medium text-[var(--color-slate-300)]">Placement</span>
             </div>
-            <div className="glass-card-subtle p-3">
-              <p className="text-sm text-[var(--color-slate-400)]">
-                {fix.placementHint}
-              </p>
+            <div className="glass-card-subtle divide-y divide-[var(--color-navy-700)]">
+              <div className="flex items-start gap-3 px-3 py-2">
+                <span className="text-xs text-[var(--color-slate-500)] w-14 shrink-0 pt-0.5">
+                  {fix.action === 'remove' ? 'At' : fix.action === 'replace' ? 'At' : 'After'}
+                </span>
+                <p className="text-sm text-[var(--color-slate-300)]">{fix.placementHint}</p>
+              </div>
+              {fix.rootCauseType && rootCauseColors[fix.rootCauseType] && (
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <span className="text-xs text-[var(--color-slate-500)] w-14 shrink-0">Pillar</span>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${rootCauseColors[fix.rootCauseType].bg} ${rootCauseColors[fix.rootCauseType].text} border ${rootCauseColors[fix.rootCauseType].border} font-medium`}>
+                    {rootCauseColors[fix.rootCauseType].icon} {fix.rootCauseType}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
