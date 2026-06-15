@@ -182,7 +182,7 @@ export function FixesPanel() {
   const [scriptSections, setScriptSections] = useState<ScriptSection[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
-  const hasEnhancedFixes = enhancedFixes?.fixes?.length > 0;
+  const hasEnhancedFixes = (enhancedFixes?.fixes?.length ?? 0) > 0;
   const hasConsolidatedFixes = consolidatedFixes && consolidatedFixes.length > 0;
 
   if (!hasEnhancedFixes && !hasConsolidatedFixes) {
