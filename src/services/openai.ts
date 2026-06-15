@@ -752,64 +752,105 @@ export async function generateConsolidatedFixes(
   referenceScript?: string,
   knowledgeBase?: string
 ): Promise<import('@/types').ConsolidatedFix[]> {
-  const systemPrompt = `You are an expert AI voice bot prompt engineer. Given a list of detected issues, group them by root cause category and produce ONE consolidated fix per category.
+  const systemPrompt = `You are an expert AI voice bot prompt engineer analysing real call failures and writing precise script fixes.
 
-Each consolidated fix covers ALL issues of that root cause type with a list of specific line-level changes to the script/prompt.
+You will receive:
+1. A list of detected issues — each with the EXACT transcript evidence showing what went wrong
+2. A reference script — your bot's current prompt/conversation flow
+3. Optionally a knowledge base
 
-RESPONSE FORMAT — return a JSON array:
+Your job: group issues by root cause, then write ONE consolidated fix per category. Each fix contains the precise line-level changes needed to prevent those failures from recurring.
+
+━━━ UNDERSTANDING THE REFERENCE SCRIPT ━━━
+The reference script may use a structured multi-pillar/state format like:
+  [Pillar 3 - Conversation Flow]
+    State S1 - Availability Check
+      Entry Gate: <condition for entering this state>
+      Instructions: <what the bot should do>
+      Exit Gate: <condition to move to next state>
+      Example: <sample dialogue>
+
+When writing fixes:
+- Respect this structure. If a state has Entry Gate / Exit Gate / Example sections, place new lines in the correct sub-section.
+- placementHint should be specific: e.g. "State S1 - Availability Check > Instructions" or "State S2 - Pitch > Exit Gate"
+- If adding an example, match the example format already used in that state
+- If adding an Entry/Exit gate condition, match the gate format used in nearby states
+- Do NOT rewrite entire states — add or change only what is necessary
+
+━━━ EVIDENCE-DRIVEN FIXES ━━━
+Every change must be directly traceable to the evidence provided:
+- Read the exact transcript lines in each issue's evidence
+- Identify what the bot said vs. what the script/instruction required
+- Write the fix to close that exact gap — not a generic instruction
+- Bad: "Acknowledge customer concerns promptly"
+- Good: "If customer says they are busy, say: 'I understand, this will only take 2 minutes.'"
+
+━━━ RESPONSE FORMAT ━━━
+Return a JSON array — one object per RCA category that has issues:
 [
   {
     "rootCauseType": "execution",
-    "summary": "1-2 sentence description of the overall pattern causing these failures",
+    "summary": "1-2 sentences: the common failure pattern across all issues in this category, referencing specific evidence",
     "relatedIssueIds": ["id1", "id2"],
     "changes": [
       {
         "action": "add",
-        "lineToAdd": "The exact single line/instruction to insert",
-        "placementHint": "Where in the script to add it (e.g. State S1 - Availability Check)",
-        "context": "Why this specific change is needed"
+        "lineToAdd": "Exact single instruction to insert — specific, not generic",
+        "placementHint": "Pillar X > State SY - Name > Sub-section (Instructions/Entry Gate/Exit Gate/Example)",
+        "context": "1 sentence: what transcript evidence this addresses and why this line prevents it"
       },
       {
         "action": "replace",
-        "targetContent": "Exact verbatim line from script to replace",
+        "targetContent": "Verbatim line copied from the script being replaced",
         "lineToAdd": "The replacement line",
-        "placementHint": "Where this line lives in the script",
-        "context": "Why replacing this fixes the issue"
+        "placementHint": "Exact location in script",
+        "context": "What was wrong with the original line based on the evidence"
       },
       {
         "action": "remove",
-        "targetContent": "Exact verbatim line from script to remove",
-        "placementHint": "Where this line lives in the script",
-        "context": "Why removing this helps"
+        "targetContent": "Verbatim line copied from the script being removed",
+        "placementHint": "Exact location in script",
+        "context": "Why this line causes the observed failure"
       }
     ]
   }
 ]
 
-RULES:
-- Only include RCA categories that have actual issues. Do not invent categories.
-- rootCauseType must be one of: "knowledge", "instruction", "execution", "conversation", "model"
-- summary: 1-2 sentences — the common pattern across all issues in this category
-- Each change.lineToAdd = ONLY the single new line to insert, nothing else
-- Each change.targetContent = verbatim line copied from the script, nothing else
-- Each change.placementHint = location only (e.g. "State S2 - Objection Handling")
-- Each change.context = 1 sentence explaining why this specific change fixes the issue
-- DO NOT repeat the same change across categories
-- Match the script's language and formatting style
+━━━ RULES ━━━
+- Only include categories that have actual issues — do not invent categories
+- rootCauseType: one of "knowledge" | "instruction" | "execution" | "conversation" | "model"
+- lineToAdd = ONLY the new line — not the surrounding context
+- targetContent = verbatim copy from the script — do not paraphrase
+- placementHint = specific location including sub-section where applicable
+- context = reference the actual transcript evidence (e.g. "Bot said X when script requires Y")
+- Match the script's exact language, alphabet, and formatting style
+- Do NOT repeat the same change across categories
 
-⚠️ SCRIPT/ALPHABET PRESERVATION: Match the exact writing system of the reference script (Latin/Roman or Devanagari).
+⚠️ ALPHABET: Match the reference script's writing system exactly (Latin/Roman or Devanagari — do not mix or translate).
 
 Return ONLY valid JSON — no markdown, no comments.`;
 
   const issuesSummary = issues
-    .map(i => `Issue ID: ${i.id}\nType: ${i.type}\nSeverity: ${i.severity}\nExplanation: ${sanitizeText(i.explanation)}\nEvidence: ${sanitizeText(i.evidenceSnippet)}`)
+    .map(i => {
+      const parts = [
+        `Issue ID: ${i.id}`,
+        `Type: ${i.type}`,
+        `Severity: ${i.severity}`,
+        `Root Cause: ${i.rootCauseType || 'unknown'}`,
+        `What Happened: ${sanitizeText(i.whatHappened || i.explanation)}`,
+        `Transcript Evidence: ${sanitizeText(i.evidenceSnippet)}`,
+      ];
+      if (i.impact) parts.push(`Impact: ${sanitizeText(i.impact)}`);
+      if (i.instructionReference) parts.push(`Instruction Not Followed: ${sanitizeText(typeof i.instructionReference === 'string' ? i.instructionReference : i.instructionReference.text || JSON.stringify(i.instructionReference))}`);
+      return parts.join('\n');
+    })
     .join('\n\n---\n\n');
 
-  const userPrompt = `Issues detected:\n\n${issuesSummary}\n\n${
-    referenceScript ? `Reference Script:\n${referenceScript}\n\n` : ''
+  const userPrompt = `Issues detected in real calls:\n\n${issuesSummary}\n\n${
+    referenceScript ? `Current Reference Script:\n${referenceScript}\n\n` : ''
   }${
     knowledgeBase ? `Knowledge Base:\n${knowledgeBase}\n\n` : ''
-  }Group these issues by root cause and return one consolidated fix per category. Each fix should have all the specific line changes needed to resolve every issue in that category.`;
+  }Group these issues by root cause. For each category, produce one consolidated fix with all the specific line changes needed — written against the actual transcript evidence above, placed precisely within the reference script structure.`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
