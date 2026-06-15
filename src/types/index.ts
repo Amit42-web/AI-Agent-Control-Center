@@ -287,6 +287,7 @@ export interface AppState {
   // Results state - Objective flow
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
+  consolidatedFixes: ConsolidatedFix[] | null;
 
   // Results state - Open-ended flow
   scenarioResults: ScenarioResults | null;
