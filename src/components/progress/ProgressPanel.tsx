@@ -1,20 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp,
   TrendingDown,
   Minus,
   ChevronDown,
+  ChevronRight,
   AlertCircle,
   BarChart2,
   RefreshCw,
   GitBranch,
   Layers,
+  ListChecks,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { SavedAnalysis, Scenario, RootCauseType } from '@/types';
+import { SavedAnalysis, Scenario, RootCauseType, Severity } from '@/types';
 
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
 
@@ -143,6 +148,109 @@ function extractRCAStats(scenarios: Scenario[], totalCalls: number) {
   }));
 }
 
+// ─── Issue pattern matching ────────────────────────────────────────────────────
+
+function normalizeTitle(t: string): string {
+  return t.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+interface IssuePattern {
+  key: string;
+  title: string;
+  dimension?: string;
+  rootCauseType?: RootCauseType;
+  maxSeverity: Severity;
+  baselineCount: number;
+  currentCount: number;
+  baselineCalls: number;
+  currentCalls: number;
+  status: 'resolved' | 'persistent' | 'new';
+  // uptick = same issue but significantly more occurrences in current
+  isUptick: boolean;
+}
+
+function extractIssuePatterns(baseline: Scenario[], current: Scenario[]): IssuePattern[] {
+  // Group by normalized title
+  const baselineMap = new Map<string, { title: string; dimension?: string; rootCauseType?: RootCauseType; maxSeverity: Severity; count: number; calls: Set<string> }>();
+  const currentMap = new Map<string, { title: string; dimension?: string; rootCauseType?: RootCauseType; maxSeverity: Severity; count: number; calls: Set<string> }>();
+
+  const addToMap = (
+    map: typeof baselineMap,
+    scenario: Scenario
+  ) => {
+    const key = normalizeTitle(scenario.title);
+    if (!map.has(key)) {
+      map.set(key, {
+        title: scenario.title,
+        dimension: scenario.dimension,
+        rootCauseType: scenario.rootCauseType,
+        maxSeverity: scenario.severity,
+        count: 0,
+        calls: new Set(),
+      });
+    }
+    const entry = map.get(key)!;
+    entry.count++;
+    entry.calls.add(scenario.callId);
+    // Keep highest severity
+    if (SEVERITY_WEIGHT[scenario.severity] > SEVERITY_WEIGHT[entry.maxSeverity]) {
+      entry.maxSeverity = scenario.severity;
+    }
+  };
+
+  baseline.forEach(s => addToMap(baselineMap, s));
+  current.forEach(s => addToMap(currentMap, s));
+
+  const allKeys = new Set([...baselineMap.keys(), ...currentMap.keys()]);
+  const patterns: IssuePattern[] = [];
+
+  for (const key of allKeys) {
+    const b = baselineMap.get(key);
+    const c = currentMap.get(key);
+
+    const baselineCount = b?.count ?? 0;
+    const currentCount = c?.count ?? 0;
+    const title = c?.title ?? b?.title ?? key;
+    const dimension = c?.dimension ?? b?.dimension;
+    const rootCauseType = c?.rootCauseType ?? b?.rootCauseType;
+    const maxSeverity: Severity = (() => {
+      const bw = b ? SEVERITY_WEIGHT[b.maxSeverity] : 0;
+      const cw = c ? SEVERITY_WEIGHT[c.maxSeverity] : 0;
+      const top = Math.max(bw, cw);
+      return top >= 4 ? 'critical' : top >= 3 ? 'high' : top >= 2 ? 'medium' : 'low';
+    })();
+
+    let status: IssuePattern['status'];
+    if (baselineCount > 0 && currentCount === 0) status = 'resolved';
+    else if (baselineCount === 0 && currentCount > 0) status = 'new';
+    else status = 'persistent';
+
+    // Uptick: current count is more than 25% higher than baseline (and at least 1 more)
+    const isUptick = status === 'persistent' && currentCount > baselineCount && (currentCount - baselineCount) / baselineCount >= 0.25;
+
+    patterns.push({
+      key,
+      title,
+      dimension,
+      rootCauseType,
+      maxSeverity,
+      baselineCount,
+      currentCount,
+      baselineCalls: b?.calls.size ?? 0,
+      currentCalls: c?.calls.size ?? 0,
+      status,
+      isUptick,
+    });
+  }
+
+  // Sort: new/uptick first (by currentCount), then persistent (by currentCount), then resolved (by baselineCount)
+  const statusOrder = { new: 0, persistent: 1, resolved: 2 };
+  return patterns.sort((a, b) => {
+    if (statusOrder[a.status] !== statusOrder[b.status]) return statusOrder[a.status] - statusOrder[b.status];
+    return (b.currentCount || b.baselineCount) - (a.currentCount || a.baselineCount);
+  });
+}
+
 // ─── Delta cell ───────────────────────────────────────────────────────────────
 
 function DeltaCell({ delta }: { delta: number | null }) {
@@ -164,7 +272,7 @@ function DeltaCell({ delta }: { delta: number | null }) {
   );
 }
 
-// ─── Table ────────────────────────────────────────────────────────────────────
+// ─── Comparison table ─────────────────────────────────────────────────────────
 
 type RowData = ReturnType<typeof extractDimensionStats>[number] | ReturnType<typeof extractRCAStats>[number];
 
@@ -282,9 +390,255 @@ function ComparisonTable({
   );
 }
 
+// ─── Issue tracking tab ───────────────────────────────────────────────────────
+
+const SEVERITY_BADGE: Record<Severity, string> = {
+  critical: 'bg-red-500/20 text-red-300 border-red-500/30',
+  high: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  medium: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  low: 'bg-green-500/20 text-green-300 border-green-500/30',
+};
+
+function IssueRow({ pattern, showBaseline, i }: { pattern: IssuePattern; showBaseline: boolean; i: number }) {
+  const dimLetter = pattern.dimension?.charAt(0).toUpperCase();
+
+  return (
+    <motion.div
+      className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-navy-800)] last:border-0 hover:bg-[var(--color-navy-800)]/40 transition-colors"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: i * 0.03 }}
+    >
+      {/* Status icon */}
+      <div className="flex-shrink-0 w-5">
+        {pattern.status === 'resolved' && <CheckCircle2 className="w-4 h-4 text-green-400" />}
+        {pattern.status === 'new' && <XCircle className="w-4 h-4 text-red-400" />}
+        {pattern.status === 'persistent' && pattern.isUptick && <TrendingUp className="w-4 h-4 text-orange-400" />}
+        {pattern.status === 'persistent' && !pattern.isUptick && <Minus className="w-4 h-4 text-yellow-400" />}
+      </div>
+
+      {/* Title + meta */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm font-medium truncate ${
+            pattern.status === 'resolved' ? 'text-[var(--color-slate-400)] line-through' :
+            pattern.status === 'new' ? 'text-white' :
+            pattern.isUptick ? 'text-orange-200' : 'text-[var(--color-slate-200)]'
+          }`}>
+            {pattern.title}
+          </span>
+          {pattern.isUptick && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/30 flex-shrink-0">
+              uptick
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          {dimLetter && DIMENSIONS[dimLetter] && (
+            <span className="text-xs text-[var(--color-slate-500)]">
+              {dimLetter} · {DIMENSIONS[dimLetter]}
+            </span>
+          )}
+          {pattern.rootCauseType && (
+            <span className={`text-xs px-1.5 py-0 rounded border ${RCA_CATEGORIES[pattern.rootCauseType].bg} ${RCA_CATEGORIES[pattern.rootCauseType].color} ${RCA_CATEGORIES[pattern.rootCauseType].border}`}>
+              {RCA_ICONS[pattern.rootCauseType]} {RCA_CATEGORIES[pattern.rootCauseType].label}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Counts */}
+      <div className="flex items-center gap-3 flex-shrink-0 text-center">
+        {showBaseline && (
+          <>
+            <div className="w-12">
+              <div className="text-xs text-[var(--color-slate-500)]">prev</div>
+              <div className={`font-mono font-semibold text-sm ${pattern.baselineCount > 0 ? 'text-[var(--color-slate-300)]' : 'text-[var(--color-slate-600)]'}`}>
+                {pattern.baselineCount || '—'}
+              </div>
+            </div>
+            <div className="w-12">
+              <div className="text-xs text-[var(--color-slate-500)]">now</div>
+              <div className={`font-mono font-semibold text-sm ${pattern.currentCount > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'}`}>
+                {pattern.currentCount || '—'}
+              </div>
+            </div>
+            <div className="w-12">
+              <div className="text-xs text-[var(--color-slate-500)]">delta</div>
+              <DeltaCell delta={pattern.currentCount - pattern.baselineCount} />
+            </div>
+          </>
+        )}
+        {!showBaseline && (
+          <div className="w-12">
+            <div className="text-xs text-[var(--color-slate-500)]">count</div>
+            <div className="font-mono font-semibold text-sm text-white">{pattern.currentCount}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Severity */}
+      <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${SEVERITY_BADGE[pattern.maxSeverity]}`}>
+        {pattern.maxSeverity}
+      </span>
+    </motion.div>
+  );
+}
+
+function IssueSection({
+  title,
+  icon,
+  issues,
+  accentColor,
+  showBaseline,
+  defaultOpen,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  issues: IssuePattern[];
+  accentColor: string;
+  showBaseline: boolean;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  if (issues.length === 0) return null;
+
+  return (
+    <div className={`border-l-2 ${accentColor} mb-4 rounded-r-lg overflow-hidden`}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--color-navy-800)] hover:bg-[var(--color-navy-700)] transition-colors text-left"
+      >
+        {icon}
+        <span className="font-medium text-white text-sm">{title}</span>
+        <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-[var(--color-navy-700)] text-[var(--color-slate-400)] font-mono">
+          {issues.length}
+        </span>
+        {open
+          ? <ChevronDown className="w-4 h-4 text-[var(--color-slate-400)]" />
+          : <ChevronRight className="w-4 h-4 text-[var(--color-slate-400)]" />
+        }
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden bg-[var(--color-navy-900)]"
+          >
+            {issues.map((p, i) => (
+              <IssueRow key={p.key} pattern={p} showBaseline={showBaseline} i={i} />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function IssuesTab({
+  currentScenarios,
+  baselineScenarios,
+}: {
+  currentScenarios: Scenario[];
+  baselineScenarios: Scenario[] | null;
+}) {
+  if (!baselineScenarios) {
+    // No baseline — just show current run issues grouped by status-equivalent (all "current")
+    const patterns = extractIssuePatterns([], currentScenarios);
+    return (
+      <div>
+        <div className="px-4 py-3 border-b border-[var(--color-navy-700)] text-xs text-[var(--color-slate-400)]">
+          Select a previous run above to see resolved / persistent / new breakdowns. Showing current run issues only.
+        </div>
+        <div className="p-4">
+          {patterns.map((p, i) => (
+            <IssueRow key={p.key} pattern={p} showBaseline={false} i={i} />
+          ))}
+          {patterns.length === 0 && (
+            <p className="text-[var(--color-slate-500)] text-sm text-center py-8">No issues found in current run.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const patterns = extractIssuePatterns(baselineScenarios, currentScenarios);
+  const resolved = patterns.filter(p => p.status === 'resolved');
+  const persistent = patterns.filter(p => p.status === 'persistent');
+  const uptick = persistent.filter(p => p.isUptick);
+  const stable = persistent.filter(p => !p.isUptick);
+  const newIssues = patterns.filter(p => p.status === 'new');
+
+  return (
+    <div>
+      {/* Summary strip */}
+      <div className="grid grid-cols-4 divide-x divide-[var(--color-navy-700)] border-b border-[var(--color-navy-700)]">
+        <div className="px-4 py-3 text-center">
+          <div className="text-lg font-bold text-green-400">{resolved.length}</div>
+          <div className="text-xs text-[var(--color-slate-500)]">Resolved</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-lg font-bold text-orange-400">{uptick.length}</div>
+          <div className="text-xs text-[var(--color-slate-500)]">Uptick</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-lg font-bold text-yellow-400">{stable.length}</div>
+          <div className="text-xs text-[var(--color-slate-500)]">Persistent</div>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <div className="text-lg font-bold text-red-400">{newIssues.length}</div>
+          <div className="text-xs text-[var(--color-slate-500)]">New</div>
+        </div>
+      </div>
+
+      {/* Sections */}
+      <div className="p-4">
+        <IssueSection
+          title="New Issues"
+          icon={<XCircle className="w-4 h-4 text-red-400" />}
+          issues={newIssues}
+          accentColor="border-red-500"
+          showBaseline
+          defaultOpen={true}
+        />
+        <IssueSection
+          title="Uptick — Worsening Issues"
+          icon={<TrendingUp className="w-4 h-4 text-orange-400" />}
+          issues={uptick}
+          accentColor="border-orange-500"
+          showBaseline
+          defaultOpen={true}
+        />
+        <IssueSection
+          title="Persistent — Still Occurring"
+          icon={<AlertTriangle className="w-4 h-4 text-yellow-400" />}
+          issues={stable}
+          accentColor="border-yellow-500"
+          showBaseline
+          defaultOpen={false}
+        />
+        <IssueSection
+          title="Resolved — No Longer Detected"
+          icon={<CheckCircle2 className="w-4 h-4 text-green-400" />}
+          issues={resolved}
+          accentColor="border-green-500"
+          showBaseline
+          defaultOpen={false}
+        />
+        {patterns.length === 0 && (
+          <p className="text-[var(--color-slate-500)] text-sm text-center py-8">No issues to compare.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-type ViewTab = 'dimensions' | 'rca';
+type ViewTab = 'dimensions' | 'rca' | 'issues';
 
 export function ProgressPanel() {
   const { scenarioResults, fixesApplied, currentAnalysisId, currentAnalysisName, transcripts } = useAppStore();
@@ -295,7 +649,7 @@ export function ProgressPanel() {
   const [baselineName, setBaselineName] = useState<string>('');
   const [loadingBaseline, setLoadingBaseline] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(true);
-  const [activeTab, setActiveTab] = useState<ViewTab>('dimensions');
+  const [activeTab, setActiveTab] = useState<ViewTab>('issues');
 
   useEffect(() => { loadAnalysesList(); }, []);
 
@@ -340,6 +694,18 @@ export function ProgressPanel() {
 
   const activeRows = activeTab === 'dimensions' ? currentDimStats : currentRCAStats;
   const activeBaselineRows = activeTab === 'dimensions' ? baselineDimStats : baselineRCAStats;
+
+  const tabs: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'issues', label: 'Issues', icon: <ListChecks className="w-3.5 h-3.5" /> },
+    { id: 'dimensions', label: 'Dimensions', icon: <Layers className="w-3.5 h-3.5" /> },
+    { id: 'rca', label: 'Root Cause', icon: <GitBranch className="w-3.5 h-3.5" /> },
+  ];
+
+  const tabColors: Record<ViewTab, { active: string }> = {
+    issues: { active: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' },
+    dimensions: { active: 'bg-blue-500/20 text-blue-300 border border-blue-500/30' },
+    rca: { active: 'bg-purple-500/20 text-purple-300 border border-purple-500/30' },
+  };
 
   return (
     <div className="space-y-6">
@@ -440,21 +806,27 @@ export function ProgressPanel() {
         </div>
       )}
 
-      {/* Comparison table with tab toggle */}
+      {/* Comparison panel with tab toggle */}
       {!loadingBaseline && (
         <div className="glass-card overflow-hidden">
           <div className="p-4 border-b border-[var(--color-navy-700)] flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {activeTab === 'dimensions'
-                ? <BarChart2 className="w-5 h-5 text-blue-400" />
-                : <GitBranch className="w-5 h-5 text-purple-400" />
-              }
+              {activeTab === 'issues' && <ListChecks className="w-5 h-5 text-emerald-400" />}
+              {activeTab === 'dimensions' && <BarChart2 className="w-5 h-5 text-blue-400" />}
+              {activeTab === 'rca' && <GitBranch className="w-5 h-5 text-purple-400" />}
               <h4 className="font-semibold text-white">
-                {activeTab === 'dimensions' ? 'By Dimension' : 'By Root Cause'}
+                {activeTab === 'issues' ? 'Issue Tracking' : activeTab === 'dimensions' ? 'By Dimension' : 'By Root Cause'}
               </h4>
-              {activeBaselineRows !== null && (
+              {activeBaselineRows !== null && activeTab !== 'issues' && (
                 <span className="text-xs text-[var(--color-slate-400)] ml-2">
                   <span className="text-blue-300">{currentAnalysisName || 'Current'}</span>
+                  {' vs '}
+                  <span className="text-purple-300">{baselineName}</span>
+                </span>
+              )}
+              {baselineName && activeTab === 'issues' && (
+                <span className="text-xs text-[var(--color-slate-400)] ml-2">
+                  <span className="text-emerald-300">{currentAnalysisName || 'Current'}</span>
                   {' vs '}
                   <span className="text-purple-300">{baselineName}</span>
                 </span>
@@ -463,65 +835,66 @@ export function ProgressPanel() {
 
             {/* Tab toggle */}
             <div className="flex items-center gap-1 bg-[var(--color-navy-800)] p-1 rounded-lg border border-[var(--color-navy-700)]">
-              <button
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  activeTab === 'dimensions'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                    : 'text-[var(--color-slate-400)] hover:text-white hover:bg-[var(--color-navy-700)]'
-                }`}
-                onClick={() => setActiveTab('dimensions')}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Dimensions
-              </button>
-              <button
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  activeTab === 'rca'
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                    : 'text-[var(--color-slate-400)] hover:text-white hover:bg-[var(--color-navy-700)]'
-                }`}
-                onClick={() => setActiveTab('rca')}
-              >
-                <GitBranch className="w-3.5 h-3.5" />
-                Root Cause
-              </button>
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? tabColors[tab.id].active
+                      : 'text-[var(--color-slate-400)] hover:text-white hover:bg-[var(--color-navy-700)]'
+                  }`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <ComparisonTable
-            rows={activeRows}
-            baselineRows={activeBaselineRows}
-            isRCA={activeTab === 'rca'}
-            baselineStats={activeBaselineRows}
-          />
+          {activeTab === 'issues' ? (
+            <IssuesTab
+              currentScenarios={currentScenarios}
+              baselineScenarios={baselineScenarios}
+            />
+          ) : (
+            <ComparisonTable
+              rows={activeRows}
+              baselineRows={activeBaselineRows}
+              isRCA={activeTab === 'rca'}
+              baselineStats={activeBaselineRows}
+            />
+          )}
 
-          {/* Legend */}
-          <div className="px-4 py-3 border-t border-[var(--color-navy-700)] flex flex-wrap items-center gap-4 text-xs text-[var(--color-slate-400)]">
-            <span className="flex items-center gap-1.5">
-              <TrendingDown className="w-3 h-3 text-green-400" />
-              Fewer scenarios = improvement
-            </span>
-            <span className="flex items-center gap-1.5">
-              <TrendingUp className="w-3 h-3 text-red-400" />
-              More scenarios = regression
-            </span>
-            {activeTab === 'dimensions' && (
+          {/* Legend (dimension/rca only) */}
+          {activeTab !== 'issues' && (
+            <div className="px-4 py-3 border-t border-[var(--color-navy-700)] flex flex-wrap items-center gap-4 text-xs text-[var(--color-slate-400)]">
               <span className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 text-xs flex items-center justify-center font-bold">G</span>
-                Discovery — track separately
+                <TrendingDown className="w-3 h-3 text-green-400" />
+                Fewer scenarios = improvement
               </span>
-            )}
-            {activeTab === 'rca' && (
-              <span className="flex items-center gap-1.5 text-amber-400">
-                🤖 Model — training-level change, not a prompt fix
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="w-3 h-3 text-red-400" />
+                More scenarios = regression
               </span>
-            )}
-            {activeBaselineRows === null && (
-              <span className="ml-auto text-[var(--color-slate-500)]">
-                Select a previous run above to see deltas
-              </span>
-            )}
-          </div>
+              {activeTab === 'dimensions' && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 text-xs flex items-center justify-center font-bold">G</span>
+                  Discovery — track separately
+                </span>
+              )}
+              {activeTab === 'rca' && (
+                <span className="flex items-center gap-1.5 text-amber-400">
+                  🤖 Model — training-level change, not a prompt fix
+                </span>
+              )}
+              {activeBaselineRows === null && (
+                <span className="ml-auto text-[var(--color-slate-500)]">
+                  Select a previous run above to see deltas
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
