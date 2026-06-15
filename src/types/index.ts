@@ -244,6 +244,7 @@ export interface AnalysisState {
   openaiConfig: OpenAIConfig;
   results: AnalysisResult | null;
   fixes: FixSuggestions | null;
+  consolidatedFixes: ConsolidatedFix[] | null;
   scenarioResults: ScenarioResults | null; // For open-ended flow
   enhancedFixes: EnhancedFixSuggestions | null; // For open-ended flow
   selectedCallId: string | null;
