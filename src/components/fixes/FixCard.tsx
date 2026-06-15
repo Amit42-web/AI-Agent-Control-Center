@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, ChevronDown, ChevronUp, Target, MapPin, MessageSquare, AlertCircle } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, Target, MapPin, MessageSquare, AlertCircle, Info } from 'lucide-react';
 import { Fix, RootCauseType } from '@/types';
 
 const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
@@ -141,8 +141,8 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
             </div>
           )}
 
-          {/* Suggestion (for add/replace) */}
-          {fix.action !== 'remove' && (
+          {/* Line to Add/Replace */}
+          {fix.action !== 'remove' && (fix.lineToAdd || fix.suggestion) && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -155,7 +155,7 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-[var(--color-navy-700)] hover:bg-[var(--color-navy-600)] text-[var(--color-slate-300)] transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
-                    copyToClipboard(fix.suggestion, 'suggestion');
+                    copyToClipboard(fix.lineToAdd || fix.suggestion, 'suggestion');
                   }}
                 >
                   {copiedField === 'suggestion' ? (
@@ -168,8 +168,21 @@ export function FixCard({ fix, index, isSelected = false, onToggleSelect }: FixC
               <div className="flex items-start gap-2 bg-green-500/10 border border-green-500/25 rounded-lg px-3 py-2.5">
                 <span className="text-green-400 font-mono font-bold text-sm select-none mt-0.5">+</span>
                 <code className="text-sm text-green-300 font-mono leading-relaxed break-all">
-                  {fix.suggestion}
+                  {fix.lineToAdd || fix.suggestion}
                 </code>
+              </div>
+            </div>
+          )}
+
+          {/* Context — why this change helps */}
+          {fix.context && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-medium text-[var(--color-slate-300)]">Why this helps</span>
+              </div>
+              <div className="glass-card-subtle px-3 py-2.5">
+                <p className="text-sm text-[var(--color-slate-400)] leading-relaxed">{fix.context}</p>
               </div>
             </div>
           )}

@@ -472,54 +472,45 @@ For each fix, provide a JSON object with these SEPARATE fields:
   * "add": Insert new content (most common)
   * "remove": Delete existing problematic content
   * "replace": Replace existing content with improved version
-- suggestion: The EXACT prompt text/instruction to add - write the literal text that should be added to the prompt, not a description
-- targetContent: (ONLY for "remove" or "replace") The exact text from the script to remove/replace
+- lineToAdd: The EXACT single line/instruction to insert into the script — nothing else, no surrounding context
+- targetContent: (ONLY for "remove" or "replace") The exact single line from the script to remove/replace — copy it verbatim
+- context: 1-2 sentences explaining what this change does and why it helps. This is where examples and reasoning go.
 - placementHint: ONLY where to make the change (e.g., "Add to State S1" or "Replace in State S2")
 - exampleResponse: (OPTIONAL) What the bot should actually say to customers (this CAN be in native language/Hinglish)
 - relatedIssueIds: array of issue IDs this addresses
 
-🎯 LANGUAGE RULES FOR SUGGESTION FIELD:
-- suggestion field = EXACT prompt text to add in ENGLISH (must be copy-paste ready)
-- DO NOT write meta-descriptions like "Add explicit guidance to..." or "Instruct the bot to..."
-- Write the LITERAL instruction text: "When customer interrupts, acknowledge immediately and redirect..."
-- DO NOT write in romanized Hindi/Hinglish like "Availability check ko hamesha..."
-- exampleResponse field = What bot SAYS to customers (can be Hindi/Hinglish/native language)
+🎯 FIELD SEPARATION RULES:
+- "lineToAdd" = ONLY the new single line/instruction to insert. No examples, no explanation, no surrounding context. ENGLISH only.
+- "targetContent" = ONLY the verbatim line from the script being removed/replaced. Nothing else.
+- "context" = 1-2 sentences: what this change does and why it helps. Put examples and reasoning here.
+- "exampleResponse" = What bot SAYS to the customer (can be Hindi/Hinglish/native language)
+- "placementHint" = Where in the script to make the change (location only)
 
-🚨 CRITICAL - SUGGESTION FIELD RULES:
-- "suggestion" = ONE sentence only. Maximum 20 words. The literal instruction to insert into the script.
-- DO NOT include examples inside suggestion — examples go ONLY in "exampleResponse"
-- DO NOT explain why — just state the instruction
-- DO NOT return the whole section/block — only the new line being added
-- DO NOT start with "In State X", "Add to...", "Ensure that...", "Make sure..." — write the instruction directly
-- BAD: "Ask the availability question in one complete, uninterrupted sentence. Do not break it into fragments or pause mid-sentence. Example: 'Namaste...'"
-- GOOD: "Ask availability in one complete uninterrupted sentence."
+🚨 CRITICAL - lineToAdd RULES:
+- Return ONLY the new line being inserted — not the whole section
+- If State S1 has 5 existing lines and you add 1 new line, lineToAdd = that 1 new line only
+- Do NOT start with "In State X", "Add to...", "Ensure that...", "Make sure..."
+- Write the instruction directly: "When customer interrupts, acknowledge and redirect."
 
-🚨 CRITICAL - TARGETCONTENT FIELD RULES (for remove/replace):
-- "targetContent" = The EXACT single line/sentence to remove or replace — copy it verbatim from the script
-- ONE LINE only — do not include surrounding context lines that are not changing
+🚨 CRITICAL - targetContent RULES (for remove/replace):
+- Copy the exact line verbatim from the script — do not paraphrase or include surrounding lines
 
-CRITICAL SEPARATION:
-- "suggestion" = 1 sentence, the new line to insert, nothing else
-- "targetContent" = 1 line verbatim from script, nothing else
-- "exampleResponse" = what the bot says to the customer (can be long, in native language)
-- "placementHint" = where to make the change (location only)
-- "problem" = why this is an issue (explanation goes here, not in suggestion)
-
-Example for LATIN/ROMAN script reference (CORRECT - DO THIS):
+Example (CORRECT - DO THIS):
 Reference script format: "State S0 - Availability & Readiness Check / Confirm customer availability"
 Scenario: Bot failed to ask availability as a single uninterrupted sentence (rootCauseType: "execution")
 {
   "action": "add",
   "rootCauseType": "execution",
-  "suggestion": "Ask availability in one complete uninterrupted sentence without mid-sentence pauses.",
+  "lineToAdd": "Ask availability in one complete uninterrupted sentence without mid-sentence pauses.",
+  "context": "Bot was breaking the availability question mid-sentence causing customer confusion. This instruction enforces it as a single fluent sentence.",
   "exampleResponse": "Namaste, kya abhi aap baat karna aapke liye theek rahega? Yeh call sirf 2 minute ka hai.",
   "placementHint": "Add under State S0 - Availability & Readiness Check"
 }
 
-WRONG Example 5 (DO NOT DO THIS - returns entire section when only 1 line is new):
+WRONG Example (DO NOT DO THIS - lineToAdd contains entire section, not just the new line):
 {
   "action": "add",
-  "suggestion": "State S0 - Availability Check\n- Greet customer\n- Ask availability\n- NEW LINE: Ask in one sentence\n- Confirm readiness",  ← WRONG - includes existing lines, only the NEW LINE should be in suggestion
+  "lineToAdd": "State S0 - Availability Check\n- Greet customer\n- Ask availability\n- Ask in one sentence\n- Confirm readiness",
   "placementHint": "Add to State S0"
 }
 
@@ -577,11 +568,11 @@ Return JSON: {"scriptFixes": [...], "generalFixes": [...]}`;
 2. FORMAT: Match the reference script's formatting style (State S0, bullet points, etc.)
 3. LOCATION: DO NOT include location/placement info in "suggestion" - that goes in "placementHint"
 4. RCA ALIGNMENT: Set rootCauseType based on the ROOT CAUSE of the issue, not the solution type (execution failure fix should be tagged "execution" even if solution adds instructions)
-5. EXACT TEXT: Write the literal instruction to add, NOT a description like "Add guidance to..."
-6. ONE LINE ONLY: suggestion = max 1 sentence, max 20 words. No examples in suggestion (examples go in exampleResponse). Never return the whole block.
-7. If you want to explain or give an example, put it in "problem" or "exampleResponse" — NOT in "suggestion".
+5. lineToAdd = only the new single line to insert, nothing else
+6. targetContent = verbatim line from script being removed/replaced, nothing else
+7. context = explanation and reasoning (1-2 sentences) — put examples and rationale here, not in lineToAdd
 
-Think: "suggestion" = 1 short instruction line | "targetContent" = 1 verbatim line from script | "exampleResponse" = What bot says to customers`;
+Think: "lineToAdd" = the 1 new line | "context" = why/how | "exampleResponse" = what bot says to customer`;
 
   try {
     const response = await callOpenAI(apiKey, model, [
@@ -708,7 +699,9 @@ Think: "suggestion" = 1 short instruction line | "targetContent" = 1 verbatim li
             id: `script-fix-${idx}`,
             issueType: fix.issueType || 'quality_issue',
             problem: fix.problem || 'Issue detected',
-            suggestion: fix.suggestion || '',
+            lineToAdd: fix.lineToAdd || '',
+            context: fix.context || '',
+            suggestion: fix.lineToAdd || fix.suggestion || '',
             placementHint: fix.placementHint || 'Add to system prompt',
             exampleResponse: fix.exampleResponse || '',
             relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
@@ -731,7 +724,9 @@ Think: "suggestion" = 1 short instruction line | "targetContent" = 1 verbatim li
             id: `general-fix-${idx}`,
             issueType: fix.issueType || 'quality_issue',
             problem: fix.problem || 'Issue detected',
-            suggestion: fix.suggestion || '',
+            lineToAdd: fix.lineToAdd || '',
+            context: fix.context || '',
+            suggestion: fix.lineToAdd || fix.suggestion || '',
             placementHint: fix.placementHint || 'Add to system prompt',
             exampleResponse: fix.exampleResponse || '',
             relatedIssueIds: Array.isArray(fix.relatedIssueIds) ? fix.relatedIssueIds : [],
