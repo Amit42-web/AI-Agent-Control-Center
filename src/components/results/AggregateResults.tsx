@@ -141,7 +141,8 @@ export function AggregateResults() {
       .join(' ');
   };
 
-  // LLM-based aggregation for all issues — skips if already cached in store
+  // LLM-based aggregation for all issues — skips if already cached in store.
+  // Use getState() to peek at the cached value without subscribing (avoids infinite loop).
   useEffect(() => {
     const performAggregation = async () => {
       if (!results?.issues || results.issues.length === 0) {
@@ -149,8 +150,8 @@ export function AggregateResults() {
         return;
       }
 
-      // Already computed for this result set — skip
-      if (storedAggregatedIssues !== null) return;
+      // Check current store value without adding it as a dependency
+      if (useAppStore.getState().aggregatedIssues !== null) return;
 
       setIsAggregating(true);
       setAggregationError(null);
@@ -202,9 +203,11 @@ export function AggregateResults() {
     };
 
     performAggregation();
-  }, [results?.issues, storedAggregatedIssues]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results?.issues]);
 
-  // LLM-based scenario aggregation for open-ended flow — skips if already cached in store
+  // LLM-based scenario aggregation for open-ended flow — skips if already cached in store.
+  // Use getState() to peek at the cached value without subscribing (avoids infinite loop).
   useEffect(() => {
     const performScenarioAggregation = async () => {
       if (!scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
@@ -214,8 +217,8 @@ export function AggregateResults() {
         return;
       }
 
-      // Already computed for this result set — skip
-      if (storedAggregatedScenarios !== null) {
+      // Check current store value without adding it as a dependency
+      if (useAppStore.getState().aggregatedScenarios !== null) {
         console.log('[LLM Scenario Aggregation] Skipping - already cached in store');
         return;
       }
@@ -259,7 +262,8 @@ export function AggregateResults() {
     };
 
     performScenarioAggregation();
-  }, [scenarioResults?.scenarios, storedAggregatedScenarios]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioResults?.scenarios]);
 
   // Aggregate scenarios for open-ended flow
   const scenarioAggregation = useMemo(() => {
