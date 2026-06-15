@@ -2,6 +2,7 @@ export interface DimensionPromptDefault {
   id: string;
   label: string;
   color: string; // tailwind color name for badge
+  tags: string[]; // topic chips shown on collapsed card
   defaultPrompt: string;
 }
 
@@ -10,6 +11,7 @@ export const DEFAULT_DIMENSION_PROMPTS: DimensionPromptDefault[] = [
     id: 'A',
     label: 'Conversation Control & Flow',
     color: 'blue',
+    tags: ['Circular loops', 'Dead ends', 'Topic drops', 'Lost objective', 'Premature closure'],
     defaultPrompt: `Evaluate whether the agent maintains direction and purpose of the call from opening to close.
 
 FLAG if the agent:
@@ -33,6 +35,7 @@ SEVERITY: High = agent loses primary objective entirely, customer left unresolve
     id: 'B',
     label: 'Temporal Dynamics & Turn-Taking',
     color: 'cyan',
+    tags: ['Interruptions', 'Rushed disclosures', 'Pacing issues', 'Long monologues', 'Silence handling'],
     defaultPrompt: `Evaluate whether the agent respects conversational rhythm — pacing, timing, and the give-and-take of turns.
 
 FLAG if the agent:
@@ -56,6 +59,7 @@ SEVERITY: High = rushed material disclosure or missed acknowledgment on a commit
     id: 'C',
     label: 'Context Tracking & Intent Alignment',
     color: 'green',
+    tags: ['Re-asking info', 'Wrong intent', 'Missed signals', 'Sub-intent drops', 'Context contradiction'],
     defaultPrompt: `Evaluate whether the agent retains and correctly applies information established earlier in the call, and addresses what the customer actually means — not just what they literally said.
 
 FLAG if the agent:
@@ -79,6 +83,7 @@ SEVERITY: High = agent acts on wrong intent or drops a customer constraint, lead
     id: 'D',
     label: 'Language Quality & Human-Likeness',
     color: 'purple',
+    tags: ['Robotic phrasing', 'Code-switching', 'Scripted repetition', 'Register mismatch', 'Jargon without clarity'],
     defaultPrompt: `Evaluate whether the agent's language sounds natural, appropriate, and clear — or robotic, scripted, or confusing in a way that degrades the customer experience.
 
 This dimension applies to Hinglish (Hindi + English) calls. The agent is expected to match the customer's dominant language register. Code-switching is normal and acceptable — the issue is whether it creates confusion or distance.
@@ -105,6 +110,7 @@ SEVERITY: High = language failure creates a materially false understanding or ca
     id: 'E',
     label: 'Knowledge & Accuracy',
     color: 'orange',
+    tags: ['False claims', 'Removed qualifiers', 'Unsupported info', 'Hardened commitments', 'Source contradiction'],
     defaultPrompt: `Evaluate whether the agent states things that are factually correct and appropriately scoped relative to approved sources (KB and/or Script).
 
 FLAG if the agent:
@@ -128,6 +134,7 @@ SEVERITY: High = incorrect commitment on pricing, eligibility, dates, or complia
     id: 'F',
     label: 'Process & Policy Adherence',
     color: 'pink',
+    tags: ['Skipped steps', 'Consent gates', 'Wrong sequence', 'Unauthorized actions', 'Policy misapplication'],
     defaultPrompt: `Evaluate whether the agent executes required procedural steps in the right sequence — judging whether the RISK CONTROL FUNCTION of each step was fulfilled, not whether exact scripted language was used.
 
 If the 8-Pillar Framework is not provided in inputs, limit evaluation to process steps explicitly defined in the KB or Script only.
@@ -153,6 +160,7 @@ SEVERITY: High = security/identity gate bypassed before account access; unauthor
     id: 'G',
     label: 'Novel & Emerging Issues',
     color: 'yellow',
+    tags: ['AI hallucinations', 'Bias / insensitivity', 'Privacy concerns', 'Emerging patterns', 'Uncategorized'],
     defaultPrompt: `Use this dimension ONLY for behavior that does not clearly fit dimensions A–F, is not explicitly covered by KB, Script, or the 8-Pillar framework, but a senior human QA would still consider noteworthy.
 
 WHEN TO USE:

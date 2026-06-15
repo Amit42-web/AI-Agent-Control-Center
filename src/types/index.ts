@@ -146,6 +146,7 @@ export interface DimensionPrompt {
   id: string;
   label: string;
   color: string;
+  tags: string[];
   prompt: string;
   defaultPrompt: string;
   enabled: boolean;
