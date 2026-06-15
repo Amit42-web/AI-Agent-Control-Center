@@ -7,6 +7,8 @@ import {
   CheckConfig,
   Transcript,
   AnalysisResult,
+  AggregatedIssue,
+  AggregatedScenario,
   IssueType,
   Severity,
   DetectedIssue,
@@ -103,6 +105,8 @@ const initialState = {
   consolidatedFixes: null,
   scenarioResults: null,
   enhancedFixes: null,
+  aggregatedIssues: null,
+  aggregatedScenarios: null,
   selectedCallId: null,
   selectedIssueId: null,
   selectedDimension: null,
@@ -237,7 +241,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    set({ isRunning: true, runProgress: 0, currentStep: 'running' });
+    set({ isRunning: true, runProgress: 0, currentStep: 'running', aggregatedIssues: null, aggregatedScenarios: null });
 
     try {
       if (flowType === 'objective') {
@@ -479,6 +483,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedDimension: (dimension: string | null) => set({ selectedDimension: dimension }),
 
+  setAggregatedIssues: (issues: AggregatedIssue[]) => set({ aggregatedIssues: issues }),
+
+  setAggregatedScenarios: (scenarios: AggregatedScenario[]) => set({ aggregatedScenarios: scenarios }),
+
   markFixesApplied: async () => {
     set({ fixesApplied: true });
     const state = get();
@@ -545,6 +553,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       consolidatedFixes: analysisState.consolidatedFixes || null,
       scenarioResults: analysisState.scenarioResults,
       enhancedFixes: analysisState.enhancedFixes,
+      aggregatedIssues: null,
+      aggregatedScenarios: null,
       selectedCallId: analysisState.selectedCallId,
       fixesApplied: analysisState.fixesApplied || false,
       currentStep: analysisState.enhancedFixes || analysisState.consolidatedFixes || analysisState.fixes

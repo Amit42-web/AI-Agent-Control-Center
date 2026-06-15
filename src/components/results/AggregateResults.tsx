@@ -99,7 +99,14 @@ function findMatchingIssue(scenario: { callId: string; lineNumbers: number[] }, 
 }
 
 export function AggregateResults() {
-  const { results, checks, scenarioResults, flowType, setResultsViewMode, setSelectedCallId, setSelectedIssueId, setSelectedDimension } = useAppStore();
+  const {
+    results, checks, scenarioResults, flowType,
+    setResultsViewMode, setSelectedCallId, setSelectedIssueId, setSelectedDimension,
+    aggregatedIssues: storedAggregatedIssues,
+    aggregatedScenarios: storedAggregatedScenarios,
+    setAggregatedIssues: storeSetAggregatedIssues,
+    setAggregatedScenarios: storeSetAggregatedScenarios,
+  } = useAppStore();
 
   // Detect flow type early - needed for useMemo hooks
   // If flowType is undefined but scenarioResults exists with scenarios, assume open-ended
@@ -110,15 +117,15 @@ export function AggregateResults() {
   const [autoExpandTarget, setAutoExpandTarget] = React.useState<{ scenarioId: string; timestamp: number } | null>(null);
   const rcaBreakdownRef = React.useRef<HTMLDivElement>(null);
 
-  // State for LLM-based aggregation
-  const [aggregatedIssues, setAggregatedIssues] = useState<AggregatedIssue[]>([]);
+  // LLM aggregation loading/error state (UI only — results cached in store)
   const [isAggregating, setIsAggregating] = useState(false);
   const [aggregationError, setAggregationError] = useState<string | null>(null);
-
-  // State for LLM-based scenario aggregation
-  const [aggregatedScenarios, setAggregatedScenarios] = useState<AggregatedScenario[]>([]);
   const [isAggregatingScenarios, setIsAggregatingScenarios] = useState(false);
   const lastProcessedScenariosRef = React.useRef<number>(0);
+
+  // Use store-cached values; fall back to empty arrays while loading
+  const aggregatedIssues = storedAggregatedIssues ?? [];
+  const aggregatedScenarios = storedAggregatedScenarios ?? [];
 
   const getIssueTypeLabel = (type: IssueType): string => {
     if (type in issueTypeLabels) {
@@ -134,24 +141,26 @@ export function AggregateResults() {
       .join(' ');
   };
 
-  // LLM-based aggregation for all issues
+  // LLM-based aggregation for all issues — skips if already cached in store
   useEffect(() => {
     const performAggregation = async () => {
       if (!results?.issues || results.issues.length === 0) {
-        setAggregatedIssues([]);
+        storeSetAggregatedIssues([]);
         return;
       }
+
+      // Already computed for this result set — skip
+      if (storedAggregatedIssues !== null) return;
 
       setIsAggregating(true);
       setAggregationError(null);
 
       try {
         const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
-        const model = 'gpt-4o-mini'; // Fast and cost-effective for aggregation
+        const model = 'gpt-4o-mini';
 
         if (!apiKey) {
           console.warn('[LLM Aggregation] No API key found, using fallback aggregation');
-          // Fallback: group by exact type
           const grouped = new Map<string, DetectedIssue[]>();
           results.issues.forEach(issue => {
             const key = issue.type;
@@ -174,7 +183,7 @@ export function AggregateResults() {
             };
           });
 
-          setAggregatedIssues(fallbackAgg);
+          storeSetAggregatedIssues(fallbackAgg);
           setIsAggregating(false);
           return;
         }
@@ -182,46 +191,44 @@ export function AggregateResults() {
         console.log(`[LLM Aggregation] Starting aggregation for ${results.issues.length} issues`);
         const aggregated = await aggregateIssuesWithLLM(apiKey, model, results.issues);
         console.log(`[LLM Aggregation] Completed - ${aggregated.length} categories created`);
-        setAggregatedIssues(aggregated);
+        storeSetAggregatedIssues(aggregated);
       } catch (error) {
         console.error('[LLM Aggregation] Error:', error);
         setAggregationError(error instanceof Error ? error.message : 'Aggregation failed');
-        // Fallback on error
-        setAggregatedIssues([]);
+        storeSetAggregatedIssues([]);
       } finally {
         setIsAggregating(false);
       }
     };
 
     performAggregation();
-  }, [results?.issues]);
+  }, [results?.issues, storedAggregatedIssues]);
 
-  // LLM-based scenario aggregation for open-ended flow
+  // LLM-based scenario aggregation for open-ended flow — skips if already cached in store
   useEffect(() => {
     const performScenarioAggregation = async () => {
       if (!scenarioResults?.scenarios || scenarioResults.scenarios.length === 0) {
-        setAggregatedScenarios([]);
+        storeSetAggregatedScenarios([]);
         setIsAggregatingScenarios(false);
         lastProcessedScenariosRef.current = 0;
         return;
       }
 
-      // Prevent duplicate aggregations for the same scenarios
-      if (lastProcessedScenariosRef.current === scenarioResults.scenarios.length && aggregatedScenarios.length > 0) {
-        console.log('[LLM Scenario Aggregation] Skipping - already processed these scenarios');
+      // Already computed for this result set — skip
+      if (storedAggregatedScenarios !== null) {
+        console.log('[LLM Scenario Aggregation] Skipping - already cached in store');
         return;
       }
 
       lastProcessedScenariosRef.current = scenarioResults.scenarios.length;
       setIsAggregatingScenarios(true);
 
-      // Add timeout to prevent indefinite loading
       const timeoutId = setTimeout(() => {
         console.warn('[LLM Scenario Aggregation] Timeout reached, using fallback');
         const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
-        setAggregatedScenarios(fallbackAgg);
+        storeSetAggregatedScenarios(fallbackAgg);
         setIsAggregatingScenarios(false);
-      }, 30000); // 30 second timeout
+      }, 30000);
 
       try {
         const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
@@ -230,9 +237,8 @@ export function AggregateResults() {
         if (!apiKey) {
           console.warn('[LLM Scenario Aggregation] No API key found, using fallback aggregation');
           clearTimeout(timeoutId);
-          // Fallback: use original aggregateScenarios function
           const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
-          setAggregatedScenarios(fallbackAgg);
+          storeSetAggregatedScenarios(fallbackAgg);
           setIsAggregatingScenarios(false);
           return;
         }
@@ -241,20 +247,19 @@ export function AggregateResults() {
         const aggregated = await aggregateScenariosWithLLM(scenarioResults.scenarios, apiKey, model);
         console.log(`[LLM Scenario Aggregation] Completed - ${aggregated.length} categories created`);
         clearTimeout(timeoutId);
-        setAggregatedScenarios(aggregated);
+        storeSetAggregatedScenarios(aggregated);
       } catch (error) {
         console.error('[LLM Scenario Aggregation] Error:', error);
         clearTimeout(timeoutId);
-        // Fallback on error: use original aggregateScenarios function
         const fallbackAgg = aggregateScenarios(scenarioResults.scenarios);
-        setAggregatedScenarios(fallbackAgg);
+        storeSetAggregatedScenarios(fallbackAgg);
       } finally {
         setIsAggregatingScenarios(false);
       }
     };
 
     performScenarioAggregation();
-  }, [scenarioResults?.scenarios]);
+  }, [scenarioResults?.scenarios, storedAggregatedScenarios]);
 
   // Aggregate scenarios for open-ended flow
   const scenarioAggregation = useMemo(() => {

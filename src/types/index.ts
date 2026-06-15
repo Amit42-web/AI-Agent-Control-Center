@@ -309,6 +309,10 @@ export interface AppState {
   scenarioResults: ScenarioResults | null;
   enhancedFixes: EnhancedFixSuggestions | null;
 
+  // Cached aggregation (session only — not persisted to DB, cleared on new run)
+  aggregatedIssues: AggregatedIssue[] | null;
+  aggregatedScenarios: AggregatedScenario[] | null;
+
   selectedCallId: string | null;
   selectedIssueId: string | null; // For highlighting specific issue in CallViewer
   selectedDimension: string | null; // For filtering scenarios by dimension
@@ -335,6 +339,8 @@ export interface AppState {
   addCustomCheck: (check: CheckConfig) => void;
   deleteCustomCheck: (checkId: CheckType) => void;
   resetCheckInstructions: (checkId: CheckType) => void;
+  setAggregatedIssues: (issues: AggregatedIssue[]) => void;
+  setAggregatedScenarios: (scenarios: AggregatedScenario[]) => void;
   resetAllToDefaults: () => void;
   runAnalysis: () => Promise<void>;
   generateFixes: () => void;
