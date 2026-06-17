@@ -15,6 +15,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { EnhancedFixCard } from './EnhancedFixCard';
 import { FixType, RootCauseType } from '@/types';
 import { generateFixesExcel, generateFixesPDF } from '@/utils/fixesExport';
+import { generateHealthReportPDF } from '@/utils/healthReport';
 
 const fixTypeLabels: Record<FixType, string> = {
   script: 'Script/Prompt',
@@ -32,7 +33,7 @@ const rootCauseLabels: Record<RootCauseType, string> = {
 };
 
 export function EnhancedFixesList() {
-  const { enhancedFixes, scenarioResults, referenceScript } = useAppStore();
+  const { enhancedFixes, scenarioResults, referenceScript, aggregatedScenarios, transcripts, currentAnalysisName } = useAppStore();
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -198,7 +199,7 @@ export function EnhancedFixesList() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Excel Report */}
           <button
             onClick={() => {
@@ -214,7 +215,7 @@ export function EnhancedFixesList() {
             <div className="text-left flex-1">
               <div className="font-semibold">Download Fix Plan (.xlsx)</div>
               <div className="text-xs opacity-80">
-                Single sheet — #, Priority, Title, Type, Root Cause, What to Do, Where, Calls Affected
+                Single sheet — #, Priority, Title, Type, Root Cause, What to Do, Where, Incidents
               </div>
             </div>
           </button>
@@ -233,7 +234,30 @@ export function EnhancedFixesList() {
             <div className="text-left flex-1">
               <div className="font-semibold">PDF Report (.pdf)</div>
               <div className="text-xs opacity-80">
-                Printable report with detailed fixes and implementation plan
+                Detailed fixes and implementation plan
+              </div>
+            </div>
+          </button>
+
+          {/* Health Report */}
+          <button
+            onClick={() => {
+              generateHealthReportPDF({
+                scenarios: scenarioResults?.scenarios ?? [],
+                aggregatedScenarios: aggregatedScenarios ?? [],
+                fixes: enhancedFixes.fixes,
+                totalCalls: transcripts.length,
+                runName: currentAnalysisName ?? undefined,
+                analysisDate: new Date().toLocaleDateString(),
+              });
+            }}
+            className="flex items-center justify-center gap-3 p-4 rounded-lg border border-teal-500/40 bg-teal-500/10 hover:bg-teal-500/20 transition-colors"
+          >
+            <span className="text-xl">🏥</span>
+            <div className="text-left flex-1">
+              <div className="font-semibold text-teal-300">Health Report (.pdf)</div>
+              <div className="text-xs text-teal-400/70">
+                Medical-style diagnosis — condition grade, vital signs, treatment plan
               </div>
             </div>
           </button>
