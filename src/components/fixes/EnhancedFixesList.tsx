@@ -32,7 +32,7 @@ const rootCauseLabels: Record<RootCauseType, string> = {
 };
 
 export function EnhancedFixesList() {
-  const { enhancedFixes, referenceScript } = useAppStore();
+  const { enhancedFixes, scenarioResults, referenceScript } = useAppStore();
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -179,7 +179,7 @@ export function EnhancedFixesList() {
         </div>
       </motion.div>
 
-      {/* Comprehensive Report Download */}
+      {/* Fixes Report Download */}
       <motion.div
         className="glass-card p-6"
         initial={{ opacity: 0, y: 20 }}
@@ -190,10 +190,10 @@ export function EnhancedFixesList() {
           <div>
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
               <Download className="w-5 h-5" />
-              Download Comprehensive Fixes Report
+              Download Fixes Report
             </h3>
             <p className="text-sm text-[var(--color-slate-400)] mt-1">
-              Complete report with all {enhancedFixes.fixes.length} fixes, implementation details, and action plan
+              {enhancedFixes.fixes.length} fixes · prioritised · ready to act on
             </p>
           </div>
         </div>
@@ -204,17 +204,17 @@ export function EnhancedFixesList() {
             onClick={() => {
               generateFixesExcel({
                 fixes: enhancedFixes.fixes,
+                scenarios: scenarioResults?.scenarios ?? [],
                 analysisDate: new Date().toLocaleString(),
-                referenceScript,
               });
             }}
             className="btn-primary flex items-center justify-center gap-3 p-4"
           >
             <FileSpreadsheet className="w-5 h-5" />
             <div className="text-left flex-1">
-              <div className="font-semibold">Excel Report (.xlsx)</div>
+              <div className="font-semibold">Download Fix Plan (.xlsx)</div>
               <div className="text-xs opacity-80">
-                5 sheets: Summary, Detailed Fixes, By RCA, By Type, Implementation Plan
+                Single sheet — #, Priority, Title, Type, Root Cause, What to Do, Where, Calls Affected
               </div>
             </div>
           </button>
@@ -225,7 +225,6 @@ export function EnhancedFixesList() {
               generateFixesPDF({
                 fixes: enhancedFixes.fixes,
                 analysisDate: new Date().toLocaleString(),
-                referenceScript,
               });
             }}
             className="btn-secondary flex items-center justify-center gap-3 p-4"

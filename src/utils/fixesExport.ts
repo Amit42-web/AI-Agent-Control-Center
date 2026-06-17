@@ -1,13 +1,110 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { EnhancedFix, FixType, RootCauseType } from '@/types';
+import { EnhancedFix, FixType, RootCauseType, Scenario } from '@/types';
 
 interface FixesReportData {
   fixes: EnhancedFix[];
+  scenarios?: Scenario[];
   analysisDate?: string;
-  referenceScript?: string;
 }
+
+const FIX_TYPE_LABELS: Record<FixType, string> = {
+  script: 'Script / Prompt',
+  training: 'Training',
+  process: 'Process',
+  system: 'System',
+};
+
+const RCA_LABELS: Record<RootCauseType, string> = {
+  knowledge: 'Knowledge Gap',
+  instruction: 'Instruction Gap',
+  execution: 'Execution Failure',
+  conversation: 'Conversation Design',
+  model: 'Model Limitation',
+};
+
+const SEVERITY_WEIGHT: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+
+// ============= EXCEL EXPORT =============
+
+export function generateFixesExcel(data: FixesReportData): void {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, buildFixPlanSheet(data), 'Fix Plan');
+  XLSX.writeFile(wb, `Fix_Plan_${timestamp}.xlsx`);
+}
+
+function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
+  const { fixes, scenarios = [] } = data;
+
+  // Count unique calls affected per RCA type
+  const rcaCallCount: Record<string, Set<string>> = {};
+  scenarios.forEach(s => {
+    if (!s.rootCauseType) return;
+    if (!rcaCallCount[s.rootCauseType]) rcaCallCount[s.rootCauseType] = new Set();
+    rcaCallCount[s.rootCauseType].add(s.callId);
+  });
+
+  // Score each fix: calls affected × avg severity of linked scenarios
+  const scored = fixes.map(fix => {
+    const callsAffected = rcaCallCount[fix.rootCauseType]?.size ?? 0;
+    const rcaScenarios = scenarios.filter(s => s.rootCauseType === fix.rootCauseType);
+    const avgSev = rcaScenarios.length
+      ? rcaScenarios.reduce((sum, s) => sum + (SEVERITY_WEIGHT[s.severity] ?? 1), 0) / rcaScenarios.length
+      : 1;
+    return { fix, callsAffected, score: callsAffected * avgSev };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  const headers = [
+    '#',
+    'Priority',
+    'Fix Title',
+    'Fix Type',
+    'Root Cause',
+    'Why This Happened',
+    'What to Do',
+    'Where to Implement',
+    'Calls Affected',
+  ];
+
+  const rows = scored.map(({ fix, callsAffected }, rank) => {
+    const priority = rank === 0 ? 'P0 — Critical'
+      : rank < 3 ? 'P1 — High'
+      : rank < 6 ? 'P2 — Medium'
+      : 'P3 — Low';
+
+    return [
+      rank + 1,
+      priority,
+      fix.title,
+      FIX_TYPE_LABELS[fix.fixType] ?? fix.fixType,
+      RCA_LABELS[fix.rootCauseType] ?? fix.rootCauseType,
+      fix.rootCause,
+      fix.suggestedSolution,
+      fix.whereToImplement,
+      callsAffected > 0 ? callsAffected : '—',
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [
+    { wch: 5 },
+    { wch: 16 },
+    { wch: 36 },
+    { wch: 16 },
+    { wch: 22 },
+    { wch: 52 },
+    { wch: 52 },
+    { wch: 36 },
+    { wch: 16 },
+  ];
+  return ws;
+}
+
+// ============= PDF EXPORT =============
 
 const fixTypeLabels: Record<FixType, string> = {
   script: 'Script/Prompt',
@@ -24,197 +121,11 @@ const rootCauseLabels: Record<RootCauseType, string> = {
   model: 'Model Limitation',
 };
 
-// ============= EXCEL EXPORT =============
-
-export function generateFixesExcel(data: FixesReportData): void {
-  const workbook = XLSX.utils.book_new();
-  const timestamp = new Date().toISOString().split('T')[0];
-
-  // Sheet 1: Executive Summary
-  const summarySheet = generateFixesSummary(data);
-  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-
-  // Sheet 2: All Fixes Detailed
-  const fixesSheet = generateDetailedFixes(data.fixes);
-  XLSX.utils.book_append_sheet(workbook, fixesSheet, 'Detailed Fixes');
-
-  // Sheet 3: Fixes by Root Cause
-  const rcaSheet = generateFixesByRCA(data.fixes);
-  XLSX.utils.book_append_sheet(workbook, rcaSheet, 'By Root Cause');
-
-  // Sheet 4: Fixes by Type
-  const typeSheet = generateFixesByType(data.fixes);
-  XLSX.utils.book_append_sheet(workbook, typeSheet, 'By Fix Type');
-
-  // Sheet 5: Implementation Plan
-  const planSheet = generateImplementationPlan(data.fixes);
-  XLSX.utils.book_append_sheet(workbook, planSheet, 'Implementation Plan');
-
-  // Download
-  XLSX.writeFile(workbook, `Fixes_Report_${timestamp}.xlsx`);
-}
-
-function generateFixesSummary(data: FixesReportData): XLSX.WorkSheet {
-  const fixesByType: Record<string, number> = {};
-  const fixesByRCA: Record<string, number> = {};
-
-  data.fixes.forEach((fix) => {
-    fixesByType[fix.fixType] = (fixesByType[fix.fixType] || 0) + 1;
-    fixesByRCA[fix.rootCauseType] = (fixesByRCA[fix.rootCauseType] || 0) + 1;
-  });
-
-  const summaryData = [
-    ['AI Agent Control Center - Fixes Report'],
-    [''],
-    ['Report Date', data.analysisDate || new Date().toLocaleString()],
-    ['Total Fixes', data.fixes.length],
-    [''],
-    ['Fixes by Type'],
-    ['Type', 'Count'],
-    ...Object.entries(fixesByType).map(([type, count]) => [fixTypeLabels[type as FixType], count]),
-    [''],
-    ['Fixes by Root Cause'],
-    ['Root Cause', 'Count'],
-    ...Object.entries(fixesByRCA).map(([rca, count]) => [rootCauseLabels[rca as RootCauseType], count]),
-  ];
-
-  return XLSX.utils.aoa_to_sheet(summaryData);
-}
-
-function generateDetailedFixes(fixes: EnhancedFix[]): XLSX.WorkSheet {
-  const headers = [
-    '#',
-    'Title',
-    'Fix Type',
-    'Root Cause Category',
-    'Root Cause (Why)',
-    'Suggested Solution (What)',
-    'Where to Implement',
-    'What to Implement',
-    'Concrete Example',
-    'Success Criteria',
-    'How to Test',
-    'Exact Content (Before)',
-    'Exact Content (After)',
-  ];
-
-  const rows = fixes.map((fix, index) => [
-    index + 1,
-    fix.title,
-    fixTypeLabels[fix.fixType],
-    rootCauseLabels[fix.rootCauseType],
-    fix.rootCause,
-    fix.suggestedSolution,
-    fix.whereToImplement,
-    fix.whatToImplement,
-    fix.concreteExample,
-    fix.successCriteria,
-    fix.howToTest,
-    fix.promptFix?.beforeText || 'N/A',
-    fix.promptFix?.exactContent || 'N/A',
-  ]);
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-function generateFixesByRCA(fixes: EnhancedFix[]): XLSX.WorkSheet {
-  const grouped = fixes.reduce((acc, fix) => {
-    if (!acc[fix.rootCauseType]) acc[fix.rootCauseType] = [];
-    acc[fix.rootCauseType].push(fix);
-    return acc;
-  }, {} as Record<string, EnhancedFix[]>);
-
-  const data: any[][] = [['Root Cause Analysis - Fixes Grouped by Category'], ['']];
-
-  Object.entries(grouped).forEach(([rca, rcaFixes]) => {
-    data.push([rootCauseLabels[rca as RootCauseType], `${rcaFixes.length} fixes`]);
-    data.push(['#', 'Title', 'Fix Type', 'Suggested Solution']);
-    rcaFixes.forEach((fix, idx) => {
-      data.push([idx + 1, fix.title, fixTypeLabels[fix.fixType], fix.suggestedSolution]);
-    });
-    data.push(['']);
-  });
-
-  return XLSX.utils.aoa_to_sheet(data);
-}
-
-function generateFixesByType(fixes: EnhancedFix[]): XLSX.WorkSheet {
-  const grouped = fixes.reduce((acc, fix) => {
-    if (!acc[fix.fixType]) acc[fix.fixType] = [];
-    acc[fix.fixType].push(fix);
-    return acc;
-  }, {} as Record<string, EnhancedFix[]>);
-
-  const data: any[][] = [['Fixes Grouped by Implementation Type'], ['']];
-
-  Object.entries(grouped).forEach(([type, typeFixes]) => {
-    data.push([fixTypeLabels[type as FixType], `${typeFixes.length} fixes`]);
-    data.push(['#', 'Title', 'Root Cause', 'Where to Implement', 'What to Implement']);
-    typeFixes.forEach((fix, idx) => {
-      data.push([
-        idx + 1,
-        fix.title,
-        rootCauseLabels[fix.rootCauseType],
-        fix.whereToImplement,
-        fix.whatToImplement,
-      ]);
-    });
-    data.push(['']);
-  });
-
-  return XLSX.utils.aoa_to_sheet(data);
-}
-
-function generateImplementationPlan(fixes: EnhancedFix[]): XLSX.WorkSheet {
-  const headers = [
-    'Priority',
-    'Fix Title',
-    'Type',
-    'Where',
-    'Action Required',
-    'Success Criteria',
-    'Testing Method',
-    'Status',
-  ];
-
-  // Sort by root cause priority: knowledge > instruction > execution > conversation > model
-  const priorityOrder: Record<RootCauseType, number> = {
-    knowledge: 1,
-    instruction: 2,
-    execution: 3,
-    conversation: 4,
-    model: 5,
-  };
-
-  const sortedFixes = [...fixes].sort(
-    (a, b) => priorityOrder[a.rootCauseType] - priorityOrder[b.rootCauseType]
-  );
-
-  const rows = sortedFixes.map((fix, index) => {
-    const priority = index < 5 ? 'P0 (Critical)' : index < 10 ? 'P1 (High)' : 'P2 (Medium)';
-    return [
-      priority,
-      fix.title,
-      fixTypeLabels[fix.fixType],
-      fix.whereToImplement,
-      fix.whatToImplement,
-      fix.successCriteria,
-      fix.howToTest,
-      'Pending',
-    ];
-  });
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-// ============= PDF EXPORT =============
-
 export function generateFixesPDF(data: FixesReportData): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   let yPos = 20;
 
-  // Cover Page
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
   doc.text('Fixes & Recommendations', pageWidth / 2, yPos, { align: 'center' });
@@ -227,7 +138,6 @@ export function generateFixesPDF(data: FixesReportData): void {
   yPos += 30;
   doc.setFontSize(12);
 
-  // Summary Box
   const fixesByType: Record<string, number> = {};
   const fixesByRCA: Record<string, number> = {};
 
@@ -265,15 +175,12 @@ export function generateFixesPDF(data: FixesReportData): void {
     yPos += 5;
   });
 
-  // Detailed Fixes Pages
   doc.addPage();
   addDetailedFixesToPDF(doc, data.fixes);
 
-  // Implementation Plan
   doc.addPage();
   addImplementationPlanToPDF(doc, data.fixes);
 
-  // Save
   const timestamp = new Date().toISOString().split('T')[0];
   doc.save(`Fixes_Report_${timestamp}.pdf`);
 }
@@ -313,7 +220,6 @@ function addImplementationPlanToPDF(doc: jsPDF, fixes: EnhancedFix[]): void {
   doc.setFont('helvetica', 'bold');
   doc.text('Implementation Plan', 20, 20);
 
-  // Sort by priority
   const priorityOrder: Record<RootCauseType, number> = {
     knowledge: 1,
     instruction: 2,
