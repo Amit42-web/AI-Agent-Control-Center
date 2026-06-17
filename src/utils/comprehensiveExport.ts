@@ -26,358 +26,378 @@ interface ExportData {
 
 // ============= CSV/EXCEL EXPORT =============
 
-export function generateComprehensiveExcel(data: ExportData): void {
-  const workbook = XLSX.utils.book_new();
-  const timestamp = new Date().toISOString().split('T')[0];
+const SEVERITY_WEIGHT: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
 
-  // Sheet 1: Executive Summary
-  const summarySheet = generateExecutiveSummary(data);
-  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Executive Summary');
+const FIX_TYPE_LABELS: Record<string, string> = {
+  script: 'Script / Prompt',
+  training: 'Training',
+  process: 'Process',
+  system: 'System',
+};
 
-  // Sheet 2: Call-Level Summary
-  const callSummarySheet = generateCallSummary(data);
-  XLSX.utils.book_append_sheet(workbook, callSummarySheet, 'Call Summary');
+const RCA_LABELS: Record<string, string> = {
+  knowledge: 'Knowledge Gap',
+  instruction: 'Instruction Gap',
+  execution: 'Execution Failure',
+  conversation: 'Conversation Design',
+  model: 'Model Limitation',
+};
 
-  // Sheet 3: Detailed Issues/Scenarios
-  if (data.flowType === 'open-ended' && data.scenarioResults) {
-    const detailsSheet = generateScenarioDetails(data.scenarioResults.scenarios);
-    XLSX.utils.book_append_sheet(workbook, detailsSheet, 'Detailed Scenarios');
-  } else if (data.flowType === 'objective' && data.results) {
-    const detailsSheet = generateIssueDetails(data.results);
-    XLSX.utils.book_append_sheet(workbook, detailsSheet, 'Detailed Issues');
-  }
+const DIMENSIONS: Record<string, string> = {
+  A: 'Conversation Control & Flow',
+  B: 'Temporal Dynamics',
+  C: 'Context Tracking',
+  D: 'Language Quality',
+  E: 'Knowledge & Accuracy',
+  F: 'Process & Policy',
+  G: 'Novel Issues',
+};
 
-  // Sheet 4: Aggregated Patterns
-  if (data.aggregatedScenarios && data.aggregatedScenarios.length > 0) {
-    const patternsSheet = generateAggregatedPatterns(data.aggregatedScenarios);
-    XLSX.utils.book_append_sheet(workbook, patternsSheet, 'Aggregated Patterns');
-  }
-
-  // Sheet 5: Fix Recommendations
-  if (data.enhancedFixes && data.enhancedFixes.fixes.length > 0) {
-    const fixesSheet = generateFixRecommendations(data.enhancedFixes.fixes);
-    XLSX.utils.book_append_sheet(workbook, fixesSheet, 'Fix Recommendations');
-  } else if (data.fixes && (data.fixes.scriptFixes.length > 0 || data.fixes.generalFixes.length > 0)) {
-    const fixesSheet = generateObjectiveFixRecommendations(data.fixes);
-    XLSX.utils.book_append_sheet(workbook, fixesSheet, 'Fix Recommendations');
-  }
-
-  // Sheet 6: Metrics Dashboard
-  const metricsSheet = generateMetricsDashboard(data);
-  XLSX.utils.book_append_sheet(workbook, metricsSheet, 'Metrics');
-
-  // Download the file
-  XLSX.writeFile(workbook, `AI_Agent_Analysis_Report_${timestamp}.xlsx`);
+function setColWidths(ws: XLSX.WorkSheet, widths: number[]): void {
+  ws['!cols'] = widths.map(w => ({ wch: w }));
 }
 
-function generateExecutiveSummary(data: ExportData): XLSX.WorkSheet {
+export function generateComprehensiveExcel(data: ExportData): void {
+  const wb = XLSX.utils.book_new();
+  const timestamp = new Date().toISOString().split('T')[0];
+
+  // Sheet 1 — Summary (quick KPIs at a glance)
+  XLSX.utils.book_append_sheet(wb, buildSummarySheet(data), '1. Summary');
+
+  // Sheet 2 — Action Plan (ranked fixes — most important for ops)
+  const hasFixes = (data.enhancedFixes?.fixes?.length ?? 0) > 0 ||
+    ((data.fixes?.scriptFixes?.length ?? 0) + (data.fixes?.generalFixes?.length ?? 0)) > 0;
+  if (hasFixes) {
+    XLSX.utils.book_append_sheet(wb, buildActionPlanSheet(data), '2. Action Plan');
+  }
+
+  // Sheet 3 — Call Scorecard (per-call dimension breakdown)
+  XLSX.utils.book_append_sheet(wb, buildCallScorecardSheet(data), '3. Call Scorecard');
+
+  // Sheet 4 — All Issues (raw, with Fix # reference)
+  if (data.flowType === 'open-ended' && data.scenarioResults?.scenarios?.length) {
+    XLSX.utils.book_append_sheet(wb, buildIssuesSheet(data.scenarioResults.scenarios, data.enhancedFixes?.fixes ?? []), '4. All Issues');
+  } else if (data.flowType === 'objective' && data.results?.issues?.length) {
+    XLSX.utils.book_append_sheet(wb, buildObjectiveIssuesSheet(data.results), '4. All Issues');
+  }
+
+  // Sheet 5 — Patterns (aggregated groups)
+  if (data.aggregatedScenarios?.length) {
+    XLSX.utils.book_append_sheet(wb, buildPatternsSheet(data.aggregatedScenarios), '5. Patterns');
+  }
+
+  XLSX.writeFile(wb, `QA_Report_${timestamp}.xlsx`);
+}
+
+// ─── Sheet 1: Summary ─────────────────────────────────────────────────────────
+
+function buildSummarySheet(data: ExportData): XLSX.WorkSheet {
   const totalCalls = data.transcripts.length;
-  const analysisDate = data.analysisDate || new Date().toLocaleString();
+  const date = data.analysisDate || new Date().toLocaleString();
 
   let totalIssues = 0;
   let callsWithIssues = 0;
-  let avgSeverity = 'N/A';
-
-  if (data.flowType === 'open-ended' && data.scenarioResults) {
-    totalIssues = data.scenarioResults.scenarios.length;
-    const callsWithScenariosSet = new Set(data.scenarioResults.scenarios.map(s => s.callId));
-    callsWithIssues = callsWithScenariosSet.size;
-  } else if (data.flowType === 'objective' && data.results) {
-    totalIssues = data.results.issues.length;
-    callsWithIssues = data.results.callsWithIssues;
-  }
-
-  const healthScore = totalCalls > 0 ? Math.round(((totalCalls - callsWithIssues) / totalCalls) * 100) : 0;
-
-  const summaryData = [
-    ['AI Agent Control Center - Analysis Report'],
-    [''],
-    ['Metric', 'Value'],
-    ['Analysis Date', analysisDate],
-    ['Flow Type', data.flowType === 'open-ended' ? 'Open-Ended Analysis' : 'Objective Checks'],
-    ['Total Calls Analyzed', totalCalls],
-    ['Calls with Issues', callsWithIssues],
-    ['Total Issues/Scenarios Found', totalIssues],
-    ['Clean Calls', totalCalls - callsWithIssues],
-    ['Overall Health Score', `${healthScore}%`],
-    [''],
-    ['Report Generated By', 'AI Agent Control Center'],
-    ['Export Date', new Date().toLocaleString()],
-  ];
-
-  return XLSX.utils.aoa_to_sheet(summaryData);
-}
-
-function generateCallSummary(data: ExportData): XLSX.WorkSheet {
-  const headers = ['Call ID', 'Total Issues/Scenarios', 'Highest Severity', 'Status', 'Issue Types'];
-
-  const rows = data.transcripts.map(transcript => {
-    let issueCount = 0;
-    let highestSeverity = 'Clean';
-    let issueTypes: string[] = [];
-
-    if (data.flowType === 'open-ended' && data.scenarioResults) {
-      const callScenarios = data.scenarioResults.scenarios.filter(s => s.callId === transcript.id);
-      issueCount = callScenarios.length;
-
-      if (callScenarios.length > 0) {
-        const severities = callScenarios.map(s => s.severity);
-        if (severities.includes('critical')) highestSeverity = 'Critical';
-        else if (severities.includes('high')) highestSeverity = 'High';
-        else if (severities.includes('medium')) highestSeverity = 'Medium';
-        else highestSeverity = 'Low';
-
-        issueTypes = [...new Set(callScenarios.map(s => s.title))];
-      }
-    } else if (data.flowType === 'objective' && data.results) {
-      const callIssues = data.results.issues.filter(i => i.callId === transcript.id);
-      issueCount = callIssues.length;
-
-      if (callIssues.length > 0) {
-        const severities = callIssues.map(i => i.severity);
-        if (severities.includes('critical')) highestSeverity = 'Critical';
-        else if (severities.includes('high')) highestSeverity = 'High';
-        else if (severities.includes('medium')) highestSeverity = 'Medium';
-        else highestSeverity = 'Low';
-
-        issueTypes = [...new Set(callIssues.map(i => i.type))];
-      }
-    }
-
-    const status = issueCount === 0 ? '✓ Pass' : highestSeverity === 'Critical' || highestSeverity === 'High' ? '⚠ Needs Review' : '⚡ Minor Issues';
-
-    return [
-      transcript.id,
-      issueCount,
-      highestSeverity,
-      status,
-      issueTypes.join('; ')
-    ];
-  });
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-function generateScenarioDetails(scenarios: Scenario[]): XLSX.WorkSheet {
-  const headers = [
-    'Call ID',
-    'Title',
-    'Audit Dimension',
-    'Root Cause Type',
-    'Context',
-    'What Happened',
-    'Impact',
-    'Suggested Action',
-    'Severity',
-    'Confidence (%)',
-    'Line Numbers',
-  ];
-
-  const rows = scenarios.map(scenario => [
-    scenario.callId,
-    scenario.title,
-    scenario.dimension || 'N/A',
-    scenario.rootCauseType || 'N/A',
-    scenario.context,
-    scenario.whatHappened,
-    scenario.impact,
-    'Review and implement recommended fixes', // Generic suggested action
-    scenario.severity,
-    scenario.confidence,
-    scenario.lineNumbers.join('; '),
-  ]);
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-function generateIssueDetails(results: AnalysisResult): XLSX.WorkSheet {
-  const headers = [
-    'Call ID',
-    'Issue Type',
-    'Severity',
-    'Confidence (%)',
-    'Evidence',
-    'Explanation',
-    'Suggested Fix',
-    'Root Cause Type',
-    'Line Numbers',
-  ];
-
-  const rows = results.issues.map(issue => [
-    issue.callId,
-    issue.type,
-    issue.severity,
-    Math.round(issue.confidence * 100),
-    issue.evidenceSnippet,
-    issue.explanation,
-    issue.suggestedFix || 'See fix recommendations',
-    issue.rootCauseType || 'N/A',
-    issue.lineNumbers.join('; '),
-  ]);
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-function generateAggregatedPatterns(aggregated: AggregatedScenario[]): XLSX.WorkSheet {
-  const headers = [
-    'Pattern Title',
-    'Audit Dimension',
-    'Root Cause Type',
-    'Pattern Description',
-    'Severity',
-    'Avg Confidence (%)',
-    'Total Occurrences',
-    'Unique Calls Affected',
-    'Affected Call IDs',
-  ];
-
-  const rows = aggregated.map(agg => [
-    agg.title,
-    agg.dimension,
-    agg.rootCauseType || 'N/A',
-    agg.pattern,
-    agg.severity,
-    agg.avgConfidence.toFixed(1),
-    agg.occurrences,
-    agg.uniqueCalls,
-    agg.affectedCallIds.join('; '),
-  ]);
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-function generateFixRecommendations(fixes: EnhancedFix[]): XLSX.WorkSheet {
-  const headers = [
-    'Priority',
-    'Fix Title',
-    'Fix Type',
-    'Root Cause Category',
-    'Root Cause Explanation',
-    'Suggested Solution',
-    'Where to Implement',
-    'What to Implement',
-    'Concrete Example',
-    'Success Criteria',
-    'How to Test',
-  ];
-
-  const rows = fixes.map((fix, index) => {
-    const priority = index < 3 ? 'P0 - Critical' : index < 6 ? 'P1 - High' : 'P2 - Medium';
-
-    return [
-      priority,
-      fix.title,
-      fix.fixType,
-      fix.rootCauseType,
-      fix.rootCause,
-      fix.suggestedSolution,
-      fix.whereToImplement,
-      fix.whatToImplement,
-      typeof fix.concreteExample === 'string' ? fix.concreteExample : JSON.stringify(fix.concreteExample),
-      fix.successCriteria,
-      fix.howToTest,
-    ];
-  });
-
-  return XLSX.utils.aoa_to_sheet([headers, ...rows]);
-}
-
-function generateObjectiveFixRecommendations(fixes: FixSuggestions): XLSX.WorkSheet {
-  const headers = [
-    'Category',
-    'Issue Type',
-    'Problem',
-    'Suggestion',
-    'Placement Hint',
-    'Example Response',
-    'Root Cause Type',
-  ];
-
-  const scriptRows = fixes.scriptFixes.map(fix => [
-    'Script Fix',
-    fix.issueType,
-    fix.problem,
-    fix.suggestion,
-    fix.placementHint,
-    fix.exampleResponse,
-    fix.rootCauseType || 'N/A',
-  ]);
-
-  const generalRows = fixes.generalFixes.map(fix => [
-    'General Fix',
-    fix.issueType,
-    fix.problem,
-    fix.suggestion,
-    fix.placementHint,
-    fix.exampleResponse,
-    fix.rootCauseType || 'N/A',
-  ]);
-
-  return XLSX.utils.aoa_to_sheet([headers, ...scriptRows, ...generalRows]);
-}
-
-function generateMetricsDashboard(data: ExportData): XLSX.WorkSheet {
-  const metricsData: any[][] = [['Metric', 'Count', 'Percentage']];
+  const sevCount: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
 
   if (data.flowType === 'open-ended' && data.scenarioResults) {
     const scenarios = data.scenarioResults.scenarios;
-    const total = scenarios.length;
-
-    // By Severity
-    metricsData.push(['=== By Severity ===', '', '']);
-    const bySeverity = scenarios.reduce((acc, s) => {
-      acc[s.severity] = (acc[s.severity] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    Object.entries(bySeverity).forEach(([severity, count]) => {
-      metricsData.push([severity, count, `${((count / total) * 100).toFixed(1)}%`]);
-    });
-
-    // By RCA Type
-    metricsData.push(['', '', '']);
-    metricsData.push(['=== By Root Cause ===', '', '']);
-    const byRCA = scenarios.reduce((acc, s) => {
-      const rca = s.rootCauseType || 'Unknown';
-      acc[rca] = (acc[rca] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    Object.entries(byRCA).forEach(([rca, count]) => {
-      metricsData.push([rca, count, `${((count / total) * 100).toFixed(1)}%`]);
-    });
-
-    // By Dimension
-    metricsData.push(['', '', '']);
-    metricsData.push(['=== By Audit Dimension ===', '', '']);
-    const byDimension = scenarios.reduce((acc, s) => {
-      const dim = s.dimension || 'Unknown';
-      acc[dim] = (acc[dim] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    Object.entries(byDimension).forEach(([dim, count]) => {
-      metricsData.push([dim, count, `${((count / total) * 100).toFixed(1)}%`]);
-    });
+    totalIssues = scenarios.length;
+    callsWithIssues = new Set(scenarios.map(s => s.callId)).size;
+    scenarios.forEach(s => { sevCount[s.severity] = (sevCount[s.severity] ?? 0) + 1; });
   } else if (data.flowType === 'objective' && data.results) {
-    const issues = data.results.issues;
-    const total = issues.length;
+    totalIssues = data.results.issues.length;
+    callsWithIssues = data.results.callsWithIssues;
+    data.results.issues.forEach(i => { sevCount[i.severity] = (sevCount[i.severity] ?? 0) + 1; });
+  }
 
-    // By Severity
-    metricsData.push(['=== By Severity ===', '', '']);
-    Object.entries(data.results.severityDistribution).forEach(([severity, count]) => {
-      metricsData.push([severity, count, `${((count / total) * 100).toFixed(1)}%`]);
+  const healthScore = totalCalls > 0 ? Math.round(((totalCalls - callsWithIssues) / totalCalls) * 100) : 0;
+  const issueRate = totalCalls > 0 ? Math.round((callsWithIssues / totalCalls) * 100) : 0;
+
+  // Top 5 recurring issues by title
+  const topIssues: string[][] = [];
+  if (data.aggregatedScenarios?.length) {
+    [...data.aggregatedScenarios]
+      .sort((a, b) => b.occurrences - a.occurrences)
+      .slice(0, 5)
+      .forEach((agg, i) => {
+        topIssues.push([`  ${i + 1}.`, agg.title, `${agg.uniqueCalls} calls`, agg.severity]);
+      });
+  }
+
+  const rows: (string | number)[][] = [
+    ['AI Agent QA Report'],
+    ['Analysis Date', date],
+    ['Flow Type', data.flowType === 'open-ended' ? 'Open-Ended (Qualitative)' : 'Objective Checks'],
+    [''],
+    ['── HEADLINE NUMBERS ──', '', '', ''],
+    ['Metric', 'Value', '', ''],
+    ['Total Calls Analyzed', totalCalls],
+    ['Calls with Issues', `${callsWithIssues} (${issueRate}%)`],
+    ['Clean Calls', `${totalCalls - callsWithIssues} (${100 - issueRate}%)`],
+    ['Total Issues Found', totalIssues],
+    ['Issues per Call (avg)', totalCalls > 0 ? +(totalIssues / totalCalls).toFixed(1) : 0],
+    ['Health Score', `${healthScore}%`],
+    [''],
+    ['── SEVERITY BREAKDOWN ──', '', '', ''],
+    ['Severity', 'Count', '% of Issues', ''],
+    ['Critical', sevCount.critical, totalIssues > 0 ? `${((sevCount.critical / totalIssues) * 100).toFixed(1)}%` : '0%'],
+    ['High',     sevCount.high,     totalIssues > 0 ? `${((sevCount.high / totalIssues) * 100).toFixed(1)}%` : '0%'],
+    ['Medium',   sevCount.medium,   totalIssues > 0 ? `${((sevCount.medium / totalIssues) * 100).toFixed(1)}%` : '0%'],
+    ['Low',      sevCount.low,      totalIssues > 0 ? `${((sevCount.low / totalIssues) * 100).toFixed(1)}%` : '0%'],
+  ];
+
+  if (topIssues.length) {
+    rows.push(['']);
+    rows.push(['── TOP RECURRING ISSUES ──', '', '', '']);
+    rows.push(['#', 'Issue Pattern', 'Calls Affected', 'Severity']);
+    topIssues.forEach(r => rows.push(r));
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  setColWidths(ws, [32, 28, 18, 12]);
+  return ws;
+}
+
+// ─── Sheet 2: Action Plan ─────────────────────────────────────────────────────
+
+function buildActionPlanSheet(data: ExportData): XLSX.WorkSheet {
+  const headers = [
+    'Fix #',
+    'Priority',
+    'Fix Title',
+    'Fix Type',
+    'Root Cause',
+    'What to Do',
+    'Where to Implement',
+    'Concrete Example',
+    'Success Criteria',
+    'How to Test',
+    'Owner',
+    'Status',
+    'Due Date',
+  ];
+
+  const rows: (string | number)[][] = [];
+
+  if (data.enhancedFixes?.fixes?.length) {
+    // Sort by severity of linked scenarios: fixes covering more critical issues first
+    const fixes = data.enhancedFixes.fixes;
+    fixes.forEach((fix, idx) => {
+      const priority = idx === 0 ? 'P0 — Critical' : idx < 3 ? 'P1 — High' : idx < 6 ? 'P2 — Medium' : 'P3 — Low';
+      rows.push([
+        `F${idx + 1}`,
+        priority,
+        fix.title,
+        FIX_TYPE_LABELS[fix.fixType] ?? fix.fixType,
+        RCA_LABELS[fix.rootCauseType] ?? fix.rootCauseType,
+        fix.suggestedSolution,
+        fix.whereToImplement,
+        typeof fix.concreteExample === 'string' ? fix.concreteExample : JSON.stringify(fix.concreteExample),
+        fix.successCriteria,
+        fix.howToTest,
+        '',        // Owner — ops fills in
+        'Pending', // Status
+        '',        // Due Date
+      ]);
     });
-
-    // By Type
-    metricsData.push(['', '', '']);
-    metricsData.push(['=== By Issue Type ===', '', '']);
-    Object.entries(data.results.issuesByType).forEach(([type, count]) => {
-      metricsData.push([type, count, `${((count / total) * 100).toFixed(1)}%`]);
+  } else if (data.fixes) {
+    const allFixes = [...(data.fixes.scriptFixes ?? []), ...(data.fixes.generalFixes ?? [])];
+    allFixes.forEach((fix, idx) => {
+      const priority = idx < 2 ? 'P0 — Critical' : idx < 5 ? 'P1 — High' : 'P2 — Medium';
+      rows.push([
+        `F${idx + 1}`,
+        priority,
+        fix.problem,
+        'Script / Prompt',
+        RCA_LABELS[fix.rootCauseType ?? ''] ?? fix.rootCauseType ?? 'N/A',
+        fix.suggestion,
+        fix.placementHint,
+        fix.exampleResponse,
+        '',
+        '',
+        '',
+        'Pending',
+        '',
+      ]);
     });
   }
 
-  return XLSX.utils.aoa_to_sheet(metricsData);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  setColWidths(ws, [7, 16, 36, 16, 20, 48, 32, 48, 36, 32, 18, 12, 12]);
+  return ws;
+}
+
+// ─── Sheet 3: Call Scorecard ──────────────────────────────────────────────────
+
+function buildCallScorecardSheet(data: ExportData): XLSX.WorkSheet {
+  const dimKeys = Object.keys(DIMENSIONS);
+  const headers = [
+    'Call ID',
+    'Total Issues',
+    'Worst Severity',
+    'Status',
+    ...dimKeys.map(k => `${k}: ${DIMENSIONS[k]}`),
+    'Top Root Cause',
+    'Issue Titles (brief)',
+  ];
+
+  const rows = data.transcripts.map(transcript => {
+    const scenarios = data.flowType === 'open-ended' && data.scenarioResults
+      ? data.scenarioResults.scenarios.filter(s => s.callId === transcript.id)
+      : [];
+    const issues = data.flowType === 'objective' && data.results
+      ? data.results.issues.filter(i => i.callId === transcript.id)
+      : [];
+
+    const allItems = scenarios.length ? scenarios : issues;
+    const count = allItems.length;
+
+    const worstSev = count === 0 ? 'Clean' : (() => {
+      const w = Math.max(...allItems.map(x => SEVERITY_WEIGHT[('severity' in x ? x.severity : 'low')] ?? 1));
+      return w >= 4 ? 'Critical' : w >= 3 ? 'High' : w >= 2 ? 'Medium' : 'Low';
+    })();
+
+    const status = count === 0 ? '✓ Pass'
+      : worstSev === 'Critical' ? '🔴 Critical'
+      : worstSev === 'High' ? '🟠 Needs Review'
+      : '🟡 Minor Issues';
+
+    // Per-dimension: issue count or blank
+    const dimCounts = dimKeys.map(k => {
+      const dimScenarios = scenarios.filter(s => s.dimension?.charAt(0).toUpperCase() === k);
+      return dimScenarios.length > 0 ? dimScenarios.length : '';
+    });
+
+    // Top root cause
+    const rcaFreq: Record<string, number> = {};
+    scenarios.forEach(s => {
+      if (s.rootCauseType) rcaFreq[s.rootCauseType] = (rcaFreq[s.rootCauseType] ?? 0) + 1;
+    });
+    const topRCA = Object.entries(rcaFreq).sort((a, b) => b[1] - a[1])[0];
+    const topRCALabel = topRCA ? (RCA_LABELS[topRCA[0]] ?? topRCA[0]) : '';
+
+    // Brief titles (first 3)
+    const titles = scenarios.slice(0, 3).map(s => s.title).join(' | ');
+
+    return [transcript.id, count, worstSev, status, ...dimCounts, topRCALabel, titles];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  setColWidths(ws, [20, 12, 14, 16, ...dimKeys.map(() => 14), 22, 60]);
+  return ws;
+}
+
+// ─── Sheet 4a: All Issues (open-ended) ───────────────────────────────────────
+
+function buildIssuesSheet(scenarios: Scenario[], fixes: EnhancedFix[]): XLSX.WorkSheet {
+  // Build RCA → Fix # map so each issue row can reference its fix
+  const rcaToFixNum: Record<string, string> = {};
+  fixes.forEach((fix, idx) => {
+    rcaToFixNum[fix.rootCauseType] = `F${idx + 1}`;
+  });
+
+  const headers = [
+    '#',
+    'Call ID',
+    'Issue Title',
+    'Audit Dimension',
+    'Root Cause',
+    'What Happened',
+    'Impact on Customer',
+    'Severity',
+    'Confidence %',
+    'Fix # (→ Action Plan)',
+  ];
+
+  const rows = scenarios.map((s, idx) => [
+    idx + 1,
+    s.callId,
+    s.title,
+    s.dimension ?? 'N/A',
+    RCA_LABELS[s.rootCauseType ?? ''] ?? s.rootCauseType ?? 'N/A',
+    s.whatHappened,
+    s.impact,
+    s.severity.charAt(0).toUpperCase() + s.severity.slice(1),
+    s.confidence,
+    s.rootCauseType ? (rcaToFixNum[s.rootCauseType] ?? '—') : '—',
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  setColWidths(ws, [5, 20, 40, 28, 22, 52, 44, 10, 12, 20]);
+  return ws;
+}
+
+// ─── Sheet 4b: All Issues (objective) ────────────────────────────────────────
+
+function buildObjectiveIssuesSheet(results: AnalysisResult): XLSX.WorkSheet {
+  const headers = [
+    '#',
+    'Call ID',
+    'Issue Type',
+    'Root Cause',
+    'Evidence',
+    'Explanation',
+    'Suggested Fix',
+    'Severity',
+    'Confidence %',
+    'Line Numbers',
+  ];
+
+  const rows = results.issues.map((issue, idx) => [
+    idx + 1,
+    issue.callId,
+    issue.type,
+    RCA_LABELS[issue.rootCauseType ?? ''] ?? issue.rootCauseType ?? 'N/A',
+    issue.evidenceSnippet,
+    issue.explanation,
+    issue.suggestedFix ?? 'See Action Plan',
+    issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1),
+    Math.round(issue.confidence * 100),
+    issue.lineNumbers.join('; '),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  setColWidths(ws, [5, 20, 24, 22, 36, 52, 40, 10, 12, 14]);
+  return ws;
+}
+
+// ─── Sheet 5: Patterns ───────────────────────────────────────────────────────
+
+function buildPatternsSheet(aggregated: AggregatedScenario[]): XLSX.WorkSheet {
+  const headers = [
+    '#',
+    'Pattern',
+    'Dimension',
+    'Root Cause',
+    'Description',
+    'Severity',
+    'Occurrences',
+    'Calls Affected',
+    'Avg Confidence %',
+    'Affected Call IDs',
+  ];
+
+  const sorted = [...aggregated].sort((a, b) => {
+    const sw = (SEVERITY_WEIGHT[b.severity] ?? 0) - (SEVERITY_WEIGHT[a.severity] ?? 0);
+    return sw !== 0 ? sw : b.occurrences - a.occurrences;
+  });
+
+  const rows = sorted.map((agg, idx) => [
+    idx + 1,
+    agg.title,
+    agg.dimension ?? 'N/A',
+    RCA_LABELS[agg.rootCauseType ?? ''] ?? agg.rootCauseType ?? 'N/A',
+    agg.pattern,
+    agg.severity.charAt(0).toUpperCase() + agg.severity.slice(1),
+    agg.occurrences,
+    agg.uniqueCalls,
+    +agg.avgConfidence.toFixed(1),
+    agg.affectedCallIds.join(', '),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  setColWidths(ws, [5, 40, 28, 22, 52, 10, 12, 14, 16, 40]);
+  return ws;
 }
 
 // ============= PDF EXPORT =============
