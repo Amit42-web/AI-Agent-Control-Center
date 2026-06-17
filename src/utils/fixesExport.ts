@@ -37,6 +37,7 @@ export function generateFixesExcel(data: FixesReportData): void {
 
 function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
   const { fixes, scenarios = [] } = data;
+  const totalCalls = new Set(scenarios.map(s => s.callId)).size;
 
   // Count unique calls affected per RCA type
   const rcaCallCount: Record<string, Set<string>> = {};
@@ -76,6 +77,10 @@ function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
       : rank < 6 ? 'P2 — Medium'
       : 'P3 — Low';
 
+    const callsDisplay = callsAffected > 0 && totalCalls > 0
+      ? `${Math.round((callsAffected / totalCalls) * 100)}% (${callsAffected}/${totalCalls})`
+      : '—';
+
     return [
       rank + 1,
       priority,
@@ -85,7 +90,7 @@ function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
       fix.rootCause,
       fix.suggestedSolution,
       fix.whereToImplement,
-      callsAffected > 0 ? callsAffected : '—',
+      callsDisplay,
     ];
   });
 
