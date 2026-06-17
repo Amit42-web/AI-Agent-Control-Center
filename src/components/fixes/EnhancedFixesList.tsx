@@ -239,7 +239,7 @@ export function EnhancedFixesList() {
             </div>
           </button>
 
-          {/* Health Report */}
+          {/* Diagnostic Report */}
           <button
             onClick={() => {
               generateHealthReportPDF({
@@ -253,11 +253,11 @@ export function EnhancedFixesList() {
             }}
             className="flex items-center justify-center gap-3 p-4 rounded-lg border border-teal-500/40 bg-teal-500/10 hover:bg-teal-500/20 transition-colors"
           >
-            <span className="text-xl">🏥</span>
+            <FileText className="w-5 h-5 text-teal-400" />
             <div className="text-left flex-1">
-              <div className="font-semibold text-teal-300">Health Report (.pdf)</div>
+              <div className="font-semibold text-teal-300">Agent Diagnostic Report (.pdf)</div>
               <div className="text-xs text-teal-400/70">
-                Medical-style diagnosis — condition grade, vital signs, treatment plan
+                Overall grade, vital signs per dimension, diagnoses, treatment plan
               </div>
             </div>
           </button>

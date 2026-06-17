@@ -755,5 +755,5 @@ export function generateHealthReportPDF(data: HealthReportData): void {
   }
 
   const ts = new Date().toISOString().split('T')[0];
-  doc.save(`Health_Report_${ts}.pdf`);
+  doc.save(`Agent_Diagnostic_Report_${ts}.pdf`);
 }
