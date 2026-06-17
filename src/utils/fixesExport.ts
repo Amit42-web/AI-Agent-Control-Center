@@ -37,24 +37,23 @@ export function generateFixesExcel(data: FixesReportData): void {
 
 function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
   const { fixes, scenarios = [] } = data;
-  const totalCalls = new Set(scenarios.map(s => s.callId)).size;
 
-  // Count unique calls affected per RCA type
-  const rcaCallCount: Record<string, Set<string>> = {};
+  // Count scenarios (incidents) per RCA type
+  const rcaIncidentCount: Record<string, number> = {};
   scenarios.forEach(s => {
     if (!s.rootCauseType) return;
-    if (!rcaCallCount[s.rootCauseType]) rcaCallCount[s.rootCauseType] = new Set();
-    rcaCallCount[s.rootCauseType].add(s.callId);
+    rcaIncidentCount[s.rootCauseType] = (rcaIncidentCount[s.rootCauseType] ?? 0) + 1;
   });
+  const totalIncidents = scenarios.length;
 
-  // Score each fix: calls affected × avg severity of linked scenarios
+  // Score each fix: incident count × avg severity
   const scored = fixes.map(fix => {
-    const callsAffected = rcaCallCount[fix.rootCauseType]?.size ?? 0;
+    const incidents = rcaIncidentCount[fix.rootCauseType] ?? 0;
     const rcaScenarios = scenarios.filter(s => s.rootCauseType === fix.rootCauseType);
     const avgSev = rcaScenarios.length
       ? rcaScenarios.reduce((sum, s) => sum + (SEVERITY_WEIGHT[s.severity] ?? 1), 0) / rcaScenarios.length
       : 1;
-    return { fix, callsAffected, score: callsAffected * avgSev };
+    return { fix, incidents, score: incidents * avgSev };
   });
 
   scored.sort((a, b) => b.score - a.score);
@@ -68,17 +67,17 @@ function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
     'Why This Happened',
     'What to Do',
     'Where to Implement',
-    'Calls Affected',
+    'Incidents',
   ];
 
-  const rows = scored.map(({ fix, callsAffected }, rank) => {
+  const rows = scored.map(({ fix, incidents }, rank) => {
     const priority = rank === 0 ? 'P0 — Critical'
       : rank < 3 ? 'P1 — High'
       : rank < 6 ? 'P2 — Medium'
       : 'P3 — Low';
 
-    const callsDisplay = callsAffected > 0 && totalCalls > 0
-      ? `${Math.round((callsAffected / totalCalls) * 100)}% (${callsAffected}/${totalCalls})`
+    const incidentsDisplay = incidents > 0 && totalIncidents > 0
+      ? `${incidents} (${Math.round((incidents / totalIncidents) * 100)}% of issues)`
       : '—';
 
     return [
@@ -90,7 +89,7 @@ function buildFixPlanSheet(data: FixesReportData): XLSX.WorkSheet {
       fix.rootCause,
       fix.suggestedSolution,
       fix.whereToImplement,
-      callsDisplay,
+      incidentsDisplay,
     ];
   });
 
