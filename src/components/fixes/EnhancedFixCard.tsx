@@ -51,8 +51,17 @@ export function EnhancedFixCard({
   const copyChange = () => {
     let text = '';
     if (fix.promptFix) {
-      if (fix.promptFix.beforeText) text += `REMOVE:\n${fix.promptFix.beforeText}\n\n`;
-      text += `${fix.promptFix.action.toUpperCase()}:\n${fix.promptFix.exactContent}`;
+      const { action, insertAfter, beforeText, exactContent, targetSection } = fix.promptFix;
+      text += `Section: ${targetSection}\n\n`;
+      if (action === 'add') {
+        if (insertAfter) text += `After this line:\n${insertAfter}\n\n`;
+        text += `Add:\n${exactContent ?? ''}`;
+      } else if (action === 'replace') {
+        if (beforeText) text += `Remove:\n${beforeText}\n\n`;
+        if (exactContent) text += `Replace with:\n${exactContent}`;
+      } else {
+        text += `Remove:\n${beforeText ?? exactContent ?? ''}`;
+      }
     } else {
       text = `${fix.whereToImplement ? `WHERE: ${fix.whereToImplement}\n\n` : ''}${fix.whatToImplement ?? fix.suggestedSolution ?? ''}`;
     }
@@ -170,28 +179,60 @@ export function EnhancedFixCard({
           {fix.promptFix ? (
             <div className="space-y-2">
               <p className="text-xs font-medium text-[var(--color-slate-400)] uppercase tracking-wide">
-                Change — {fix.promptFix.targetSection}
+                {fix.promptFix.targetSection}
               </p>
 
-              {fix.promptFix.beforeText && (
+              {/* ADD — show anchor + new lines */}
+              {fix.promptFix.action === 'add' && (
+                <>
+                  {fix.promptFix.insertAfter && (
+                    <div>
+                      <div className="text-xs text-[var(--color-slate-400)] font-medium mb-1">After this line</div>
+                      <pre className="text-xs text-[var(--color-slate-300)] whitespace-pre-wrap font-mono bg-white/5 p-2 rounded border border-white/10 leading-relaxed opacity-70">
+                        {fix.promptFix.insertAfter}
+                      </pre>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs text-green-400 font-medium mb-1">Add</div>
+                    <pre className="text-xs text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2.5 rounded border border-green-500/20 leading-relaxed">
+                      {fix.promptFix.exactContent}
+                    </pre>
+                  </div>
+                </>
+              )}
+
+              {/* REPLACE — show old line → new line */}
+              {fix.promptFix.action === 'replace' && (
+                <>
+                  {fix.promptFix.beforeText && (
+                    <div>
+                      <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
+                      <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
+                        {fix.promptFix.beforeText}
+                      </pre>
+                    </div>
+                  )}
+                  {fix.promptFix.exactContent && (
+                    <div>
+                      <div className="text-xs text-green-400 font-medium mb-1">Replace with</div>
+                      <pre className="text-xs text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2.5 rounded border border-green-500/20 leading-relaxed">
+                        {fix.promptFix.exactContent}
+                      </pre>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* REMOVE — show only what to delete */}
+              {fix.promptFix.action === 'remove' && (
                 <div>
                   <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
                   <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
-                    {fix.promptFix.beforeText}
+                    {fix.promptFix.beforeText ?? fix.promptFix.exactContent}
                   </pre>
                 </div>
               )}
-
-              <div>
-                <div className="text-xs text-green-400 font-medium mb-1">
-                  {fix.promptFix.action === 'add' ? 'Add' : fix.promptFix.action === 'replace' ? 'Replace with' : 'Confirmed removal'}
-                </div>
-                {fix.promptFix.action !== 'remove' && (
-                  <pre className="text-xs text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2.5 rounded border border-green-500/20 leading-relaxed">
-                    {fix.promptFix.exactContent}
-                  </pre>
-                )}
-              </div>
             </div>
           ) : (
             /* Fallback when no promptFix */

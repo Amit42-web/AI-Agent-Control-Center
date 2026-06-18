@@ -174,8 +174,9 @@ export interface PromptFix {
   action: 'add' | 'replace' | 'remove';
   targetSection: string; // e.g., "State S0 - Availability Check" or "System Prompt - Line 15"
   lineNumber?: number; // Specific line number if known
-  exactContent: string; // The exact text to add or use as replacement
-  beforeText?: string; // For "replace" action - what to replace
+  exactContent?: string; // New content to add or replacement text (not needed for pure remove)
+  beforeText?: string; // For "replace" and "remove" — the exact existing line(s) being changed or deleted
+  insertAfter?: string; // For "add" — the exact line after which to insert (verbatim from script)
   visualDiff?: string; // Optional formatted diff for display
 }
 
