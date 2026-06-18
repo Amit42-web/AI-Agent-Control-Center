@@ -30,9 +30,9 @@ interface Grade {
 }
 
 function getGrade(score: number): Grade {
-  if (score >= 80) return { grade: 'A', label: 'Healthy', color: [21, 128, 61], bgColor: [220, 252, 231] };
-  if (score >= 60) return { grade: 'B', label: 'Moderate Risk', color: [133, 77, 14], bgColor: [254, 243, 199] };
-  if (score >= 40) return { grade: 'C', label: 'High Risk', color: [154, 52, 18], bgColor: [255, 237, 213] };
+  if (score >= 80) return { grade: 'A', label: 'Good', color: [21, 128, 61], bgColor: [220, 252, 231] };
+  if (score >= 60) return { grade: 'B', label: 'Needs Attention', color: [133, 77, 14], bgColor: [254, 243, 199] };
+  if (score >= 40) return { grade: 'C', label: 'At Risk', color: [154, 52, 18], bgColor: [255, 237, 213] };
   return { grade: 'D', label: 'Critical', color: [153, 27, 27], bgColor: [254, 226, 226] };
 }
 
@@ -49,7 +49,7 @@ const DIMENSION_MAP = [
 interface VitalSign {
   dim: string;
   label: string;
-  status: 'Optimal' | 'Mild' | 'Monitoring' | 'Elevated' | 'Critical';
+  status: 'No Issues' | 'Low' | 'Moderate' | 'Elevated' | 'Critical';
   count: number;
   statusColor: [number, number, number];
 }
@@ -80,15 +80,15 @@ function getVitalSigns(scenarios: Scenario[]): VitalSign[] {
     let statusColor: [number, number, number];
 
     if (count === 0) {
-      status = 'Optimal'; statusColor = [21, 128, 61];
+      status = 'No Issues'; statusColor = [21, 128, 61];
     } else if (critCount > 0 || highCount >= 2) {
       status = 'Critical'; statusColor = [153, 27, 27];
     } else if (highCount > 0 || count >= 4) {
       status = 'Elevated'; statusColor = [154, 52, 18];
     } else if (count >= 2) {
-      status = 'Monitoring'; statusColor = [133, 77, 14];
+      status = 'Moderate'; statusColor = [133, 77, 14];
     } else {
-      status = 'Mild'; statusColor = [21, 128, 61];
+      status = 'Low'; statusColor = [21, 128, 61];
     }
 
     return { dim: key, label, status, count, statusColor };
@@ -150,7 +150,7 @@ function drawPageHeader(doc: jsPDF, W: number, runName?: string, date?: string):
 
   ink(doc, 255, 255, 255);
   bold(doc, 14);
-  doc.text('AI Agent Health Report', 15, 10);
+  doc.text('AI Agent Diagnostic Report', 15, 10);
 
   italic(doc, 7.5);
   ink(doc, 148, 163, 184);
@@ -180,7 +180,7 @@ function addPageFooter(doc: jsPDF, W: number, H: number) {
   doc.rect(0, H - 8, W, 8, 'F');
   ink(doc, 148, 163, 184);
   normal(doc, 6.5);
-  doc.text('AI Agent Control Center — Confidential Diagnostic Report', W / 2, H - 2.5, { align: 'center' });
+  doc.text('AI Agent Control Center — Confidential QA Report', W / 2, H - 2.5, { align: 'center' });
 }
 
 // ─── Page 1: Overview + Vital Signs ──────────────────────────────────────────
@@ -213,11 +213,11 @@ function drawPage1(
   const rx = margin + 42;
   ink(doc, grade.color[0], grade.color[1], grade.color[2]);
   bold(doc, 15);
-  doc.text(`Overall Condition: ${grade.label}`, rx, y + 14);
+  doc.text(`Overall Status: ${grade.label}`, rx, y + 14);
 
   normal(doc, 10);
   ink(doc, 15, 23, 42);
-  doc.text(`Health Score: ${score} / 100`, rx, y + 24);
+  doc.text(`QA Score: ${score} / 100`, rx, y + 24);
 
   const callsWithIssues = new Set(data.scenarios.map(s => s.callId)).size;
   const pctAffected = data.totalCalls > 0 ? Math.round((callsWithIssues / data.totalCalls) * 100) : 0;
@@ -275,7 +275,7 @@ function drawPage1(
   y += 22;
 
   // ── Conversation Vital Signs
-  y = sectionLabel(doc, 'CONVERSATION VITAL SIGNS', margin, y);
+  y = sectionLabel(doc, 'PERFORMANCE BY DIMENSION', margin, y);
 
   // Table header
   fill(doc, 30, 41, 59);
@@ -283,7 +283,7 @@ function drawPage1(
   ink(doc, 255, 255, 255);
   bold(doc, 7.5);
   doc.text('Dim', margin + 3, y + 5);
-  doc.text('Vital Sign', margin + 14, y + 5);
+  doc.text('Dimension', margin + 14, y + 5);
   doc.text('Status', margin + 118, y + 5);
   doc.text('Incidents', margin + 152, y + 5);
   y += 7;
@@ -334,12 +334,12 @@ function drawPage2(
   const contentW = W - 2 * margin;
   let y = drawPageHeader(doc, W, data.runName, data.analysisDate);
 
-  y = sectionLabel(doc, 'DIAGNOSES', margin, y);
+  y = sectionLabel(doc, 'KEY FINDINGS', margin, y);
   y += 2;
 
   const diagConfig = [
-    { label: 'PRIMARY DIAGNOSIS', headerColor: [153, 27, 27] as [number, number, number], bgColor: [254, 242, 242] as [number, number, number] },
-    { label: 'SECONDARY DIAGNOSIS', headerColor: [154, 52, 18] as [number, number, number], bgColor: [255, 247, 237] as [number, number, number] },
+    { label: 'TOP FINDING', headerColor: [153, 27, 27] as [number, number, number], bgColor: [254, 242, 242] as [number, number, number] },
+    { label: 'FINDING #2', headerColor: [154, 52, 18] as [number, number, number], bgColor: [255, 247, 237] as [number, number, number] },
   ];
 
   const sevColors: Record<string, [number, number, number]> = {
@@ -399,7 +399,7 @@ function drawPage2(
 
     ink(doc, 55, 65, 81);
     bold(doc, 8);
-    doc.text('Symptoms Observed:', lx, ly);
+    doc.text('What Was Observed:', lx, ly);
     ly += 5;
 
     const symptoms = diag.scenarios
@@ -420,7 +420,7 @@ function drawPage2(
     if (impact) {
       ink(doc, 55, 65, 81);
       bold(doc, 8);
-      doc.text('Patient Impact:', lx, ly);
+      doc.text('Customer Impact:', lx, ly);
       ly += 5;
       normal(doc, 7.5);
       const impLines = doc.splitTextToSize(impact, colW - 4);
@@ -452,7 +452,7 @@ function drawPage2(
     if (linkedFix) {
       ink(doc, 55, 65, 81);
       bold(doc, 8);
-      doc.text('Prescription:', rx2, ry);
+      doc.text('Recommended Fix:', rx2, ry);
       ry += 5;
       normal(doc, 7.5);
       const fixLines = doc.splitTextToSize(linkedFix.suggestedSolution, colW - 2);
@@ -591,8 +591,8 @@ function drawPage3(
 
   y += riskCardH + 12;
 
-  // ── Treatment Plan
-  y = sectionLabel(doc, 'TREATMENT PLAN', margin, y);
+  // ── Action Plan
+  y = sectionLabel(doc, 'ACTION PLAN', margin, y);
   y += 2;
 
   const total = data.scenarios.length;
@@ -668,13 +668,13 @@ function drawPage3(
     doc.rect(wx, y + cardH - 7, cardW, 7, 'F');
     ink(doc, 255, 255, 255);
     bold(doc, 7.5);
-    doc.text(`Expected recovery: +${recovery}%`, wx + cardW / 2, y + cardH - 2.5, { align: 'center' });
+    doc.text(`Est. improvement: +${recovery}%`, wx + cardW / 2, y + cardH - 2.5, { align: 'center' });
   });
 
   y += cardH + 14;
 
-  // ── Projected Health Score
-  y = sectionLabel(doc, 'PROJECTED HEALTH SCORE', margin, y);
+  // ── Projected QA Score
+  y = sectionLabel(doc, 'PROJECTED QA SCORE', margin, y);
   y += 3;
 
   const currentGrade = getGrade(currentScore);
