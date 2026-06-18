@@ -205,13 +205,17 @@ export function EnhancedFixCard({
               {/* REPLACE — show old line → new line */}
               {fix.promptFix.action === 'replace' && (
                 <>
-                  {fix.promptFix.beforeText && (
+                  {fix.promptFix.beforeText ? (
                     <div>
                       <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
                       <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
                         {fix.promptFix.beforeText}
                       </pre>
                     </div>
+                  ) : (
+                    <p className="text-xs text-[var(--color-slate-500)] italic">
+                      Find and remove the relevant line in: {fix.promptFix.targetSection}
+                    </p>
                   )}
                   {fix.promptFix.exactContent && (
                     <div>
@@ -228,9 +232,15 @@ export function EnhancedFixCard({
               {fix.promptFix.action === 'remove' && (
                 <div>
                   <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
-                  <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
-                    {fix.promptFix.beforeText ?? fix.promptFix.exactContent}
-                  </pre>
+                  {(fix.promptFix.beforeText ?? fix.promptFix.exactContent) ? (
+                    <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
+                      {fix.promptFix.beforeText ?? fix.promptFix.exactContent}
+                    </pre>
+                  ) : (
+                    <p className="text-xs text-[var(--color-slate-500)] italic">
+                      Locate and remove the relevant line in: {fix.promptFix.targetSection}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
