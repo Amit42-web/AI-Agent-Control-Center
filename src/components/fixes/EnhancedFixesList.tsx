@@ -42,6 +42,22 @@ export function EnhancedFixesList() {
   const [generatedDocument, setGeneratedDocument] = useState('');
   const [isCopied, setIsCopied] = useState(false);
 
+  // ── Severity-weighted impact per fix ──────────────────────────────────────
+  const SEV_WEIGHT: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+
+  const allScenarios = scenarioResults?.scenarios ?? [];
+  const totalWeight = allScenarios.reduce((sum, s) => sum + (SEV_WEIGHT[s.severity] ?? 1), 0);
+
+  const fixImpact = (fix: { rootCauseType: string }) => {
+    const matched = allScenarios.filter(s => s.rootCauseType === fix.rootCauseType);
+    const weight = matched.reduce((sum, s) => sum + (SEV_WEIGHT[s.severity] ?? 1), 0);
+    return {
+      incidentCount: matched.length,
+      impactPct: totalWeight > 0 ? Math.round((weight / totalWeight) * 100) : 0,
+    };
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   // Proper null/undefined checks
   if (!enhancedFixes || !enhancedFixes.fixes || enhancedFixes.fixes.length === 0) {
     return (
@@ -273,15 +289,20 @@ export function EnhancedFixesList() {
 
       {/* Fixes List */}
       <div className="space-y-4">
-        {filteredFixes.map((fix, index) => (
+        {filteredFixes.map((fix, index) => {
+          const { incidentCount, impactPct } = fixImpact(fix);
+          return (
           <EnhancedFixCard
             key={fix.id}
             fix={fix}
             index={index}
             isSelected={selectedFixIds.has(fix.id)}
             onToggleSelect={() => toggleFixSelection(fix.id)}
+            incidentCount={incidentCount}
+            impactPct={impactPct}
           />
-        ))}
+          );
+        })}
       </div>
 
       {/* Generate Combined Document Button */}

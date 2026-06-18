@@ -2,65 +2,63 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, ChevronDown, ChevronUp, Target, MapPin, Code, CheckCircle, FlaskConical, Lightbulb, AlertCircle } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { EnhancedFix } from '@/types';
 
 const rootCauseColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  knowledge: { bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', icon: '📚' },
-  instruction: { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30', icon: '📋' },
-  execution: { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', icon: '⚠️' },
-  conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', icon: '💬' },
-  model: { bg: 'bg-green-500/20', text: 'text-green-300', border: 'border-green-500/30', icon: '🤖' },
+  knowledge:    { bg: 'bg-yellow-500/20', text: 'text-yellow-300',  border: 'border-yellow-500/30',  icon: '📚' },
+  instruction:  { bg: 'bg-cyan-500/20',   text: 'text-cyan-300',    border: 'border-cyan-500/30',    icon: '📋' },
+  execution:    { bg: 'bg-orange-500/20', text: 'text-orange-300',  border: 'border-orange-500/30',  icon: '⚠️' },
+  conversation: { bg: 'bg-purple-500/20', text: 'text-purple-300',  border: 'border-purple-500/30',  icon: '💬' },
+  model:        { bg: 'bg-green-500/20',  text: 'text-green-300',   border: 'border-green-500/30',   icon: '🤖' },
 };
 
 const fixTypeColors: Record<string, { bg: string; text: string }> = {
-  script: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
-  training: { bg: 'bg-green-500/20', text: 'text-green-400' },
-  process: { bg: 'bg-purple-500/20', text: 'text-purple-400' },
-  system: { bg: 'bg-red-500/20', text: 'text-red-400' },
+  script:   { bg: 'bg-blue-500/20',   text: 'text-blue-400'   },
+  training: { bg: 'bg-green-500/20',  text: 'text-green-400'  },
+  process:  { bg: 'bg-purple-500/20', text: 'text-purple-400' },
+  system:   { bg: 'bg-red-500/20',    text: 'text-red-400'    },
 };
 
-interface EnhancedFixCardProps {
+function impactLabel(pct: number): { label: string; color: string; barColor: string } {
+  if (pct >= 35) return { label: 'High Impact',     color: 'text-red-400',    barColor: 'bg-red-500'    };
+  if (pct >= 15) return { label: 'Moderate Impact', color: 'text-amber-400',  barColor: 'bg-amber-500'  };
+  return              { label: 'Low Impact',       color: 'text-slate-400',  barColor: 'bg-slate-500'  };
+}
+
+export interface EnhancedFixCardProps {
   fix: EnhancedFix;
   index: number;
   isSelected?: boolean;
   onToggleSelect?: () => void;
+  impactPct?: number;       // severity-weighted % of total incidents this fix covers
+  incidentCount?: number;   // raw count of incidents for this fix's RCA
 }
 
-export function EnhancedFixCard({ fix, index, isSelected = false, onToggleSelect }: EnhancedFixCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
+export function EnhancedFixCard({
+  fix,
+  index,
+  isSelected = false,
+  onToggleSelect,
+  impactPct = 0,
+  incidentCount = 0,
+}: EnhancedFixCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const copyToClipboard = (text: string, field: string) => {
+  const impact = impactLabel(impactPct);
+
+  const copyChange = () => {
+    let text = '';
+    if (fix.promptFix) {
+      if (fix.promptFix.beforeText) text += `REMOVE:\n${fix.promptFix.beforeText}\n\n`;
+      text += `${fix.promptFix.action.toUpperCase()}:\n${fix.promptFix.exactContent}`;
+    } else {
+      text = `${fix.whereToImplement ? `WHERE: ${fix.whereToImplement}\n\n` : ''}${fix.whatToImplement ?? fix.suggestedSolution ?? ''}`;
+    }
     navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const copyAll = () => {
-    const concreteExampleText = typeof fix.concreteExample === 'string'
-      ? fix.concreteExample
-      : JSON.stringify(fix.concreteExample, null, 2);
-
-    const allContent = `
-Title: ${fix.title || ''}
-
-Root Cause: ${fix.rootCause || ''}
-
-Suggested Solution: ${fix.suggestedSolution || ''}
-
-Where to Implement: ${fix.whereToImplement || ''}
-
-What to Implement: ${fix.whatToImplement || ''}
-
-Concrete Example: ${concreteExampleText || ''}
-
-Success Criteria: ${fix.successCriteria || ''}
-
-How to Test: ${fix.howToTest || ''}
-${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Section: ${fix.promptFix.targetSection}\nExact Content:\n${fix.promptFix.exactContent}` : ''}
-    `.trim();
-    copyToClipboard(allContent, 'all');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -68,249 +66,143 @@ ${fix.promptFix ? `\nPrompt Fix:\nAction: ${fix.promptFix.action}\nTarget Sectio
       className="glass-card overflow-hidden"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.1 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
     >
-      {/* Header */}
+      {/* ── Header (always visible) */}
       <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 transition-colors"
+        className="flex items-start gap-3 p-4 cursor-pointer hover:bg-white/5 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-3 flex-1">
-          {onToggleSelect && (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => {
-                e.stopPropagation();
-                onToggleSelect();
-              }}
-              className="w-5 h-5 rounded border-2 border-[var(--color-navy-600)] bg-[var(--color-navy-800)] checked:bg-blue-500 checked:border-blue-500 cursor-pointer"
-            />
-          )}
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-            {index + 1}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h4 className="font-semibold text-white text-base">{fix.title}</h4>
-              {fix.fixType && fixTypeColors[fix.fixType] && (
-                <span className={`text-xs px-2 py-0.5 rounded ${fixTypeColors[fix.fixType].bg} ${fixTypeColors[fix.fixType].text} font-medium`}>
-                  {fix.fixType}
-                </span>
-              )}
-              {fix.rootCauseType && rootCauseColors[fix.rootCauseType] && (
-                <span className={`px-2 py-0.5 text-xs rounded-full ${rootCauseColors[fix.rootCauseType].bg} ${rootCauseColors[fix.rootCauseType].text} border ${rootCauseColors[fix.rootCauseType].border} font-medium`}>
-                  {rootCauseColors[fix.rootCauseType].icon} {fix.rootCauseType}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--color-slate-400)]">
-              Category-level fix addressing multiple scenarios
-            </p>
-          </div>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-5 h-5 text-[var(--color-slate-400)] flex-shrink-0" />
-        ) : (
-          <ChevronDown className="w-5 h-5 text-[var(--color-slate-400)] flex-shrink-0" />
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => { e.stopPropagation(); onToggleSelect(); }}
+            className="mt-1 w-4 h-4 rounded border-2 border-[var(--color-navy-600)] bg-[var(--color-navy-800)] checked:bg-blue-500 checked:border-blue-500 cursor-pointer flex-shrink-0"
+          />
         )}
+
+        {/* Index badge */}
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0 mt-0.5">
+          {index + 1}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          {/* Title row */}
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <h4 className="font-semibold text-white text-sm">{fix.title}</h4>
+            {fix.fixType && fixTypeColors[fix.fixType] && (
+              <span className={`text-xs px-1.5 py-0.5 rounded ${fixTypeColors[fix.fixType].bg} ${fixTypeColors[fix.fixType].text} font-medium`}>
+                {fix.fixType}
+              </span>
+            )}
+            {fix.rootCauseType && rootCauseColors[fix.rootCauseType] && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${rootCauseColors[fix.rootCauseType].bg} ${rootCauseColors[fix.rootCauseType].text} border ${rootCauseColors[fix.rootCauseType].border} font-medium`}>
+                {rootCauseColors[fix.rootCauseType].icon} {fix.rootCauseType}
+              </span>
+            )}
+            {fix.promptFix && (
+              <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold uppercase
+                ${fix.promptFix.action === 'add'     ? 'bg-green-500/20 text-green-400' :
+                  fix.promptFix.action === 'replace' ? 'bg-blue-500/20  text-blue-400'  :
+                                                       'bg-red-500/20   text-red-400'   }`}>
+                {fix.promptFix.action}
+              </span>
+            )}
+          </div>
+
+          {/* Impact bar */}
+          {incidentCount > 0 && (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex-1 max-w-[120px] h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${impact.barColor}`}
+                  style={{ width: `${Math.min(100, impactPct)}%` }}
+                />
+              </div>
+              <span className={`text-xs font-medium ${impact.color}`}>{impact.label}</span>
+              <span className="text-xs text-[var(--color-slate-500)]">
+                {incidentCount} incident{incidentCount !== 1 ? 's' : ''} · {impactPct}% of issues
+              </span>
+            </div>
+          )}
+
+          {/* Where — always show as a quick hint */}
+          {fix.whereToImplement && (
+            <p className="text-xs text-[var(--color-slate-400)] mt-1 truncate">
+              📍 {fix.whereToImplement}
+            </p>
+          )}
+        </div>
+
+        {isExpanded
+          ? <ChevronUp className="w-4 h-4 text-[var(--color-slate-400)] flex-shrink-0 mt-1" />
+          : <ChevronDown className="w-4 h-4 text-[var(--color-slate-400)] flex-shrink-0 mt-1" />
+        }
       </div>
 
-      {/* Content */}
+      {/* ── Expanded body */}
       {isExpanded && (
         <motion.div
-          className="px-4 pb-4 space-y-4"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
+          className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          {/* Copy All Button */}
+          {/* Copy button */}
           <div className="flex justify-end">
             <button
-              className="btn-primary flex items-center gap-2 text-xs py-1.5 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                copyAll();
-              }}
+              className="btn-secondary flex items-center gap-1.5 text-xs py-1 px-2.5"
+              onClick={(e) => { e.stopPropagation(); copyChange(); }}
             >
-              {copiedField === 'all' ? (
-                <>
-                  <Check className="w-3 h-3" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  Copy All
-                </>
-              )}
+              {copied ? <><Check className="w-3 h-3" />Copied!</> : <><Copy className="w-3 h-3" />Copy change</>}
             </button>
           </div>
 
-          {/* Root Cause Section */}
+          {/* Root cause — brief */}
           {fix.rootCause && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  Root Cause Analysis
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-amber-500 bg-amber-500/5">
-                <p className="text-sm text-[var(--color-slate-200)]">
-                  {fix.rootCause}
-                </p>
-              </div>
+            <div className="flex gap-2">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[var(--color-slate-300)]">{fix.rootCause}</p>
             </div>
           )}
 
-          {/* Suggested Solution */}
-          {fix.suggestedSolution && (
+          {/* ── The actual change */}
+          {fix.promptFix ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  Suggested Solution
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-blue-500 bg-blue-500/5">
-                <p className="text-sm text-[var(--color-slate-200)]">
-                  {fix.suggestedSolution}
-                </p>
-              </div>
-            </div>
-          )}
+              <p className="text-xs font-medium text-[var(--color-slate-400)] uppercase tracking-wide">
+                Change — {fix.promptFix.targetSection}
+              </p>
 
-          {/* Prompt Fix - PRIORITIZED (show first if available) */}
-          {fix.promptFix && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  📍 Exact Location & Implementation
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-cyan-500 bg-cyan-500/5">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-medium uppercase">
-                      {fix.promptFix.action}
-                    </span>
-                    <span className="text-xs text-[var(--color-slate-300)] font-medium">
-                      {fix.promptFix.targetSection}
-                    </span>
-                    {fix.promptFix.lineNumber && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                        Line {fix.promptFix.lineNumber}
-                      </span>
-                    )}
-                  </div>
-                  {fix.promptFix.beforeText && (
-                    <div>
-                      <div className="text-xs text-red-400 font-medium mb-1">❌ Remove:</div>
-                      <pre className="text-sm text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2 rounded border border-red-500/30">
-                        {fix.promptFix.beforeText}
-                      </pre>
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-xs text-green-400 font-medium mb-1">
-                      ✅ {fix.promptFix.action === 'add' ? 'Add this' : fix.promptFix.action === 'replace' ? 'Replace with this' : 'Confirm removal'}:
-                    </div>
-                    <pre className="text-sm text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2 rounded border border-green-500/30">
-                      {fix.promptFix.exactContent}
-                    </pre>
-                  </div>
+              {fix.promptFix.beforeText && (
+                <div>
+                  <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
+                  <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
+                    {fix.promptFix.beforeText}
+                  </pre>
                 </div>
+              )}
+
+              <div>
+                <div className="text-xs text-green-400 font-medium mb-1">
+                  {fix.promptFix.action === 'add' ? 'Add' : fix.promptFix.action === 'replace' ? 'Replace with' : 'Confirmed removal'}
+                </div>
+                {fix.promptFix.action !== 'remove' && (
+                  <pre className="text-xs text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2.5 rounded border border-green-500/20 leading-relaxed">
+                    {fix.promptFix.exactContent}
+                  </pre>
+                )}
               </div>
             </div>
-          )}
-
-          {/* Where to Implement - only show if no promptFix */}
-          {!fix.promptFix && fix.whereToImplement && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  📍 Where to Implement
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-purple-500 bg-purple-500/5">
-                <p className="text-sm text-[var(--color-slate-200)] font-mono">
-                  {fix.whereToImplement}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* What to Implement - only show if no promptFix */}
-          {!fix.promptFix && fix.whatToImplement && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  ✅ What to Implement
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
-                <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap font-mono">
+          ) : (
+            /* Fallback when no promptFix */
+            fix.whatToImplement && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-[var(--color-slate-400)] uppercase tracking-wide">What to change</p>
+                <pre className="text-xs text-[var(--color-slate-200)] whitespace-pre-wrap font-mono bg-white/5 p-2.5 rounded border border-white/10 leading-relaxed">
                   {fix.whatToImplement}
                 </pre>
               </div>
-            </div>
-          )}
-
-          {/* Concrete Example */}
-          {fix.concreteExample && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-pink-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  Concrete Example
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-pink-500 bg-pink-500/5">
-                <pre className="text-sm text-[var(--color-slate-200)] whitespace-pre-wrap">
-                  {typeof fix.concreteExample === 'string'
-                    ? fix.concreteExample
-                    : JSON.stringify(fix.concreteExample, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* Success Criteria */}
-          {fix.successCriteria && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  Success Criteria
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-green-500 bg-green-500/5">
-                <p className="text-sm text-[var(--color-slate-200)]">
-                  {fix.successCriteria}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* How to Test */}
-          {fix.howToTest && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="w-4 h-4 text-orange-400" />
-                <span className="text-xs font-medium text-[var(--color-slate-300)]">
-                  How to Test
-                </span>
-              </div>
-              <div className="glass-card-subtle p-3 border-l-2 border-orange-500 bg-orange-500/5">
-                <p className="text-sm text-[var(--color-slate-200)]">
-                  {fix.howToTest}
-                </p>
-              </div>
-            </div>
+            )
           )}
         </motion.div>
       )}
