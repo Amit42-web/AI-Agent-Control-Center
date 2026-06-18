@@ -1293,19 +1293,20 @@ For each scenario, provide a JSON object with:
 **CRITICAL - For INSTRUCTION or KNOWLEDGE fixes, ALSO provide a "promptFix" object:**
 {
   "action": "add" | "replace" | "remove",
-  "targetSection": "Specific section name (e.g., 'State S0 - Availability Check')",
-  "exactContent": "ONLY the new or changed line(s) — not needed for pure remove",
-  "beforeText": "For replace/remove — ONLY the specific existing line(s) being changed or deleted",
-  "insertAfter": "For add — copy the exact line from the script after which to insert (verbatim)"
+  "targetSection": "Section name only — e.g., 'State S0 Rules'",
+  "exactContent": "≤5 lines — the new content only (omit for remove)",
+  "beforeText": "≤3 lines — the exact existing line(s) being replaced or deleted (omit for add)",
+  "insertAfter": "1 line — the verbatim script line immediately before the insertion point (add only)"
 }
 
-**MINIMAL DIFF RULES — MANDATORY:**
-- "add": new lines only in exactContent. Set insertAfter = the verbatim line in the script right before the insertion point.
-- "replace": beforeText = ONLY the old line(s) changing. exactContent = ONLY the new version of those line(s).
-- "remove": beforeText = ONLY the exact line(s) to delete. No exactContent needed.
-- NEVER copy the whole section/state as beforeText just to make a small change inside it.
-- WRONG: beforeText = entire S0 section, exactContent = same section with 2 lines added.
-- RIGHT: action = "add", insertAfter = "last rule line verbatim", exactContent = "the 2 new lines".
+**HARD LIMITS — NO EXCEPTIONS:**
+- exactContent: 5 lines maximum. If your change needs more, create a second fix object.
+- beforeText: 3 lines maximum. You are identifying A LINE TO CHANGE, not copying a section.
+- insertAfter: 1 line only (the single line it goes after).
+- If you catch yourself writing more than 5 lines in any field: STOP. Split into multiple fix objects.
+- "add" = inserting new lines that do not exist yet. beforeText is NOT set.
+- "replace" = swapping an existing line for a new one. Set both beforeText (old) and exactContent (new).
+- "remove" = deleting an existing line. beforeText is the line to delete. exactContent is NOT set.
 
 Examples:
 - If rootCauseType is "instruction" or "knowledge": Add promptFix with exact system instruction text, conversation flow, or script dialogue to add/replace
@@ -1527,17 +1528,19 @@ For the RCA category "${rcaType}", provide a JSON object with a "fixes" array:
       "howToTest": "Testing method for this patch",
       "promptFix": {
         "action": "add" | "replace" | "remove",
-        "targetSection": "EXACT section - e.g., 'Pillar 3, State S0'",
-        "exactContent": "ONLY the new or changed line(s) — not needed for pure remove",
-        "beforeText": "For replace/remove — ONLY the specific existing line(s) being changed or deleted",
-        "insertAfter": "For add — the verbatim line from the script after which to insert"
+        "targetSection": "Section name only — e.g., 'Pillar 3, State S0 Rules'",
+        "exactContent": "≤5 lines — new content only (omit for remove)",
+        "beforeText": "≤3 lines — exact existing line(s) being replaced or deleted (omit for add)",
+        "insertAfter": "1 line — verbatim script line immediately before insertion point (add only)"
       }
 
-MANDATORY MINIMAL DIFF RULES for promptFix:
-- "add": exactContent = only the new lines. insertAfter = the exact line in the script right before the insertion point (copy it verbatim).
-- "replace": beforeText = ONLY the old line(s) changing. exactContent = ONLY the corrected version of those line(s).
-- "remove": beforeText = ONLY the exact line(s) to delete. No exactContent needed.
-- NEVER copy a whole section as beforeText — identify the specific line that needs to change.
+HARD LIMITS for promptFix — NO EXCEPTIONS:
+- exactContent: 5 lines maximum. Need more? Create a second fix object.
+- beforeText: 3 lines maximum. You are pinpointing A LINE, not copying a section.
+- insertAfter: 1 line only.
+- "add": new lines only. Do NOT set beforeText.
+- "replace": set beforeText (old line) AND exactContent (new line).
+- "remove": set beforeText (line to delete). Do NOT set exactContent.
     }
   ]
 }

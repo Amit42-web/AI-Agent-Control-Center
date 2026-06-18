@@ -35,6 +35,61 @@ export interface EnhancedFixCardProps {
   incidentCount?: number;   // raw count of incidents for this fix's RCA
 }
 
+const LINE_LIMIT = 8; // patches longer than this are likely full-section copies
+
+function isLongPatch(text?: string): boolean {
+  if (!text) return false;
+  return text.split('\n').length > LINE_LIMIT;
+}
+
+function LongPatchWarning({ label, text }: { label: string; text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const lines = text.split('\n');
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs font-medium text-amber-400">{label}</div>
+        <span className="text-xs text-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
+          {lines.length} lines — may be over-specified
+        </span>
+      </div>
+      <pre className={`text-xs whitespace-pre-wrap font-mono p-2.5 rounded border leading-relaxed overflow-hidden transition-all
+        ${label.toLowerCase().includes('remove') || label.toLowerCase().includes('after')
+          ? 'text-red-200 bg-red-900/20 border-red-500/20'
+          : 'text-green-200 bg-green-900/20 border-green-500/20'}`}
+        style={{ maxHeight: expanded ? 'none' : '80px' }}
+      >
+        {text}
+      </pre>
+      <button
+        className="text-xs text-amber-400 hover:text-amber-300 mt-1"
+        onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+      >
+        {expanded ? 'Collapse' : `Show all ${lines.length} lines`}
+      </button>
+    </div>
+  );
+}
+
+function DiffBlock({ label, text, variant }: { label: string; text: string; variant: 'remove' | 'add' | 'neutral' }) {
+  if (isLongPatch(text)) return <LongPatchWarning label={label} text={text} />;
+  const styles = {
+    remove:  'text-red-200 bg-red-900/20 border-red-500/20',
+    add:     'text-green-200 bg-green-900/20 border-green-500/20',
+    neutral: 'text-[var(--color-slate-300)] bg-white/5 border-white/10 opacity-70',
+  };
+  return (
+    <div>
+      <div className={`text-xs font-medium mb-1 ${variant === 'remove' ? 'text-red-400' : variant === 'add' ? 'text-green-400' : 'text-[var(--color-slate-400)]'}`}>
+        {label}
+      </div>
+      <pre className={`text-xs whitespace-pre-wrap font-mono p-2.5 rounded border leading-relaxed ${styles[variant]}`}>
+        {text}
+      </pre>
+    </div>
+  );
+}
+
 export function EnhancedFixCard({
   fix,
   index,
@@ -182,66 +237,41 @@ export function EnhancedFixCard({
                 {fix.promptFix.targetSection}
               </p>
 
-              {/* ADD — show anchor + new lines */}
+              {/* ADD */}
               {fix.promptFix.action === 'add' && (
                 <>
                   {fix.promptFix.insertAfter && (
-                    <div>
-                      <div className="text-xs text-[var(--color-slate-400)] font-medium mb-1">After this line</div>
-                      <pre className="text-xs text-[var(--color-slate-300)] whitespace-pre-wrap font-mono bg-white/5 p-2 rounded border border-white/10 leading-relaxed opacity-70">
-                        {fix.promptFix.insertAfter}
-                      </pre>
-                    </div>
+                    <DiffBlock label="After this line" text={fix.promptFix.insertAfter} variant="neutral" />
                   )}
-                  <div>
-                    <div className="text-xs text-green-400 font-medium mb-1">Add</div>
-                    <pre className="text-xs text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2.5 rounded border border-green-500/20 leading-relaxed">
-                      {fix.promptFix.exactContent}
-                    </pre>
-                  </div>
+                  {fix.promptFix.exactContent
+                    ? <DiffBlock label="Add" text={fix.promptFix.exactContent} variant="add" />
+                    : <p className="text-xs text-[var(--color-slate-500)] italic">No content specified.</p>
+                  }
                 </>
               )}
 
-              {/* REPLACE — show old line → new line */}
+              {/* REPLACE */}
               {fix.promptFix.action === 'replace' && (
                 <>
-                  {fix.promptFix.beforeText ? (
-                    <div>
-                      <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
-                      <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
-                        {fix.promptFix.beforeText}
-                      </pre>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[var(--color-slate-500)] italic">
-                      Find and remove the relevant line in: {fix.promptFix.targetSection}
-                    </p>
-                  )}
-                  {fix.promptFix.exactContent && (
-                    <div>
-                      <div className="text-xs text-green-400 font-medium mb-1">Replace with</div>
-                      <pre className="text-xs text-green-200 whitespace-pre-wrap font-mono bg-green-900/20 p-2.5 rounded border border-green-500/20 leading-relaxed">
-                        {fix.promptFix.exactContent}
-                      </pre>
-                    </div>
-                  )}
+                  {fix.promptFix.beforeText
+                    ? <DiffBlock label="Remove" text={fix.promptFix.beforeText} variant="remove" />
+                    : <p className="text-xs text-[var(--color-slate-500)] italic">Find and remove the relevant line in: {fix.promptFix.targetSection}</p>
+                  }
+                  {fix.promptFix.exactContent
+                    ? <DiffBlock label="Replace with" text={fix.promptFix.exactContent} variant="add" />
+                    : null
+                  }
                 </>
               )}
 
-              {/* REMOVE — show only what to delete */}
+              {/* REMOVE */}
               {fix.promptFix.action === 'remove' && (
-                <div>
-                  <div className="text-xs text-red-400 font-medium mb-1">Remove</div>
-                  {(fix.promptFix.beforeText ?? fix.promptFix.exactContent) ? (
-                    <pre className="text-xs text-red-200 whitespace-pre-wrap font-mono bg-red-900/20 p-2.5 rounded border border-red-500/20 leading-relaxed">
-                      {fix.promptFix.beforeText ?? fix.promptFix.exactContent}
-                    </pre>
-                  ) : (
-                    <p className="text-xs text-[var(--color-slate-500)] italic">
-                      Locate and remove the relevant line in: {fix.promptFix.targetSection}
-                    </p>
-                  )}
-                </div>
+                <>
+                  {(fix.promptFix.beforeText ?? fix.promptFix.exactContent)
+                    ? <DiffBlock label="Remove" text={(fix.promptFix.beforeText ?? fix.promptFix.exactContent)!} variant="remove" />
+                    : <p className="text-xs text-[var(--color-slate-500)] italic">Locate and remove the relevant line in: {fix.promptFix.targetSection}</p>
+                  }
+                </>
               )}
             </div>
           ) : (
