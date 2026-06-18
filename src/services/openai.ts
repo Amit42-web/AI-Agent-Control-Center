@@ -1295,9 +1295,18 @@ For each scenario, provide a JSON object with:
   "action": "add" | "replace" | "remove",
   "targetSection": "Specific section name (e.g., 'State S0 - Availability Check' or 'System Prompt - Empathy Guidelines')",
   "lineNumber": optional number if you can identify exact line,
-  "exactContent": "The EXACT text to add or use as replacement - make this copy-paste ready",
-  "beforeText": "For 'replace' action - the text to be replaced"
+  "exactContent": "ONLY the new or changed line(s) — nothing else",
+  "beforeText": "For 'replace' action — ONLY the specific existing line(s) being changed, nothing else"
 }
+
+**MINIMAL DIFF RULE — THIS IS MANDATORY:**
+- exactContent and beforeText must contain ONLY the lines that actually change — not the surrounding context
+- WRONG: beforeText = entire S0 section (20 lines), exactContent = same 20 lines with 2 new lines inserted
+- RIGHT: action = "add", targetSection = "S0 Rules", exactContent = only the 2 new rule lines
+- WRONG: beforeText = full state block, exactContent = full state block with one word changed
+- RIGHT: action = "replace", beforeText = the one sentence that changes, exactContent = the corrected sentence
+- If you are only ADDING new content to an existing section (no existing line is deleted), use action "add"
+- Only use "replace" when an existing line must be changed — and beforeText is ONLY that line
 
 Examples:
 - If rootCauseType is "instruction" or "knowledge": Add promptFix with exact system instruction text, conversation flow, or script dialogue to add/replace
@@ -1521,9 +1530,16 @@ For the RCA category "${rcaType}", provide a JSON object with a "fixes" array:
         "action": "add" | "replace" | "remove",
         "targetSection": "EXACT section - e.g., 'Pillar 3, State S0'",
         "lineNumber": number (if known),
-        "exactContent": "EXACT text to add/replace at this location",
-        "beforeText": "For replace - exact text being replaced"
+        "exactContent": "ONLY the new or changed line(s) — not the whole section",
+        "beforeText": "For replace ONLY — the specific existing line(s) being changed, nothing else"
       }
+
+MANDATORY MINIMAL DIFF RULE for promptFix:
+- exactContent = only lines that are new or changed. Do NOT copy surrounding context.
+- beforeText = only the specific lines being deleted or replaced. Do NOT copy the whole state/section.
+- If adding new rules/lines to an existing list → use action "add", exactContent = only the new lines
+- If changing one instruction → use action "replace", beforeText = that one line, exactContent = corrected line
+- NEVER copy an entire section as beforeText just to make a small change inside it
     }
   ]
 }
