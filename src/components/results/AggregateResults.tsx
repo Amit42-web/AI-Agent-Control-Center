@@ -106,6 +106,7 @@ export function AggregateResults() {
     aggregatedScenarios: storedAggregatedScenarios,
     setAggregatedIssues: storeSetAggregatedIssues,
     setAggregatedScenarios: storeSetAggregatedScenarios,
+    saveAnalysis, currentAnalysisName,
   } = useAppStore();
 
   // Detect flow type early - needed for useMemo hooks
@@ -251,6 +252,9 @@ export function AggregateResults() {
         console.log(`[LLM Scenario Aggregation] Completed - ${aggregated.length} categories created`);
         clearTimeout(timeoutId);
         storeSetAggregatedScenarios(aggregated);
+        // Auto-save so aggregated data survives the next load (makes Impact Zone stable)
+        const { currentAnalysisName: name } = useAppStore.getState();
+        if (name) saveAnalysis(name).catch(() => {});
       } catch (error) {
         console.error('[LLM Scenario Aggregation] Error:', error);
         clearTimeout(timeoutId);

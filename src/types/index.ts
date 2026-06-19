@@ -261,6 +261,9 @@ export interface AnalysisState {
   enhancedFixes: EnhancedFixSuggestions | null; // For open-ended flow
   selectedCallId: string | null;
   fixesApplied?: boolean; // Whether fixes from this run have been applied
+  // Cached aggregations — persisted so Impact Zone is stable across loads
+  aggregatedScenarios?: AggregatedScenario[] | null;
+  aggregatedIssues?: AggregatedIssue[] | null;
 }
 
 export type ResultsViewMode = 'detailed' | 'overview';

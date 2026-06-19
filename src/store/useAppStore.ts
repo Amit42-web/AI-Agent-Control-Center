@@ -533,6 +533,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       enhancedFixes: state.enhancedFixes,
       selectedCallId: state.selectedCallId,
       fixesApplied: state.fixesApplied,
+      aggregatedScenarios: state.aggregatedScenarios,
+      aggregatedIssues: state.aggregatedIssues,
     };
   },
 
@@ -553,8 +555,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       consolidatedFixes: analysisState.consolidatedFixes || null,
       scenarioResults: analysisState.scenarioResults,
       enhancedFixes: analysisState.enhancedFixes,
-      aggregatedIssues: null,
-      aggregatedScenarios: null,
+      aggregatedIssues: analysisState.aggregatedIssues ?? null,
+      aggregatedScenarios: analysisState.aggregatedScenarios ?? null,
       selectedCallId: analysisState.selectedCallId,
       fixesApplied: analysisState.fixesApplied || false,
       currentStep: analysisState.enhancedFixes || analysisState.consolidatedFixes || analysisState.fixes
