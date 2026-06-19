@@ -1,5 +1,7 @@
 import jsPDF from 'jspdf';
-import { AggregatedScenario, EnhancedFix, RootCauseType, Scenario } from '@/types';
+import { AggregatedScenario, EnhancedFix, Scenario } from '@/types';
+
+// ─── Public interface ────────────────────────────────────────────────────────
 
 export interface HealthReportData {
   scenarios: Scenario[];
@@ -10,750 +12,628 @@ export interface HealthReportData {
   analysisDate?: string;
 }
 
-// ─── Data helpers ────────────────────────────────────────────────────────────
-
-const SEV_WEIGHT: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
-const SEV_PENALTY: Record<string, number> = { low: 3, medium: 8, high: 15, critical: 25 };
-
-function computeHealthScore(scenarios: Scenario[], totalCalls: number): number {
-  if (totalCalls === 0) return 100;
-  let pen = 0;
-  scenarios.forEach(s => (pen += SEV_PENALTY[s.severity] ?? 3));
-  return Math.max(0, Math.min(100, Math.round(100 - pen / totalCalls)));
-}
+// ─── Internal types ───────────────────────────────────────────────────────────
 
 interface Grade {
-  grade: string;
   label: string;
   color: [number, number, number];
   bgColor: [number, number, number];
 }
 
-function getGrade(score: number): Grade {
-  if (score >= 80) return { grade: 'A', label: 'Good', color: [21, 128, 61], bgColor: [220, 252, 231] };
-  if (score >= 60) return { grade: 'B', label: 'Needs Attention', color: [133, 77, 14], bgColor: [254, 243, 199] };
-  if (score >= 40) return { grade: 'C', label: 'At Risk', color: [154, 52, 18], bgColor: [255, 237, 213] };
-  return { grade: 'D', label: 'Critical', color: [153, 27, 27], bgColor: [254, 226, 226] };
+interface Driver {
+  label: string;
+  pct: number;
+  color: [number, number, number];
 }
 
-const DIMENSION_MAP = [
-  { key: 'A', label: 'Conversation Control & Flow' },
-  { key: 'B', label: 'Empathy & Tone' },
-  { key: 'C', label: 'Knowledge & Accuracy' },
-  { key: 'D', label: 'Script Adherence' },
-  { key: 'E', label: 'Resolution & Outcome' },
-  { key: 'F', label: 'Communication Clarity' },
-  { key: 'G', label: 'Novel & Emerging Issues' },
+interface Opp {
+  title: string;
+  pct: number;
+  scoreFrom: number;
+  scoreTo: number;
+}
+
+interface Risk {
+  level: string;
+  levelColor: [number, number, number];
+  primaryRisk: string;
+  impact: string;
+  urgency: string;
+  urgencyColor: [number, number, number];
+}
+
+interface Rx {
+  num: number;
+  title: string;
+  why: string;
+  gain: number;
+  color: [number, number, number];
+}
+
+// ─── Weights & penalties ──────────────────────────────────────────────────────
+
+const SEV_W: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+const SEV_P: Record<string, number> = { low: 3, medium: 8, high: 15, critical: 25 };
+
+// ─── Data helpers ─────────────────────────────────────────────────────────────
+
+function computeScore(scenarios: Scenario[], totalCalls: number): number {
+  if (totalCalls === 0) return 100;
+  const pen = scenarios.reduce((s, sc) => s + (SEV_P[sc.severity] ?? 3), 0);
+  return Math.max(0, Math.min(100, Math.round(100 - pen / totalCalls)));
+}
+
+function getGrade(score: number): Grade {
+  if (score >= 80) return { label: 'Good',            color: [21, 128, 61],  bgColor: [220, 252, 231] };
+  if (score >= 60) return { label: 'Needs Attention', color: [133, 77, 14],  bgColor: [254, 243, 199] };
+  if (score >= 40) return { label: 'At Risk',         color: [154, 52, 18],  bgColor: [255, 237, 213] };
+  return             { label: 'Critical',             color: [153, 27, 27],  bgColor: [254, 226, 226] };
+}
+
+const DIM_SHORT: Record<string, string> = {
+  A: 'Conversation Flow',
+  B: 'Empathy & Tone',
+  C: 'Knowledge & Accuracy',
+  D: 'Script Adherence',
+  E: 'Resolution & Outcome',
+  F: 'Communication Clarity',
+  G: 'Novel Issues',
+};
+
+const DRIVER_COLORS: [number, number, number][] = [
+  [239, 68, 68],
+  [245, 158, 11],
+  [139, 92, 246],
+  [59, 130, 246],
+  [100, 116, 139],
 ];
 
-interface VitalSign {
-  dim: string;
-  label: string;
-  status: 'No Issues' | 'Low' | 'Moderate' | 'Elevated' | 'Critical';
-  count: number;
-  statusColor: [number, number, number];
-}
-
-function getVitalSigns(scenarios: Scenario[]): VitalSign[] {
-  return DIMENSION_MAP.map(({ key, label }) => {
-    const dimScenarios = scenarios.filter(s => {
-      if (!s.dimension) return false;
-      const d = s.dimension.trim().toUpperCase();
-      return (
-        d === key ||
-        d.startsWith(key + ' ') ||
-        d.startsWith(key + '-') ||
-        d.startsWith('DIM ' + key) ||
-        d.startsWith('DIMENSION ' + key) ||
-        label
-          .toUpperCase()
-          .split(' ')
-          .some(w => w.length > 4 && d.includes(w))
-      );
-    });
-
-    const critCount = dimScenarios.filter(s => s.severity === 'critical').length;
-    const highCount = dimScenarios.filter(s => s.severity === 'high').length;
-    const count = dimScenarios.length;
-
-    let status: VitalSign['status'];
-    let statusColor: [number, number, number];
-
-    if (count === 0) {
-      status = 'No Issues'; statusColor = [21, 128, 61];
-    } else if (critCount > 0 || highCount >= 2) {
-      status = 'Critical'; statusColor = [153, 27, 27];
-    } else if (highCount > 0 || count >= 4) {
-      status = 'Elevated'; statusColor = [154, 52, 18];
-    } else if (count >= 2) {
-      status = 'Moderate'; statusColor = [133, 77, 14];
-    } else {
-      status = 'Low'; statusColor = [21, 128, 61];
-    }
-
-    return { dim: key, label, status, count, statusColor };
-  });
-}
-
-function topAggregated(aggs: AggregatedScenario[], n: number): AggregatedScenario[] {
-  return [...aggs]
-    .sort((a, b) => SEV_WEIGHT[b.severity] * b.occurrences - SEV_WEIGHT[a.severity] * a.occurrences)
-    .slice(0, n);
-}
-
-function calcProjectedScore(currentScore: number, fixes: EnhancedFix[], scenarios: Scenario[]): number {
-  const total = scenarios.length;
-  if (total === 0) return currentScore;
-
-  const rcaCount: Record<string, number> = {};
+function computeDrivers(scenarios: Scenario[]): Driver[] {
+  const wts: Record<string, number> = {};
+  let total = 0;
   scenarios.forEach(s => {
-    if (s.rootCauseType) rcaCount[s.rootCauseType] = (rcaCount[s.rootCauseType] ?? 0) + 1;
+    const key = (s.dimension ?? '').trim().toUpperCase().charAt(0);
+    const label = DIM_SHORT[key] ?? (s.dimension?.trim() || 'Other');
+    const w = SEV_W[s.severity] ?? 1;
+    wts[label] = (wts[label] ?? 0) + w;
+    total += w;
   });
-
-  let totalRecovery = 0;
-  fixes.forEach(fix => {
-    const incidents = rcaCount[fix.rootCauseType] ?? 0;
-    totalRecovery += Math.min(5, (incidents / total) * 20);
-  });
-
-  return Math.min(100, Math.round(currentScore + Math.min(30, totalRecovery)));
+  if (!total) return [];
+  return Object.entries(wts)
+    .map(([label, w], i) => ({ label, pct: Math.round((w / total) * 100), color: DRIVER_COLORS[i % DRIVER_COLORS.length] }))
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 3);
 }
 
-// ─── PDF drawing helpers ──────────────────────────────────────────────────────
-
-function fill(doc: jsPDF, r: number, g: number, b: number) {
-  doc.setFillColor(r, g, b);
+function getBiggestOpp(aggs: AggregatedScenario[], score: number): Opp {
+  if (!aggs.length) return { title: 'No issues detected', pct: 0, scoreFrom: score, scoreTo: score };
+  const sorted = [...aggs].sort((a, b) => SEV_W[b.severity] * b.occurrences - SEV_W[a.severity] * a.occurrences);
+  const top = sorted[0];
+  const totalW = aggs.reduce((s, a) => s + SEV_W[a.severity] * a.occurrences, 0);
+  const pct = totalW > 0 ? Math.round((SEV_W[top.severity] * top.occurrences / totalW) * 100) : 0;
+  return { title: top.title, pct, scoreFrom: score, scoreTo: Math.min(100, score + Math.min(15, Math.round(pct * 0.22))) };
 }
 
-function ink(doc: jsPDF, r: number, g: number, b: number) {
-  doc.setTextColor(r, g, b);
+function computeRisk(scenarios: Scenario[], aggs: AggregatedScenario[]): Risk {
+  const crit = scenarios.filter(s => s.severity === 'critical').length;
+  const high = scenarios.filter(s => s.severity === 'high').length;
+  const top = aggs.length ? [...aggs].sort((a, b) => SEV_W[b.severity] * b.occurrences - SEV_W[a.severity] * a.occurrences)[0] : null;
+  if (crit > 0) return {
+    level: 'High', levelColor: [153, 27, 27],
+    primaryRisk: top?.title ?? `${crit} critical issue${crit > 1 ? 's' : ''} detected`,
+    impact: 'Immediate customer risk and potential compliance exposure.',
+    urgency: 'High', urgencyColor: [153, 27, 27],
+  };
+  if (high >= 2) return {
+    level: 'Medium', levelColor: [133, 77, 14],
+    primaryRisk: top?.title ?? `${high} high-severity patterns detected`,
+    impact: 'Quality inconsistency impacting satisfaction and resolution rates.',
+    urgency: 'Medium', urgencyColor: [133, 77, 14],
+  };
+  if (scenarios.length > 0) return {
+    level: 'Medium', levelColor: [133, 77, 14],
+    primaryRisk: top?.title ?? 'Recurring quality gaps detected',
+    impact: 'Inconsistent agent behaviour affecting overall quality score.',
+    urgency: 'Low', urgencyColor: [21, 128, 61],
+  };
+  return {
+    level: 'Low', levelColor: [21, 128, 61],
+    primaryRisk: 'No significant risks identified',
+    impact: 'Agent performing within acceptable parameters.',
+    urgency: 'Low', urgencyColor: [21, 128, 61],
+  };
 }
 
-function bold(doc: jsPDF, size: number) {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(size);
+function getEvidence(aggs: AggregatedScenario[]): string[] {
+  return [...aggs]
+    .sort((a, b) => SEV_W[b.severity] * b.occurrences - SEV_W[a.severity] * a.occurrences)
+    .slice(0, 5)
+    .map(a => {
+      const n = a.uniqueCalls ?? a.occurrences;
+      return `${a.title} — ${n} call${n !== 1 ? 's' : ''}`;
+    });
 }
 
-function normal(doc: jsPDF, size: number) {
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(size);
+function getTopRx(fixes: EnhancedFix[], scenarios: Scenario[]): Rx[] {
+  const rcaCount: Record<string, number> = {};
+  scenarios.forEach(s => { if (s.rootCauseType) rcaCount[s.rootCauseType] = (rcaCount[s.rootCauseType] ?? 0) + 1; });
+  const total = Math.max(1, scenarios.length);
+  const palette: [number, number, number][] = [[239, 68, 68], [245, 158, 11], [59, 130, 246]];
+  return fixes.slice(0, 3).map((f, i): Rx => ({
+    num: i + 1,
+    title: f.title,
+    why: f.suggestedSolution,
+    gain: Math.min(12, Math.max(1, Math.round(((rcaCount[f.rootCauseType] ?? 0) / total) * 20))),
+    color: palette[i],
+  }));
 }
 
-function italic(doc: jsPDF, size: number) {
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(size);
+function calcProjected(score: number, fixes: EnhancedFix[], scenarios: Scenario[]): number {
+  const total = scenarios.length;
+  if (!total) return score;
+  const rcaCount: Record<string, number> = {};
+  scenarios.forEach(s => { if (s.rootCauseType) rcaCount[s.rootCauseType] = (rcaCount[s.rootCauseType] ?? 0) + 1; });
+  const rec = fixes.reduce((s, f) => s + Math.min(5, ((rcaCount[f.rootCauseType] ?? 0) / total) * 20), 0);
+  return Math.min(100, Math.round(score + Math.min(30, rec)));
 }
 
-function drawPageHeader(doc: jsPDF, W: number, runName?: string, date?: string): number {
-  fill(doc, 15, 23, 42);
-  doc.rect(0, 0, W, 22, 'F');
+// ─── PDF primitives ───────────────────────────────────────────────────────────
 
-  ink(doc, 255, 255, 255);
-  bold(doc, 14);
-  doc.text('AI Agent Diagnostic Report', 15, 10);
+function fill(doc: jsPDF, r: number, g: number, b: number) { doc.setFillColor(r, g, b); }
+function ink(doc: jsPDF, r: number, g: number, b: number)  { doc.setTextColor(r, g, b); }
+function bold(doc: jsPDF, sz: number)   { doc.setFont('helvetica', 'bold');   doc.setFontSize(sz); }
+function normal(doc: jsPDF, sz: number) { doc.setFont('helvetica', 'normal'); doc.setFontSize(sz); }
+function italic(doc: jsPDF, sz: number) { doc.setFont('helvetica', 'italic'); doc.setFontSize(sz); }
 
-  italic(doc, 7.5);
-  ink(doc, 148, 163, 184);
-  const sub = [runName && `Run: ${runName}`, `Date: ${date || new Date().toLocaleDateString()}`]
-    .filter(Boolean)
-    .join('  |  ');
-  doc.text(sub, 15, 17);
-
-  // Teal accent
-  fill(doc, 20, 184, 166);
-  doc.rect(0, 22, W, 1.5, 'F');
-
-  return 30;
+function cardBg(doc: jsPDF, x: number, y: number, w: number, h: number, topAccent?: [number, number, number]) {
+  fill(doc, 255, 255, 255);
+  doc.rect(x, y, w, h, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.rect(x, y, w, h, 'S');
+  if (topAccent) {
+    fill(doc, topAccent[0], topAccent[1], topAccent[2]);
+    doc.rect(x, y, w, 2, 'F');
+  }
 }
 
-function sectionLabel(doc: jsPDF, label: string, x: number, y: number): number {
-  fill(doc, 20, 184, 166);
-  doc.rect(x, y, 3, 5, 'F');
+function eyebrow(doc: jsPDF, label: string, x: number, y: number, color: [number, number, number]): number {
+  fill(doc, color[0], color[1], color[2]);
+  doc.rect(x, y, 2.5, 5.5, 'F');
   ink(doc, 15, 23, 42);
-  bold(doc, 9);
-  doc.text(label, x + 7, y + 4);
+  bold(doc, 7.5);
+  doc.text(label, x + 5, y + 4.5);
   return y + 10;
 }
 
-function addPageFooter(doc: jsPDF, W: number, H: number) {
+// ─── Score ring ───────────────────────────────────────────────────────────────
+
+function drawRing(
+  doc: jsPDF,
+  cx: number, cy: number,
+  outerR: number, innerR: number,
+  score: number,
+  color: [number, number, number],
+) {
+  fill(doc, 226, 232, 240);
+  doc.circle(cx, cy, outerR, 'F');
+
+  const pct = Math.min(score / 100, 0.9999);
+  const startA = -Math.PI / 2;
+  const STEPS = 72;
+  fill(doc, color[0], color[1], color[2]);
+  for (let i = 0; i < STEPS; i++) {
+    if (i / STEPS >= pct) break;
+    const a1 = startA + 2 * Math.PI * (i / STEPS);
+    const a2 = startA + 2 * Math.PI * Math.min((i + 1) / STEPS, pct);
+    const r = outerR + 0.3;
+    doc.triangle(cx, cy, cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2), 'F');
+  }
+
+  fill(doc, 255, 255, 255);
+  doc.circle(cx, cy, innerR, 'F');
+}
+
+// ─── Page chrome ──────────────────────────────────────────────────────────────
+
+function drawHeader(doc: jsPDF, W: number, data: HealthReportData): number {
+  fill(doc, 15, 23, 42);
+  doc.rect(0, 0, W, 20, 'F');
+
+  ink(doc, 255, 255, 255);
+  bold(doc, 13);
+  doc.text('AI Agent Diagnostic Report', 14, 9);
+
+  italic(doc, 7);
+  ink(doc, 148, 163, 184);
+  const sub = [
+    data.runName && `Run: ${data.runName}`,
+    data.analysisDate ?? new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+  ].filter(Boolean).join('   ·   ');
+  doc.text(sub, 14, 16.5);
+
+  // Teal accent
+  fill(doc, 20, 184, 166);
+  doc.rect(0, 20, W, 2, 'F');
+  return 26;
+}
+
+function drawFooter(doc: jsPDF, W: number, H: number) {
   fill(doc, 241, 245, 249);
-  doc.rect(0, H - 8, W, 8, 'F');
+  doc.rect(0, H - 9, W, 9, 'F');
   ink(doc, 148, 163, 184);
   normal(doc, 6.5);
-  doc.text('AI Agent Control Center — Confidential QA Report', W / 2, H - 2.5, { align: 'center' });
+  doc.text(
+    'AI Agent Control Center  ·  Confidential QA Report  ·  For internal use only',
+    W / 2, H - 3.5, { align: 'center' },
+  );
 }
 
-// ─── Page 1: Overview + Vital Signs ──────────────────────────────────────────
+// ─── Section renderers ────────────────────────────────────────────────────────
 
-function drawPage1(
+function drawScoreCard(doc: jsPDF, score: number, grade: Grade, x: number, y: number, w: number, h: number) {
+  cardBg(doc, x, y, w, h, grade.color);
+
+  // Eyebrow
+  ink(doc, grade.color[0], grade.color[1], grade.color[2]);
+  bold(doc, 6.5);
+  doc.text('HEALTH SCORE', x + w / 2, y + 8, { align: 'center' });
+
+  // Ring
+  const ringCy = y + 37;
+  drawRing(doc, x + w / 2, ringCy, 22, 15, score, grade.color);
+
+  // Score number
+  ink(doc, grade.color[0], grade.color[1], grade.color[2]);
+  bold(doc, 20);
+  doc.text(String(score), x + w / 2, ringCy + 3.5, { align: 'center' });
+  ink(doc, 148, 163, 184);
+  normal(doc, 7);
+  doc.text('/ 100', x + w / 2, ringCy + 10.5, { align: 'center' });
+
+  // Status badge
+  const badgeY = y + h - 18;
+  fill(doc, grade.bgColor[0], grade.bgColor[1], grade.bgColor[2]);
+  doc.rect(x + 6, badgeY, w - 12, 10, 'F');
+  ink(doc, grade.color[0], grade.color[1], grade.color[2]);
+  bold(doc, 9);
+  doc.text(grade.label.toUpperCase(), x + w / 2, badgeY + 7, { align: 'center' });
+}
+
+function drawDiagnosisCard(
   doc: jsPDF,
-  data: HealthReportData,
   score: number,
   grade: Grade,
-  vitals: VitalSign[],
-  W: number,
-  margin: number
-): void {
-  const H = doc.internal.pageSize.height;
-  const contentW = W - 2 * margin;
-  let y = drawPageHeader(doc, W, data.runName, data.analysisDate);
+  drivers: Driver[],
+  projected: number,
+  x: number, y: number, w: number, h: number,
+) {
+  cardBg(doc, x, y, w, h, [59, 130, 246]);
 
-  // ── Overall Condition Card
-  fill(doc, grade.bgColor[0], grade.bgColor[1], grade.bgColor[2]);
-  doc.rect(margin, y, contentW, 56, 'F');
+  let cy = y + 7;
+  cy = eyebrow(doc, 'DIAGNOSIS SUMMARY', x + 6, cy, [59, 130, 246]);
 
-  // Grade circle
-  fill(doc, grade.color[0], grade.color[1], grade.color[2]);
-  doc.circle(margin + 20, y + 27, 16, 'F');
-  ink(doc, 255, 255, 255);
-  bold(doc, 22);
-  doc.text(grade.grade, margin + 20, y + 31.5, { align: 'center' });
+  // Narrative
+  const gain = Math.max(0, projected - score);
+  const narrative = score >= 80
+    ? `Agent performance is stable with no critical failures detected. Quality gaps are present but non-blocking. Estimated improvement opportunity: +${gain} points — recoverable within 3 weeks.`
+    : score >= 60
+    ? `Agent performance needs attention. Recurring quality issues are impacting call consistency. Estimated improvement opportunity: +${gain} points with targeted corrections.`
+    : `Agent performance is at risk. Significant quality failures detected across multiple dimensions. Estimated recovery potential: +${gain} points with immediate action.`;
 
-  // Condition headline
-  const rx = margin + 42;
-  ink(doc, grade.color[0], grade.color[1], grade.color[2]);
-  bold(doc, 15);
-  doc.text(`Overall Status: ${grade.label}`, rx, y + 14);
-
-  normal(doc, 10);
-  ink(doc, 15, 23, 42);
-  doc.text(`QA Score: ${score} / 100`, rx, y + 24);
-
-  const callsWithIssues = new Set(data.scenarios.map(s => s.callId)).size;
-  const pctAffected = data.totalCalls > 0 ? Math.round((callsWithIssues / data.totalCalls) * 100) : 0;
-  const critCount = data.scenarios.filter(s => s.severity === 'critical').length;
-  const highCount = data.scenarios.filter(s => s.severity === 'high').length;
-
-  ink(doc, 55, 65, 81);
   normal(doc, 8.5);
-  doc.text(
-    `${critCount} critical · ${highCount} high severity incidents across ${data.totalCalls} calls`,
-    rx,
-    y + 33
-  );
-  doc.text(`Est. ${pctAffected}% of calls impacted by quality issues`, rx, y + 41);
-
-  // Recommended action line
-  let reco: string;
-  if (score >= 80) reco = 'Maintain current protocols. Monitor for emerging patterns.';
-  else if (score >= 60) reco = 'Review high-severity issues. Prioritise script prompt updates.';
-  else if (score >= 40) reco = 'Immediate review required. Escalate critical incidents before next deployment.';
-  else reco = 'Critical intervention needed. Halt deployment pending remediation.';
-
-  fill(doc, grade.color[0], grade.color[1], grade.color[2]);
-  doc.rect(margin, y + 48, contentW, 0.5, 'F');
-
-  ink(doc, grade.color[0], grade.color[1], grade.color[2]);
-  bold(doc, 8);
-  doc.text('Recommended:', rx - 38, y + 54);
   ink(doc, 55, 65, 81);
-  normal(doc, 8);
-  doc.text(reco, rx - 12, y + 54);
+  const narLines = doc.splitTextToSize(narrative, w - 12);
+  doc.text(narLines.slice(0, 3), x + 6, cy);
+  cy += narLines.slice(0, 3).length * 5.2 + 5;
 
-  y += 62;
-
-  // ── Stats strip
-  fill(doc, 15, 23, 42);
-  doc.rect(margin, y, contentW, 16, 'F');
-  const stats = [
-    { label: 'Total Calls', value: String(data.totalCalls) },
-    { label: 'Total Incidents', value: String(data.scenarios.length) },
-    { label: 'Calls Affected', value: `${callsWithIssues} (${pctAffected}%)` },
-    { label: 'Fixes Identified', value: String(data.fixes.length) },
-  ];
-  const sw = contentW / 4;
-  stats.forEach((s, i) => {
-    const sx = margin + i * sw + sw / 2;
+  // Drivers
+  if (drivers.length > 0) {
+    bold(doc, 7);
     ink(doc, 100, 116, 139);
-    normal(doc, 6.5);
-    doc.text(s.label, sx, y + 6, { align: 'center' });
-    ink(doc, 255, 255, 255);
-    bold(doc, 11);
-    doc.text(s.value, sx, y + 13, { align: 'center' });
-  });
+    doc.text('PRIMARY QUALITY-LOSS DRIVERS', x + 6, cy);
+    cy += 6;
 
-  y += 22;
+    const barX = x + 72;
+    const barW = w - 78;
 
-  // ── Conversation Vital Signs
-  y = sectionLabel(doc, 'PERFORMANCE BY DIMENSION', margin, y);
+    drivers.forEach(d => {
+      // Label
+      normal(doc, 7.5);
+      ink(doc, 55, 65, 81);
+      const label = d.label.length > 20 ? d.label.slice(0, 20) + '…' : d.label;
+      doc.text(label, x + 6, cy);
 
-  // Table header
-  fill(doc, 30, 41, 59);
-  doc.rect(margin, y, contentW, 7, 'F');
-  ink(doc, 255, 255, 255);
-  bold(doc, 7.5);
-  doc.text('Dim', margin + 3, y + 5);
-  doc.text('Dimension', margin + 14, y + 5);
-  doc.text('Status', margin + 118, y + 5);
-  doc.text('Incidents', margin + 152, y + 5);
-  y += 7;
+      // Track + fill
+      fill(doc, 226, 232, 240);
+      doc.rect(barX, cy - 4, barW, 4.5, 'F');
+      fill(doc, d.color[0], d.color[1], d.color[2]);
+      doc.rect(barX, cy - 4, barW * (d.pct / 100), 4.5, 'F');
 
-  vitals.forEach((v, i) => {
-    const rowH = 8;
-    if (i % 2 === 0) {
-      fill(doc, 248, 250, 252);
-      doc.rect(margin, y, contentW, rowH, 'F');
-    } else {
-      fill(doc, 241, 245, 249);
-      doc.rect(margin, y, contentW, rowH, 'F');
-    }
+      // Pct
+      bold(doc, 7.5);
+      ink(doc, 15, 23, 42);
+      doc.text(`${d.pct}%`, x + w - 4, cy, { align: 'right' });
 
-    ink(doc, 15, 23, 42);
-    bold(doc, 7.5);
-    doc.text(v.dim, margin + 3, y + 5.5);
-    normal(doc, 7.5);
-    doc.text(v.label, margin + 14, y + 5.5);
-
-    // Status badge
-    fill(doc, v.statusColor[0], v.statusColor[1], v.statusColor[2]);
-    doc.rect(margin + 116, y + 1.5, 30, 5, 'F');
-    ink(doc, 255, 255, 255);
-    bold(doc, 6.5);
-    doc.text(v.status, margin + 131, y + 5.5, { align: 'center' });
-
-    ink(doc, 55, 65, 81);
-    normal(doc, 7.5);
-    doc.text(v.count > 0 ? `${v.count}` : '—', margin + 152, y + 5.5);
-
-    y += rowH;
-  });
-
-  addPageFooter(doc, W, H);
+      cy += 7;
+    });
+  }
 }
 
-// ─── Page 2: Diagnoses ────────────────────────────────────────────────────────
+function drawOppCard(doc: jsPDF, opp: Opp, x: number, y: number, w: number, h: number) {
+  cardBg(doc, x, y, w, h, [245, 158, 11]);
 
-function drawPage2(
-  doc: jsPDF,
-  data: HealthReportData,
-  diagnoses: AggregatedScenario[],
-  W: number,
-  margin: number
-): void {
-  const H = doc.internal.pageSize.height;
-  const contentW = W - 2 * margin;
-  let y = drawPageHeader(doc, W, data.runName, data.analysisDate);
+  let cy = y + 7;
+  cy = eyebrow(doc, 'BIGGEST OPPORTUNITY', x + 5, cy, [245, 158, 11]);
 
-  y = sectionLabel(doc, 'KEY FINDINGS', margin, y);
-  y += 2;
+  // Title
+  ink(doc, 15, 23, 42);
+  bold(doc, 9.5);
+  const titleLines = doc.splitTextToSize(opp.title, w - 10);
+  doc.text(titleLines.slice(0, 2), x + 5, cy);
+  cy += Math.min(2, titleLines.length) * 5.5 + 3;
 
-  const diagConfig = [
-    { label: 'TOP FINDING', headerColor: [153, 27, 27] as [number, number, number], bgColor: [254, 242, 242] as [number, number, number] },
-    { label: 'FINDING #2', headerColor: [154, 52, 18] as [number, number, number], bgColor: [255, 247, 237] as [number, number, number] },
-  ];
+  // Stat
+  ink(doc, 133, 77, 14);
+  normal(doc, 7.5);
+  const statLines = doc.splitTextToSize(`${opp.pct}% of total quality loss originates here`, w - 10);
+  doc.text(statLines.slice(0, 2), x + 5, cy);
+  cy += Math.min(2, statLines.length) * 4.5 + 6;
 
-  const sevColors: Record<string, [number, number, number]> = {
-    critical: [153, 27, 27],
-    high: [154, 52, 18],
-    medium: [133, 77, 14],
-    low: [21, 128, 61],
-  };
-  const ftColors: Record<string, [number, number, number]> = {
-    script: [37, 99, 235],
-    process: [147, 51, 234],
-    training: [5, 150, 105],
-    system: [75, 85, 99],
-  };
-  const ftLabels: Record<string, string> = {
-    script: 'Script Update',
-    process: 'Process Change',
-    training: 'Training Required',
-    system: 'System Update',
-  };
+  // Score jump block
+  const jumpH = 18;
+  fill(doc, 248, 250, 252);
+  doc.rect(x + 5, cy, w - 10, jumpH, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.rect(x + 5, cy, w - 10, jumpH, 'S');
 
-  diagnoses.slice(0, 2).forEach((diag, idx) => {
-    const cfg = diagConfig[idx];
-    const colW = (contentW - 6) / 2;
-    const rightX = margin + colW + 6;
+  const midX = x + 5 + (w - 10) / 2;
 
-    // Card header
-    fill(doc, cfg.headerColor[0], cfg.headerColor[1], cfg.headerColor[2]);
-    doc.rect(margin, y, contentW, 6, 'F');
-    ink(doc, 255, 255, 255);
-    bold(doc, 7.5);
-    doc.text(cfg.label, margin + 4, y + 4.3);
+  ink(doc, 100, 116, 139);
+  bold(doc, 18);
+  doc.text(String(opp.scoreFrom), x + 5 + (w - 10) * 0.22, cy + 12, { align: 'center' });
 
-    // Severity badge in header
-    const sc = sevColors[diag.severity] ?? [55, 65, 81];
-    fill(doc, sc[0] + 40, sc[1] + 40, sc[2] + 40);
-    doc.rect(W - margin - 30, y + 0.5, 28, 5, 'F');
-    ink(doc, sc[0], sc[1], sc[2]);
+  ink(doc, 21, 128, 61);
+  bold(doc, 11);
+  doc.text('→', midX, cy + 12, { align: 'center' });
+
+  ink(doc, 21, 128, 61);
+  bold(doc, 18);
+  doc.text(String(opp.scoreTo), x + 5 + (w - 10) * 0.78, cy + 12, { align: 'center' });
+
+  normal(doc, 6);
+  ink(doc, 148, 163, 184);
+  doc.text('Current', x + 5 + (w - 10) * 0.22, cy + jumpH - 1.5, { align: 'center' });
+  doc.text('After Fix', x + 5 + (w - 10) * 0.78, cy + jumpH - 1.5, { align: 'center' });
+}
+
+function drawRiskCard(doc: jsPDF, risk: Risk, x: number, y: number, w: number, h: number) {
+  cardBg(doc, x, y, w, h, risk.levelColor);
+
+  let cy = y + 7;
+  cy = eyebrow(doc, 'OVERALL RISK', x + 5, cy, risk.levelColor);
+
+  ink(doc, risk.levelColor[0], risk.levelColor[1], risk.levelColor[2]);
+  bold(doc, 20);
+  doc.text(risk.level, x + 5, cy + 5);
+  cy += 12;
+
+  const field = (label: string, value: string, color?: [number, number, number]) => {
     bold(doc, 7);
-    doc.text(diag.severity.toUpperCase(), W - margin - 16, y + 4.3, { align: 'center' });
+    ink(doc, 100, 116, 139);
+    doc.text(label, x + 5, cy);
+    cy += 5;
+    normal(doc, 7.5);
+    ink(doc, color ? color[0] : 55, color ? color[1] : 65, color ? color[2] : 81);
+    const lines = doc.splitTextToSize(value, w - 10);
+    doc.text(lines.slice(0, 3), x + 5, cy);
+    cy += Math.min(3, lines.length) * 4.5 + 5;
+  };
 
-    // Card body
-    fill(doc, cfg.bgColor[0], cfg.bgColor[1], cfg.bgColor[2]);
-    doc.rect(margin, y + 6, contentW, 90, 'F');
-    y += 6;
+  field('PRIMARY RISK', risk.primaryRisk);
+  field('BUSINESS IMPACT', risk.impact);
+
+  // Urgency badge
+  bold(doc, 7);
+  ink(doc, 100, 116, 139);
+  doc.text('URGENCY', x + 5, cy);
+  cy += 5;
+  fill(doc, risk.urgencyColor[0], risk.urgencyColor[1], risk.urgencyColor[2]);
+  doc.rect(x + 5, cy - 4, 30, 6.5, 'F');
+  ink(doc, 255, 255, 255);
+  bold(doc, 7);
+  doc.text(risk.urgency.toUpperCase(), x + 20, cy + 0.5, { align: 'center' });
+}
+
+function drawEvidenceCard(doc: jsPDF, lines: string[], x: number, y: number, w: number, h: number) {
+  cardBg(doc, x, y, w, h, [139, 92, 246]);
+
+  let cy = y + 7;
+  cy = eyebrow(doc, 'EVIDENCE OBSERVED', x + 5, cy, [139, 92, 246]);
+
+  if (!lines.length) {
+    italic(doc, 8);
+    ink(doc, 148, 163, 184);
+    doc.text('No specific evidence recorded', x + 5, cy + 5);
+    return;
+  }
+
+  lines.forEach(line => {
+    fill(doc, 139, 92, 246);
+    doc.circle(x + 7, cy + 0.5, 1.3, 'F');
+    normal(doc, 7.5);
+    ink(doc, 55, 65, 81);
+    const wrapped = doc.splitTextToSize(line, w - 14);
+    doc.text(wrapped[0], x + 11, cy + 1.5);
+    cy += 8;
+  });
+}
+
+function drawPrescriptions(doc: jsPDF, rxList: Rx[], x: number, y: number, totalW: number, h: number) {
+  if (!rxList.length) return;
+  const colW = (totalW - 10) / 3;
+
+  rxList.slice(0, 3).forEach((rx, i) => {
+    const cx = x + i * (colW + 5);
+    cardBg(doc, cx, y, colW, h, rx.color);
+
+    // Left accent stripe
+    fill(doc, rx.color[0], rx.color[1], rx.color[2]);
+    doc.rect(cx, y, 2.5, h, 'F');
+
+    let cy = y + 8;
+
+    // Rx label
+    italic(doc, 11);
+    ink(doc, rx.color[0], rx.color[1], rx.color[2]);
+    doc.text('Rx', cx + 6, cy + 1);
+    bold(doc, 7);
+    ink(doc, 148, 163, 184);
+    doc.text(`Prescription #${rx.num}`, cx + 17, cy + 1);
+    cy += 10;
 
     // Title
     ink(doc, 15, 23, 42);
-    bold(doc, 11);
-    const titleLines = doc.splitTextToSize(diag.title, contentW - 8);
-    doc.text(titleLines.slice(0, 2), margin + 4, y + 8);
-    const titleH = Math.min(2, titleLines.length) * 6.5 + 10;
+    bold(doc, 9.5);
+    const titleLines = doc.splitTextToSize(rx.title, colW - 10);
+    doc.text(titleLines.slice(0, 2), cx + 6, cy);
+    cy += Math.min(2, titleLines.length) * 5.5 + 3;
 
-    // Left column: symptoms + impact
-    let lx = margin + 4;
-    let ly = y + titleH;
-
-    ink(doc, 55, 65, 81);
-    bold(doc, 8);
-    doc.text('What Was Observed:', lx, ly);
-    ly += 5;
-
-    const symptoms = diag.scenarios
-      .map(s => s.whatHappened)
-      .filter((w): w is string => Boolean(w))
-      .slice(0, 3);
-
+    // Why
     normal(doc, 7.5);
-    symptoms.forEach(sym => {
-      const lines = doc.splitTextToSize(`• ${sym}`, colW - 4);
-      ink(doc, 55, 65, 81);
-      doc.text(lines.slice(0, 2), lx, ly);
-      ly += Math.min(2, lines.length) * 4.5 + 1;
-    });
-
-    ly += 3;
-    const impact = diag.scenarios[0]?.impact;
-    if (impact) {
-      ink(doc, 55, 65, 81);
-      bold(doc, 8);
-      doc.text('Customer Impact:', lx, ly);
-      ly += 5;
-      normal(doc, 7.5);
-      const impLines = doc.splitTextToSize(impact, colW - 4);
-      doc.text(impLines.slice(0, 3), lx, ly);
-    }
-
-    // Right column
-    let rx2 = rightX;
-    let ry = y + titleH;
-
-    const pct = data.totalCalls > 0 ? Math.round((diag.uniqueCalls / data.totalCalls) * 100) : 0;
-
-    // Prevalence badge
-    fill(doc, cfg.headerColor[0], cfg.headerColor[1], cfg.headerColor[2]);
-    doc.rect(rx2, ry, colW, 20, 'F');
-    ink(doc, 255, 255, 255);
-    bold(doc, 20);
-    doc.text(`${pct}%`, rx2 + colW / 2, ry + 13, { align: 'center' });
-    normal(doc, 7);
-    doc.text('of conversations affected', rx2 + colW / 2, ry + 19, { align: 'center' });
-    ry += 24;
-
-    ink(doc, 75, 85, 99);
-    normal(doc, 7.5);
-    doc.text(`${diag.occurrences} total incidents · ${diag.uniqueCalls} calls`, rx2, ry);
-    ry += 8;
-
-    const linkedFix = data.fixes.find(f => f.rootCauseType === diag.rootCauseType);
-    if (linkedFix) {
-      ink(doc, 55, 65, 81);
-      bold(doc, 8);
-      doc.text('Recommended Fix:', rx2, ry);
-      ry += 5;
-      normal(doc, 7.5);
-      const fixLines = doc.splitTextToSize(linkedFix.suggestedSolution, colW - 2);
-      ink(doc, 15, 23, 42);
-      doc.text(fixLines.slice(0, 4), rx2, ry);
-      ry += Math.min(4, fixLines.length) * 4.5 + 4;
-
-      const ftc = ftColors[linkedFix.fixType] ?? [55, 65, 81];
-      fill(doc, ftc[0], ftc[1], ftc[2]);
-      const ftText = ftLabels[linkedFix.fixType] ?? linkedFix.fixType;
-      doc.rect(rx2, ry, 42, 5, 'F');
-      ink(doc, 255, 255, 255);
-      bold(doc, 7);
-      doc.text(ftText, rx2 + 21, ry + 3.7, { align: 'center' });
-    }
-
-    y += 96; // advance past card
-    y += 6; // gap between cards
-  });
-
-  addPageFooter(doc, W, H);
-}
-
-// ─── Page 3: Risk Assessment + Treatment Plan + Projected Score ───────────────
-
-function drawPage3(
-  doc: jsPDF,
-  data: HealthReportData,
-  currentScore: number,
-  projectedScore: number,
-  W: number,
-  margin: number
-): void {
-  const H = doc.internal.pageSize.height;
-  const contentW = W - 2 * margin;
-  let y = drawPageHeader(doc, W, data.runName, data.analysisDate);
-
-  // ── Risk Assessment
-  y = sectionLabel(doc, 'RISK ASSESSMENT', margin, y);
-
-  const colW = (contentW - 5) / 2;
-  const col2X = margin + colW + 5;
-
-  const immediateRisks = [...data.aggregatedScenarios]
-    .filter(a => a.severity === 'critical' || (a.severity === 'high' && a.occurrences >= 3))
-    .sort((a, b) => SEV_WEIGHT[b.severity] * b.occurrences - SEV_WEIGHT[a.severity] * a.occurrences)
-    .slice(0, 3);
-
-  const mediumRisks = [...data.aggregatedScenarios]
-    .filter(a => !immediateRisks.includes(a))
-    .filter(a => a.severity === 'high' || (a.severity === 'medium' && a.occurrences >= 3))
-    .sort((a, b) => b.occurrences - a.occurrences)
-    .slice(0, 3);
-
-  const riskCardH = Math.max(
-    14 + immediateRisks.length * 20,
-    14 + mediumRisks.length * 20,
-    40
-  );
-
-  // Immediate Risk
-  fill(doc, 254, 226, 226);
-  doc.rect(margin, y, colW, riskCardH, 'F');
-  fill(doc, 153, 27, 27);
-  doc.rect(margin, y, colW, 6, 'F');
-  ink(doc, 255, 255, 255);
-  bold(doc, 8);
-  doc.text('IMMEDIATE RISK', margin + 4, y + 4.5);
-  let ry1 = y + 10;
-
-  if (immediateRisks.length === 0) {
-    ink(doc, 75, 85, 99);
-    italic(doc, 7.5);
-    doc.text('No immediate critical risks identified', margin + 4, ry1 + 5);
-  } else {
-    immediateRisks.forEach(risk => {
-      fill(doc, 153, 27, 27);
-      doc.circle(margin + 5, ry1 + 2, 1.5, 'F');
-      ink(doc, 15, 23, 42);
-      bold(doc, 7.5);
-      const t = doc.splitTextToSize(risk.title, colW - 14);
-      doc.text(t[0], margin + 10, ry1 + 3);
-      ry1 += 6;
-      ink(doc, 100, 116, 139);
-      normal(doc, 6.5);
-      doc.text(`${risk.occurrences} incidents · ${risk.uniqueCalls} calls`, margin + 10, ry1);
-      ry1 += 5;
-      const impact = risk.scenarios[0]?.impact;
-      if (impact) {
-        ink(doc, 55, 65, 81);
-        italic(doc, 6.5);
-        const il = doc.splitTextToSize(`Likely: ${impact}`, colW - 14);
-        doc.text(il[0], margin + 10, ry1);
-        ry1 += 6;
-      }
-    });
-  }
-
-  // Medium Risk
-  fill(doc, 255, 237, 213);
-  doc.rect(col2X, y, colW, riskCardH, 'F');
-  fill(doc, 154, 52, 18);
-  doc.rect(col2X, y, colW, 6, 'F');
-  ink(doc, 255, 255, 255);
-  bold(doc, 8);
-  doc.text('MEDIUM-TERM RISK', col2X + 4, y + 4.5);
-  let ry2 = y + 10;
-
-  if (mediumRisks.length === 0) {
-    ink(doc, 75, 85, 99);
-    italic(doc, 7.5);
-    doc.text('No significant medium-term risks', col2X + 4, ry2 + 5);
-  } else {
-    mediumRisks.forEach(risk => {
-      fill(doc, 154, 52, 18);
-      doc.circle(col2X + 5, ry2 + 2, 1.5, 'F');
-      ink(doc, 15, 23, 42);
-      bold(doc, 7.5);
-      const t = doc.splitTextToSize(risk.title, colW - 14);
-      doc.text(t[0], col2X + 10, ry2 + 3);
-      ry2 += 6;
-      ink(doc, 100, 116, 139);
-      normal(doc, 6.5);
-      doc.text(`${risk.occurrences} incidents · ${risk.uniqueCalls} calls`, col2X + 10, ry2);
-      ry2 += 5;
-      const impact = risk.scenarios[0]?.impact;
-      if (impact) {
-        ink(doc, 55, 65, 81);
-        italic(doc, 6.5);
-        const il = doc.splitTextToSize(`Watch: ${impact}`, colW - 14);
-        doc.text(il[0], col2X + 10, ry2);
-        ry2 += 6;
-      }
-    });
-  }
-
-  y += riskCardH + 12;
-
-  // ── Action Plan
-  y = sectionLabel(doc, 'ACTION PLAN', margin, y);
-  y += 2;
-
-  const total = data.scenarios.length;
-  const rcaCount: Record<string, number> = {};
-  data.scenarios.forEach(s => {
-    if (s.rootCauseType) rcaCount[s.rootCauseType] = (rcaCount[s.rootCauseType] ?? 0) + 1;
-  });
-  const calcRecovery = (weekFixes: EnhancedFix[]) => {
-    let inc = 0;
-    weekFixes.forEach(f => (inc += rcaCount[f.rootCauseType] ?? 0));
-    return total > 0 ? Math.min(15, Math.round((inc / total) * 25)) : 0;
-  };
-
-  const weeks = [
-    {
-      label: 'Week 1', theme: 'Prompt & Script Updates',
-      fixes: data.fixes.filter(f => f.fixType === 'script'),
-      color: [37, 99, 235] as [number, number, number],
-    },
-    {
-      label: 'Week 2', theme: 'Process & Workflow Changes',
-      fixes: data.fixes.filter(f => f.fixType === 'process'),
-      color: [147, 51, 234] as [number, number, number],
-    },
-    {
-      label: 'Week 3', theme: 'Training & System Updates',
-      fixes: data.fixes.filter(f => f.fixType === 'training' || f.fixType === 'system'),
-      color: [5, 150, 105] as [number, number, number],
-    },
-  ];
-
-  const cardW = (contentW - 8) / 3;
-  const cardH = 52;
-
-  weeks.forEach((week, i) => {
-    const wx = margin + i * (cardW + 4);
-    const recovery = calcRecovery(week.fixes);
-
-    fill(doc, week.color[0], week.color[1], week.color[2]);
-    doc.rect(wx, y, cardW, 7, 'F');
-    ink(doc, 255, 255, 255);
-    bold(doc, 9);
-    doc.text(week.label, wx + cardW / 2, y + 5.2, { align: 'center' });
-
-    fill(doc, 241, 245, 249);
-    doc.rect(wx, y + 7, cardW, cardH - 7, 'F');
-
-    ink(doc, 15, 23, 42);
-    bold(doc, 8);
-    const themeLines = doc.splitTextToSize(week.theme, cardW - 6);
-    doc.text(themeLines, wx + 3, y + 14);
-    let wy = y + 14 + themeLines.length * 5.5;
-
     ink(doc, 100, 116, 139);
-    normal(doc, 7);
-    doc.text(`${week.fixes.length} fix${week.fixes.length !== 1 ? 'es' : ''}`, wx + 3, wy);
-    wy += 5;
+    const whyLines = doc.splitTextToSize(rx.why, colW - 10);
+    doc.text(whyLines.slice(0, 4), cx + 6, cy);
 
-    ink(doc, 55, 65, 81);
-    normal(doc, 7);
-    week.fixes.slice(0, 2).forEach(fix => {
-      const fl = doc.splitTextToSize(`• ${fix.title}`, cardW - 6);
-      doc.text(fl[0], wx + 3, wy);
-      wy += 4.5;
-    });
-    if (week.fixes.length > 2) {
-      ink(doc, 100, 116, 139);
-      doc.text(`+ ${week.fixes.length - 2} more`, wx + 3, wy);
-    }
-
-    // Recovery footer
-    fill(doc, week.color[0], week.color[1], week.color[2]);
-    doc.rect(wx, y + cardH - 7, cardW, 7, 'F');
+    // Expected gain badge
+    const badgeY = y + h - 13;
+    fill(doc, rx.color[0], rx.color[1], rx.color[2]);
+    doc.rect(cx + 6, badgeY, colW - 12, 9, 'F');
     ink(doc, 255, 255, 255);
     bold(doc, 7.5);
-    doc.text(`Est. improvement: +${recovery}%`, wx + cardW / 2, y + cardH - 2.5, { align: 'center' });
+    doc.text(`Expected gain: +${rx.gain} points`, cx + colW / 2, badgeY + 6.2, { align: 'center' });
   });
+}
 
-  y += cardH + 14;
+function drawOutcomeBanner(
+  doc: jsPDF,
+  score: number,
+  projected: number,
+  rxCount: number,
+  x: number, y: number, w: number, h: number,
+) {
+  fill(doc, 15, 23, 42);
+  doc.rect(x, y, w, h, 'F');
 
-  // ── Projected QA Score
-  y = sectionLabel(doc, 'PROJECTED QA SCORE', margin, y);
-  y += 3;
-
-  const currentGrade = getGrade(currentScore);
-  const projectedGrade = getGrade(projectedScore);
-
-  // Score bar background
-  fill(doc, 226, 232, 240);
-  doc.rect(margin, y, contentW, 18, 'F');
-
-  // Current bar
-  const barW = Math.max(4, (contentW - 4) * (currentScore / 100));
-  fill(doc, currentGrade.color[0], currentGrade.color[1], currentGrade.color[2]);
-  doc.rect(margin + 2, y + 2, barW, 5, 'F');
-
-  // Projected bar
-  const projBarW = Math.max(4, (contentW - 4) * (projectedScore / 100));
-  fill(doc, projectedGrade.color[0], projectedGrade.color[1], projectedGrade.color[2]);
-  doc.rect(margin + 2, y + 10, projBarW, 5, 'F');
-
-  // Labels inside/outside bars
-  ink(doc, 255, 255, 255);
+  // Section label
+  ink(doc, 20, 184, 166);
   bold(doc, 7);
-  if (barW > 30) doc.text(`Now: ${currentScore}`, margin + 4, y + 5.8);
-  if (projBarW > 40) doc.text(`Projected: ${projectedScore}`, margin + 4, y + 13.8);
+  doc.text('EXPECTED OUTCOME', x + 10, y + 8);
 
-  y += 22;
+  const midY = y + h / 2 + 4;
 
-  ink(doc, currentGrade.color[0], currentGrade.color[1], currentGrade.color[2]);
-  bold(doc, 9);
-  doc.text(`Current: ${currentScore}/100 — ${currentGrade.label}`, margin, y);
-
-  ink(doc, projectedGrade.color[0], projectedGrade.color[1], projectedGrade.color[2]);
-  doc.text(`Projected: ${projectedScore}/100 — ${projectedGrade.label}`, margin + contentW / 2, y);
-
-  y += 8;
+  // Current score
   ink(doc, 100, 116, 139);
-  italic(doc, 7);
-  doc.text(
-    'Projection assumes successful implementation of all identified fixes within 3 weeks.',
-    margin,
-    y
-  );
+  bold(doc, 26);
+  doc.text(String(score), x + 34, midY, { align: 'center' });
+  normal(doc, 6.5);
+  ink(doc, 100, 116, 139);
+  doc.text('CURRENT', x + 34, midY + 8, { align: 'center' });
 
-  addPageFooter(doc, W, H);
+  // Arrow line
+  doc.setDrawColor(20, 184, 166);
+  doc.setLineWidth(0.7);
+  doc.line(x + 52, midY - 2.5, x + 80, midY - 2.5);
+  fill(doc, 20, 184, 166);
+  doc.triangle(x + 82, midY - 2.5, x + 78, midY - 5.5, x + 78, midY + 0.5, 'F');
+  doc.setLineWidth(0.2);
+
+  // Projected score
+  ink(doc, 21, 128, 61);
+  bold(doc, 26);
+  doc.text(String(projected), x + 100, midY, { align: 'center' });
+  normal(doc, 6.5);
+  doc.text('PROJECTED', x + 100, midY + 8, { align: 'center' });
+
+  // Stats trio
+  const stats = [
+    { label: 'TIMELINE', value: '3 Weeks' },
+    { label: 'PRESCRIPTIONS', value: String(rxCount) },
+    { label: 'SCORE GAIN', value: `+${Math.max(0, projected - score)}` },
+  ];
+
+  const statsStartX = x + w - 110;
+  stats.forEach((s, i) => {
+    const sx = statsStartX + i * 37;
+    bold(doc, 11);
+    ink(doc, 255, 255, 255);
+    doc.text(s.value, sx, midY, { align: 'center' });
+    normal(doc, 6);
+    ink(doc, 100, 116, 139);
+    doc.text(s.label, sx, midY + 8, { align: 'center' });
+  });
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function generateHealthReportPDF(data: HealthReportData): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.width;
-  const margin = 15;
+  const W = doc.internal.pageSize.width;   // 210mm
+  const H = doc.internal.pageSize.height;  // 297mm
+  const M = 12;                            // left/right margin
+  const CW = W - 2 * M;                   // 186mm
 
-  const score = computeHealthScore(data.scenarios, data.totalCalls);
-  const grade = getGrade(score);
-  const vitals = getVitalSigns(data.scenarios);
-  const diagnoses = topAggregated(data.aggregatedScenarios, 2);
-  const projectedScore = calcProjectedScore(score, data.fixes, data.scenarios);
+  // ── Precompute ──────────────────────────────────────────────────────────────
+  const score     = computeScore(data.scenarios, data.totalCalls);
+  const grade     = getGrade(score);
+  const drivers   = computeDrivers(data.scenarios);
+  const opp       = getBiggestOpp(data.aggregatedScenarios, score);
+  const risk      = computeRisk(data.scenarios, data.aggregatedScenarios);
+  const evidence  = getEvidence(data.aggregatedScenarios);
+  const rxList    = getTopRx(data.fixes, data.scenarios);
+  const projected = calcProjected(score, data.fixes, data.scenarios);
 
-  drawPage1(doc, data, score, grade, vitals, W, margin);
+  // ── Page chrome ─────────────────────────────────────────────────────────────
+  let y = drawHeader(doc, W, data);
+  drawFooter(doc, W, H);
 
-  if (data.aggregatedScenarios.length > 0) {
-    doc.addPage();
-    drawPage2(doc, data, diagnoses, W, margin);
-  }
+  // ── ROW 1: Health Score (62mm) + Diagnosis Summary (119mm)  h=78 ──────────
+  const HERO_H = 78;
+  const SCORE_W = 62;
+  const DIAG_W = CW - SCORE_W - 5;
 
-  doc.addPage();
-  drawPage3(doc, data, score, projectedScore, W, margin);
+  drawScoreCard(doc, score, grade, M, y, SCORE_W, HERO_H);
+  drawDiagnosisCard(doc, score, grade, drivers, projected, M + SCORE_W + 5, y, DIAG_W, HERO_H);
+  y += HERO_H + 5;
 
-  // Page numbers
-  const pageCount = (doc.internal as any).pages.length - 1;
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    const H = doc.internal.pageSize.height;
-    ink(doc, 148, 163, 184);
-    normal(doc, 6.5);
-    doc.text(`${i} / ${pageCount}`, W - margin, H - 3);
-  }
+  // ── ROW 2: Biggest Opportunity + Overall Risk + Evidence  h=62 ───────────
+  const MID_H = 62;
+  const COL_W = (CW - 10) / 3;
 
+  drawOppCard(doc, opp, M, y, COL_W, MID_H);
+  drawRiskCard(doc, risk, M + COL_W + 5, y, COL_W, MID_H);
+  drawEvidenceCard(doc, evidence, M + (COL_W + 5) * 2, y, COL_W, MID_H);
+  y += MID_H + 5;
+
+  // ── ROW 3: Top Prescriptions  h=64 ────────────────────────────────────────
+  // Section header
+  bold(doc, 8);
+  ink(doc, 100, 116, 139);
+  doc.text('TOP PRESCRIPTIONS', M, y + 6);
+  fill(doc, 226, 232, 240);
+  doc.rect(M + 49, y + 3.5, CW - 49, 0.4, 'F');
+  y += 12;
+
+  const RX_H = 64;
+  drawPrescriptions(doc, rxList, M, y, CW, RX_H);
+  y += RX_H + 5;
+
+  // ── ROW 4: Expected Outcome banner  h=32 ──────────────────────────────────
+  const OUT_H = 32;
+  drawOutcomeBanner(doc, score, projected, rxList.length, M, y, CW, OUT_H);
+
+  // ── Save ────────────────────────────────────────────────────────────────────
   const ts = new Date().toISOString().split('T')[0];
   doc.save(`Agent_Diagnostic_Report_${ts}.pdf`);
 }
