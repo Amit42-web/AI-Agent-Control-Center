@@ -5,8 +5,9 @@ import { useAppStore } from '@/store/useAppStore';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
+// Keys match DEFAULT_DIMENSION_PROMPTS labels exactly (see src/data/dimensionPrompts.ts)
 const DIMENSION_MAP: Record<string, { letter: string; name: string; desc: string }> = {
-  'Conversation Control & Flow Management': { letter: 'A', name: 'Conversation Control & Flow', desc: 'Managing conversation flow and agent direction' },
+  'Conversation Control & Flow': { letter: 'A', name: 'Conversation Control & Flow', desc: 'Managing conversation flow and agent direction' },
   'Language Quality & Human-Likeness': { letter: 'B', name: 'Empathy & Tone', desc: 'Emotional intelligence & tone' },
   'Knowledge & Accuracy': { letter: 'C', name: 'Knowledge & Accuracy', desc: 'Accuracy of information provided' },
   'Process & Policy Adherence': { letter: 'D', name: 'Script Adherence', desc: 'Following required scripts & compliance protocols' },
@@ -14,6 +15,11 @@ const DIMENSION_MAP: Record<string, { letter: string; name: string; desc: string
   'Context Tracking & Intent Alignment': { letter: 'F', name: 'Communication Clarity', desc: 'Clear, understandable responses' },
   'Novel & Emerging Issues': { letter: 'G', name: 'Novel & Emerging Issues', desc: 'Unexpected new problems' },
 };
+
+// Normalize a raw dimension string: strip trailing (A)–(G) suffixes that the QA LLM sometimes adds
+function normalizeDim(raw: string): string {
+  return raw.replace(/\s*\([A-G]\)\s*$/, '').trim();
+}
 
 const SEV_P: Record<string, number> = { low: 3, medium: 8, high: 15, critical: 25 };
 
@@ -112,7 +118,7 @@ function MetricCard({ label, value, icon, iconBg, color, fillPct, subtext, badge
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AgentDiagnosticReport() {
-  const { transcripts, scenarioResults, aggregatedScenarios, enhancedFixes, currentAnalysisName, goToStep } = useAppStore();
+  const { transcripts, scenarioResults, enhancedFixes, currentAnalysisName, goToStep } = useAppStore();
 
   const allScenarios = scenarioResults?.scenarios ?? [];
   const allFixes = enhancedFixes?.fixes ?? [];
@@ -148,8 +154,9 @@ export default function AgentDiagnosticReport() {
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
   // ─── Dimensions ─────────────────────────────────────────────────────────────
-
-  const aggs = aggregatedScenarios ?? [];
+  // Build from raw scenarios (same normalization as AggregateResults.tsx) so
+  // dimension names reliably match DIMENSION_MAP keys even when the QA LLM
+  // appends "(A)", "(B)" suffixes or uses slightly different phrasing.
 
   interface DimData {
     key: string;
@@ -166,19 +173,19 @@ export default function AgentDiagnosticReport() {
     dimMap[dimKey] = { key: dimKey, ...meta, incidents: 0, pct: 0, status: 'clear' };
   }
 
-  for (const agg of aggs) {
-    const dim = agg.dimension;
-    if (!dimMap[dim]) {
-      // Unmapped dimension — try to find closest or skip
-      continue;
-    }
-    dimMap[dim].incidents += agg.occurrences;
-    if (agg.severity === 'critical') {
+  for (const scenario of allScenarios) {
+    const dim = normalizeDim(scenario.dimension || '');
+    if (!dimMap[dim]) continue;
+    dimMap[dim].incidents += 1;
+    if (scenario.severity === 'critical') {
       dimMap[dim].status = 'critical';
-    } else if (agg.severity === 'high' && dimMap[dim].status !== 'critical') {
+    } else if (scenario.severity === 'high' && dimMap[dim].status !== 'critical') {
       dimMap[dim].status = 'elevated';
-    } else if (dimMap[dim].status === 'clear' && dimMap[dim].incidents > 0) {
-      dimMap[dim].status = 'elevated';
+    } else if (dimMap[dim].incidents === 1 && dimMap[dim].status === 'clear') {
+      // First incident in a dim with only medium/low severity → elevated
+      if (scenario.severity === 'medium' || scenario.severity === 'low') {
+        dimMap[dim].status = 'elevated';
+      }
     }
   }
 
