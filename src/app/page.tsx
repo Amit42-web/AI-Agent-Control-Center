@@ -34,7 +34,8 @@ import {
   downloadExcel,
   generateExportFilename
 } from '@/utils/exportUtils';
-import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid, Download, ChevronDown, CheckCircle2, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, List, LayoutGrid, Download, ChevronDown, CheckCircle2, TrendingUp, BarChart2 } from 'lucide-react';
+import AgentDiagnosticReport from '@/components/results/AgentDiagnosticReport';
 
 function RunWizardPage() {
   const { flowType, goToStep } = useAppStore();
@@ -619,6 +620,16 @@ function FixesPage() {
             <TrendingUp className="w-4 h-4" />
             View Progress
           </motion.button>
+          <motion.button
+            className="btn-primary flex items-center gap-2"
+            onClick={() => goToStep('report')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            style={{ background: 'linear-gradient(135deg, #14B8A6, #0D9488)' }}
+          >
+            <BarChart2 className="w-4 h-4" />
+            View Report
+          </motion.button>
         </div>
       </motion.div>
 
@@ -672,6 +683,14 @@ function ProgressPage() {
   );
 }
 
+function ReportPage() {
+  return (
+    <div style={{ background: '#EDF0F5', minHeight: '100vh', padding: '24px 0' }}>
+      <AgentDiagnosticReport />
+    </div>
+  );
+}
+
 export default function Home() {
   const { currentStep, goToStep } = useAppStore();
 
@@ -695,16 +714,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {currentStep !== 'analyses' && <Header />}
+      {currentStep !== 'analyses' && currentStep !== 'report' && <Header />}
 
       <main className="flex-1 w-full">
-        {currentStep !== 'running' && currentStep !== 'analyses' && (
+        {currentStep !== 'running' && currentStep !== 'analyses' && currentStep !== 'report' && (
           <div className="max-w-7xl mx-auto px-6 pt-8">
             <StepNavigator />
           </div>
         )}
 
-        <div className={currentStep !== 'analyses' ? 'max-w-7xl mx-auto px-6 py-8' : ''}>
+        <div className={currentStep !== 'analyses' && currentStep !== 'report' ? 'max-w-7xl mx-auto px-6 py-8' : ''}>
           <AnimatePresence mode="wait">
             {currentStep === 'analyses' && <AnalysisManager key="analyses" />}
             {currentStep === 'input' && <RunWizardPage key="input" />}
@@ -712,11 +731,12 @@ export default function Home() {
             {currentStep === 'results' && <ResultsPage key="results" />}
             {currentStep === 'fixes' && <FixesPage key="fixes" />}
             {currentStep === 'progress' && <ProgressPage key="progress" />}
+            {currentStep === 'report' && <ReportPage key="report" />}
           </AnimatePresence>
         </div>
       </main>
 
-      {currentStep !== 'analyses' && <Footer />}
+      {currentStep !== 'analyses' && currentStep !== 'report' && <Footer />}
     </div>
   );
 }

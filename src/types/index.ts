@@ -298,7 +298,7 @@ export interface AppState {
   // Run state
   isRunning: boolean;
   runProgress: number;
-  currentStep: 'analyses' | 'input' | 'running' | 'results' | 'fixes' | 'progress';
+  currentStep: 'analyses' | 'input' | 'running' | 'results' | 'fixes' | 'progress' | 'report';
 
   // Analysis management
   currentAnalysisId: string | null;
@@ -350,7 +350,7 @@ export interface AppState {
   generateFixes: () => void;
   setSelectedCallId: (id: string | null) => void;
   setSelectedIssueId: (id: string | null) => void;
-  goToStep: (step: 'analyses' | 'input' | 'running' | 'results' | 'fixes' | 'progress') => void;
+  goToStep: (step: 'analyses' | 'input' | 'running' | 'results' | 'fixes' | 'progress' | 'report') => void;
 
   markFixesApplied: () => Promise<void>;
 
