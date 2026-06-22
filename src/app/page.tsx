@@ -10,6 +10,8 @@ import { TranscriptInput } from '@/components/wizard/TranscriptInput';
 import { ReferenceScript } from '@/components/wizard/ReferenceScript';
 import { KnowledgeBase } from '@/components/wizard/KnowledgeBase';
 import { ChecksConfig } from '@/components/wizard/ChecksConfig';
+import { CriticalAlertSettings } from '@/components/alerts/CriticalAlertSettings';
+import { CriticalAlertsPanel } from '@/components/alerts/CriticalAlertsPanel';
 import { AuditPromptConfig } from '@/components/wizard/AuditPromptConfig';
 import { OpenAIConfig } from '@/components/wizard/OpenAIConfig';
 import { RunButton } from '@/components/wizard/RunButton';
@@ -92,6 +94,7 @@ function RunWizardPage() {
       ) : (
         <motion.div variants={itemVariants}><AuditPromptConfig /></motion.div>
       )}
+      <motion.div variants={itemVariants}><CriticalAlertSettings /></motion.div>
       <motion.div variants={itemVariants}><RunButton /></motion.div>
     </motion.div>
   );
@@ -357,6 +360,7 @@ function ResultsPage() {
       animate="show"
       exit={{ opacity: 0, x: -20 }}
     >
+      <CriticalAlertsPanel />
       <motion.div className="flex items-center justify-between" variants={itemVariants}>
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">Analysis Results</h2>
@@ -560,6 +564,7 @@ function FixesPage() {
       exit={{ opacity: 0, x: -20 }}
       transition={{ type: 'spring', damping: 20 }}
     >
+      <CriticalAlertsPanel />
       <motion.div
         className="flex items-center justify-between"
         initial={{ opacity: 0, y: -10 }}

@@ -264,6 +264,9 @@ export interface AnalysisState {
   // Cached aggregations — persisted so Impact Zone is stable across loads
   aggregatedScenarios?: AggregatedScenario[] | null;
   aggregatedIssues?: AggregatedIssue[] | null;
+  // Critical alerts
+  criticalAlertConfigs?: CriticalAlertConfig[];
+  criticalAlertResults?: CriticalAlertSummary | null;
 }
 
 export type ResultsViewMode = 'detailed' | 'overview';
@@ -360,4 +363,50 @@ export interface AppState {
   createNewAnalysis: (name: string, flowType: FlowType, auditPrompt?: string) => void;
   getAnalysisState: () => AnalysisState;
   restoreAnalysisState: (state: AnalysisState) => void;
+
+  // Critical alerts
+  criticalAlertConfigs: CriticalAlertConfig[];
+  criticalAlertResults: CriticalAlertSummary | null;
+  criticalAlertsEnabled: boolean;
+  toggleCriticalAlert: (id: CriticalAlertId) => void;
+  toggleCriticalAlertsEnabled: () => void;
+}
+
+// ─── Critical Alerts ──────────────────────────────────────────────────────────
+
+export type CriticalAlertCategory = 'bot_failure' | 'compliance' | 'escalation' | 'deception' | 'flow';
+
+export type CriticalAlertId =
+  | 'bot_silence' | 'loop_detection' | 'one_sided_call' | 'call_ended_customer' | 'no_greeting' | 'wrong_language'
+  | 'transfer_denied' | 'cancel_ignored' | 'repeated_unresolved' | 'frustration_ignored' | 'customer_hung_up'
+  | 'denied_being_bot' | 'impersonated_human' | 'false_urgency'
+  | 'unauthorized_commitment' | 'shared_data_no_verification' | 'identity_skip'
+  | 'skipped_mandatory_disclosure' | 'continued_after_optout' | 'out_of_scope_advice' | 'wrong_price' | 'no_resolution';
+
+export interface CriticalAlertConfig {
+  id: CriticalAlertId;
+  name: string;
+  description: string;
+  category: CriticalAlertCategory;
+  detectionMethod: 'deterministic' | 'llm';
+  enabled: boolean;
+  icon: string;
+}
+
+export interface DetectedCriticalAlert {
+  id: string;
+  alertConfigId: CriticalAlertId;
+  callId: string;
+  alertName: string;
+  category: CriticalAlertCategory;
+  evidence: string;
+  lineNumbers?: number[];
+  confidence: number;
+}
+
+export interface CriticalAlertSummary {
+  totalAlerts: number;
+  callsWithAlerts: number;
+  alertsByCall: Record<string, DetectedCriticalAlert[]>;
+  allAlerts: DetectedCriticalAlert[];
 }

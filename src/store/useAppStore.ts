@@ -13,7 +13,12 @@ import {
   Severity,
   DetectedIssue,
   Scenario,
+  CriticalAlertId,
+  CriticalAlertSummary,
+  DetectedCriticalAlert,
 } from '@/types';
+import { DEFAULT_CRITICAL_ALERT_CONFIGS } from '@/data/criticalAlertConfigs';
+import { runDeterministicChecks, runLLMChecks } from '@/utils/criticalAlertDetection';
 import {
   defaultChecks,
   demoTranscript,
@@ -113,6 +118,9 @@ const initialState = {
   currentAnalysisId: null,
   currentAnalysisName: null,
   fixesApplied: false,
+  criticalAlertConfigs: DEFAULT_CRITICAL_ALERT_CONFIGS,
+  criticalAlertResults: null,
+  criticalAlertsEnabled: true,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -241,7 +249,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    set({ isRunning: true, runProgress: 0, currentStep: 'running', aggregatedIssues: null, aggregatedScenarios: null });
+    set({ isRunning: true, runProgress: 0, currentStep: 'running', aggregatedIssues: null, aggregatedScenarios: null, criticalAlertResults: null });
 
     try {
       if (flowType === 'objective') {
@@ -323,12 +331,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           languageMismatchRate,
         };
 
-        set({
-          isRunning: false,
-          runProgress: 100,
-          currentStep: 'results',
-          results,
-        });
+        set({ results });
       } else {
         // Open-Ended Flow: Scenario-based analysis
         const totalTranscripts = transcripts.length;
@@ -394,13 +397,51 @@ export const useAppStore = create<AppState>((set, get) => ({
           severityDistribution,
         };
 
-        set({
-          isRunning: false,
-          runProgress: 100,
-          currentStep: 'results',
-          scenarioResults,
-        });
+        set({ scenarioResults });
       }
+
+      // ── Critical Alert Detection (runs for both flow types) ─────────────────
+      set({ runProgress: 97 });
+      const { criticalAlertConfigs, criticalAlertsEnabled } = get();
+      let criticalAlertResults: CriticalAlertSummary | null = null;
+
+      if (criticalAlertsEnabled) {
+        try {
+          const enabledConfigs = criticalAlertConfigs.filter((c) => c.enabled);
+
+          const deterministicAlerts: DetectedCriticalAlert[] = transcripts.flatMap((t) =>
+            runDeterministicChecks(t, enabledConfigs)
+          );
+
+          const llmEnabledConfigs = enabledConfigs.filter((c) => c.detectionMethod === 'llm');
+          let llmAlerts: DetectedCriticalAlert[] = [];
+          if (llmEnabledConfigs.length > 0) {
+            const llmResultArrays = await processInParallel(
+              transcripts,
+              (t) => runLLMChecks(t, llmEnabledConfigs, apiKey, openaiConfig.model),
+              5
+            );
+            llmAlerts = llmResultArrays.flat();
+          }
+
+          const allAlerts = [...deterministicAlerts, ...llmAlerts];
+          const alertsByCall: Record<string, DetectedCriticalAlert[]> = {};
+          for (const alert of allAlerts) {
+            if (!alertsByCall[alert.callId]) alertsByCall[alert.callId] = [];
+            alertsByCall[alert.callId].push(alert);
+          }
+          criticalAlertResults = {
+            totalAlerts: allAlerts.length,
+            callsWithAlerts: Object.keys(alertsByCall).length,
+            alertsByCall,
+            allAlerts,
+          };
+        } catch (err) {
+          console.error('Critical alert detection failed:', err);
+        }
+      }
+
+      set({ isRunning: false, runProgress: 100, currentStep: 'results', criticalAlertResults });
     } catch (error) {
       console.error('Error during analysis:', error);
       set({ isRunning: false, runProgress: 0 });
@@ -487,6 +528,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setAggregatedScenarios: (scenarios: AggregatedScenario[]) => set({ aggregatedScenarios: scenarios }),
 
+  toggleCriticalAlert: (id: CriticalAlertId) => {
+    set({ criticalAlertConfigs: get().criticalAlertConfigs.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c) });
+  },
+
+  toggleCriticalAlertsEnabled: () => {
+    set({ criticalAlertsEnabled: !get().criticalAlertsEnabled });
+  },
+
   markFixesApplied: async () => {
     set({ fixesApplied: true });
     const state = get();
@@ -535,6 +584,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       fixesApplied: state.fixesApplied,
       aggregatedScenarios: state.aggregatedScenarios,
       aggregatedIssues: state.aggregatedIssues,
+      criticalAlertConfigs: state.criticalAlertConfigs,
+      criticalAlertResults: state.criticalAlertResults,
     };
   },
 
@@ -557,6 +608,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       enhancedFixes: analysisState.enhancedFixes,
       aggregatedIssues: analysisState.aggregatedIssues ?? null,
       aggregatedScenarios: analysisState.aggregatedScenarios ?? null,
+      criticalAlertConfigs: analysisState.criticalAlertConfigs ?? DEFAULT_CRITICAL_ALERT_CONFIGS,
+      criticalAlertResults: analysisState.criticalAlertResults ?? null,
       selectedCallId: analysisState.selectedCallId,
       fixesApplied: analysisState.fixesApplied || false,
       currentStep: analysisState.enhancedFixes || analysisState.consolidatedFixes || analysisState.fixes
