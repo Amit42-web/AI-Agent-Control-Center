@@ -42,37 +42,42 @@ function isLongPatch(text?: string): boolean {
   return text.split('\n').length > LINE_LIMIT;
 }
 
-function LongPatchWarning({ label, text }: { label: string; text: string }) {
+function LongPatchWarning({ label, text, variant }: { label: string; text: string; variant: 'remove' | 'add' | 'neutral' }) {
   const [expanded, setExpanded] = useState(false);
   const lines = text.split('\n');
+
+  const labelColor   = variant === 'remove' ? 'text-red-400'   : variant === 'add' ? 'text-green-400'   : 'text-[var(--color-slate-400)]';
+  const badgeColor   = variant === 'remove' ? 'text-red-300/70 bg-red-500/10'   : variant === 'add' ? 'text-green-300/70 bg-green-500/10'   : 'text-amber-400/60 bg-amber-500/10';
+  const preStyles    = variant === 'remove' ? 'text-red-200 bg-red-900/20 border-red-500/20'
+                     : variant === 'add'    ? 'text-green-200 bg-green-900/20 border-green-500/20'
+                     :                       'text-[var(--color-slate-300)] bg-white/5 border-white/10';
+  const btnColor     = variant === 'remove' ? 'text-red-400 hover:text-red-300' : variant === 'add' ? 'text-green-400 hover:text-green-300' : 'text-amber-400 hover:text-amber-300';
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <div className="text-xs font-medium text-amber-400">{label}</div>
-        <span className="text-xs text-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
-          {lines.length} lines — may be over-specified
+        <div className={`text-xs font-medium ${labelColor}`}>{label}</div>
+        <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColor}`}>
+          {lines.length} lines
         </span>
       </div>
-      <pre className={`text-xs whitespace-pre-wrap font-mono p-2.5 rounded border leading-relaxed overflow-hidden transition-all
-        ${label.toLowerCase().includes('remove') || label.toLowerCase().includes('after')
-          ? 'text-red-200 bg-red-900/20 border-red-500/20'
-          : 'text-green-200 bg-green-900/20 border-green-500/20'}`}
-        style={{ maxHeight: expanded ? 'none' : '80px' }}
+      <pre className={`text-xs whitespace-pre-wrap font-mono p-2.5 rounded border leading-relaxed overflow-hidden transition-all ${preStyles}`}
+        style={{ maxHeight: expanded ? 'none' : '96px' }}
       >
         {text}
       </pre>
       <button
-        className="text-xs text-amber-400 hover:text-amber-300 mt-1"
+        className={`text-xs mt-1 ${btnColor}`}
         onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
       >
-        {expanded ? 'Collapse' : `Show all ${lines.length} lines`}
+        {expanded ? '▲ Collapse' : `▼ Show all ${lines.length} lines`}
       </button>
     </div>
   );
 }
 
 function DiffBlock({ label, text, variant }: { label: string; text: string; variant: 'remove' | 'add' | 'neutral' }) {
-  if (isLongPatch(text)) return <LongPatchWarning label={label} text={text} />;
+  if (isLongPatch(text)) return <LongPatchWarning label={label} text={text} variant={variant} />;
   const styles = {
     remove:  'text-red-200 bg-red-900/20 border-red-500/20',
     add:     'text-green-200 bg-green-900/20 border-green-500/20',
