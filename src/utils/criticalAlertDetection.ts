@@ -233,32 +233,6 @@ function mode(arr: string[]): string | null {
 
 // ─── LLM checks ──────────────────────────────────────────────────────────────
 
-const LLM_CHECK_DESCRIPTIONS: Record<CriticalAlertId, string> = {
-  transfer_denied: 'Customer explicitly asked to speak to a human and the bot refused or ignored the request',
-  cancel_ignored: 'Customer said cancel/terminate/stop the service and the bot ignored or deflected the request',
-  repeated_unresolved: 'Customer repeated the exact same request 3+ times without the bot resolving it',
-  frustration_ignored: 'Customer expressed extreme frustration/anger and the bot gave a generic or dismissive response',
-  customer_hung_up: 'Customer abruptly ended the call (e.g., said "hello? hello?" repeatedly or disconnected mid-conversation)',
-  denied_being_bot: 'Customer asked if the agent is a bot/AI/robot and the bot explicitly denied it',
-  impersonated_human: 'Bot claimed to be a human agent or used a human name to pass as a person',
-  false_urgency: 'Bot created false time pressure such as "this offer expires soon" to manipulate the customer',
-  unauthorized_commitment: 'Bot promised a refund, callback, compensation, or discount without authority to do so',
-  shared_data_no_verification: 'Bot shared sensitive account or personal data before verifying the customer\'s identity',
-  identity_skip: 'Bot proceeded to account-related actions (balance, changes) without completing identity verification',
-  skipped_mandatory_disclosure: 'Bot missed a required legal or compliance statement (recording notice, terms, etc.)',
-  continued_after_optout: 'Customer explicitly said to stop calling / remove them, but bot continued the interaction',
-  out_of_scope_advice: 'Bot gave legal, medical, or financial advice outside its role and authority',
-  wrong_price: 'Bot quoted a price, fee, or plan that differs from the correct/standard pricing',
-  no_resolution: 'Call ended without any clear outcome, resolution, or next step being communicated to the customer',
-  // Deterministic IDs (will never be requested here, but typed to satisfy Record<CriticalAlertId, string>)
-  bot_silence: '',
-  loop_detection: '',
-  one_sided_call: '',
-  call_ended_customer: '',
-  no_greeting: '',
-  wrong_language: '',
-};
-
 const CATEGORY_MAP: Record<CriticalAlertId, CriticalAlertCategory> = {
   bot_silence: 'bot_failure',
   loop_detection: 'bot_failure',
@@ -299,7 +273,7 @@ export async function runLLMChecks(
 
   try {
     const checksList = llmConfigs
-      .map((c, i) => `${i + 1}. ${c.id}: ${LLM_CHECK_DESCRIPTIONS[c.id]}`)
+      .map((c, i) => `${i + 1}. ${c.id}: ${c.prompt || c.description}`)
       .join('\n');
 
     const transcriptText = transcript.lines

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { CriticalAlertCategory, CriticalAlertConfig } from '@/types';
 
@@ -65,6 +65,84 @@ function ToggleSwitch({
         }}
       />
     </button>
+  );
+}
+
+function AlertRow({
+  alert,
+  onToggle,
+}: {
+  alert: CriticalAlertConfig;
+  onToggle: () => void;
+}) {
+  const [showPrompt, setShowPrompt] = useState(false);
+  const isLLM = alert.detectionMethod === 'llm';
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-start gap-3">
+        <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{alert.icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-white">{alert.name}</span>
+            {isLLM ? (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa' }}
+              >
+                AI Check
+              </span>
+            ) : (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}
+              >
+                Instant
+              </span>
+            )}
+            {isLLM && alert.prompt && (
+              <button
+                type="button"
+                onClick={() => setShowPrompt((v) => !v)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: showPrompt ? '#60a5fa' : 'var(--color-slate-400)',
+                }}
+                title="Show detection criteria"
+              >
+                <Info className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: 'var(--color-slate-400)' }}
+          >
+            {alert.description}
+          </p>
+          {isLLM && alert.prompt && showPrompt && (
+            <div
+              className="mt-2 text-xs rounded-lg px-3 py-2"
+              style={{
+                background: 'rgba(59,130,246,0.08)',
+                border: '1px solid rgba(59,130,246,0.2)',
+                color: '#93c5fd',
+                lineHeight: 1.5,
+              }}
+            >
+              <span style={{ color: '#60a5fa', fontWeight: 600, marginRight: 4 }}>Detection criteria:</span>
+              {alert.prompt}
+            </div>
+          )}
+        </div>
+        <ToggleSwitch enabled={alert.enabled} onChange={onToggle} />
+      </div>
+    </div>
   );
 }
 
@@ -184,43 +262,11 @@ export function CriticalAlertSettings() {
                 {isCatExpanded && (
                   <div className="divide-y" style={{ borderColor: 'var(--color-navy-700)' }}>
                     {items.map((alert) => (
-                      <div
+                      <AlertRow
                         key={alert.id}
-                        className="flex items-center gap-3 px-4 py-3"
-                      >
-                        <span style={{ fontSize: 20, flexShrink: 0 }}>{alert.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-white">{alert.name}</span>
-                            {alert.detectionMethod === 'deterministic' ? (
-                              <span
-                                className="text-xs px-1.5 py-0.5 rounded"
-                                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}
-                              >
-                                Instant
-                              </span>
-                            ) : (
-                              <span
-                                className="text-xs px-1.5 py-0.5 rounded"
-                                style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa' }}
-                              >
-                                AI Check
-                              </span>
-                            )}
-                          </div>
-                          <p
-                            className="text-xs mt-0.5 truncate"
-                            style={{ color: 'var(--color-slate-400)' }}
-                            title={alert.description}
-                          >
-                            {alert.description}
-                          </p>
-                        </div>
-                        <ToggleSwitch
-                          enabled={alert.enabled}
-                          onChange={() => toggleCriticalAlert(alert.id)}
-                        />
-                      </div>
+                        alert={alert}
+                        onToggle={() => toggleCriticalAlert(alert.id)}
+                      />
                     ))}
                   </div>
                 )}
