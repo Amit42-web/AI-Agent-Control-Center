@@ -164,12 +164,13 @@ interface IssuePattern {
   currentCount: number;
   baselineCalls: number;
   currentCalls: number;
+  baseTotalCalls: number;
+  currTotalCalls: number;
   status: 'resolved' | 'persistent' | 'new';
-  // uptick = same issue but significantly more occurrences in current
   isUptick: boolean;
 }
 
-function extractIssuePatterns(baseline: Scenario[], current: Scenario[]): IssuePattern[] {
+function extractIssuePatterns(baseline: Scenario[], current: Scenario[], baseTotalCalls: number, currTotalCalls: number): IssuePattern[] {
   // Group by normalized title
   const baselineMap = new Map<string, { title: string; dimension?: string; rootCauseType?: RootCauseType; maxSeverity: Severity; count: number; calls: Set<string> }>();
   const currentMap = new Map<string, { title: string; dimension?: string; rootCauseType?: RootCauseType; maxSeverity: Severity; count: number; calls: Set<string> }>();
@@ -225,8 +226,12 @@ function extractIssuePatterns(baseline: Scenario[], current: Scenario[]): IssueP
     else if (baselineCount === 0 && currentCount > 0) status = 'new';
     else status = 'persistent';
 
-    // Uptick: current count is more than 25% higher than baseline (and at least 1 more)
-    const isUptick = status === 'persistent' && currentCount > baselineCount && (currentCount - baselineCount) / baselineCount >= 0.25;
+    // Uptick: rate in current is more than 25% higher than baseline rate
+    const bCalls = b?.calls.size ?? 0;
+    const cCalls = c?.calls.size ?? 0;
+    const bRate = baseTotalCalls > 0 ? bCalls / baseTotalCalls : 0;
+    const cRate = currTotalCalls > 0 ? cCalls / currTotalCalls : 0;
+    const isUptick = status === 'persistent' && cRate > bRate && bRate > 0 && (cRate - bRate) / bRate >= 0.25;
 
     patterns.push({
       key,
@@ -236,8 +241,10 @@ function extractIssuePatterns(baseline: Scenario[], current: Scenario[]): IssueP
       maxSeverity,
       baselineCount,
       currentCount,
-      baselineCalls: b?.calls.size ?? 0,
-      currentCalls: c?.calls.size ?? 0,
+      baselineCalls: bCalls,
+      currentCalls: cCalls,
+      baseTotalCalls,
+      currTotalCalls,
       status,
       isUptick,
     });
@@ -253,21 +260,21 @@ function extractIssuePatterns(baseline: Scenario[], current: Scenario[]): IssueP
 
 // ─── Delta cell ───────────────────────────────────────────────────────────────
 
-function DeltaCell({ delta }: { delta: number | null }) {
+function DeltaCell({ delta, suffix = '' }: { delta: number | null; suffix?: string }) {
   if (delta === null) return <span className="text-[var(--color-slate-600)]">—</span>;
   if (delta === 0) return (
     <span className="flex items-center justify-center gap-1 text-[var(--color-slate-400)]">
-      <Minus className="w-3 h-3" /><span className="font-mono text-xs">0</span>
+      <Minus className="w-3 h-3" /><span className="font-mono text-xs">0{suffix}</span>
     </span>
   );
   if (delta < 0) return (
     <span className="flex items-center justify-center gap-1 text-green-400">
-      <TrendingDown className="w-3.5 h-3.5" /><span className="font-mono text-xs font-semibold">{delta}</span>
+      <TrendingDown className="w-3.5 h-3.5" /><span className="font-mono text-xs font-semibold">{delta}{suffix}</span>
     </span>
   );
   return (
     <span className="flex items-center justify-center gap-1 text-red-400">
-      <TrendingUp className="w-3.5 h-3.5" /><span className="font-mono text-xs font-semibold">+{delta}</span>
+      <TrendingUp className="w-3.5 h-3.5" /><span className="font-mono text-xs font-semibold">+{delta}{suffix}</span>
     </span>
   );
 }
@@ -294,7 +301,7 @@ function ComparisonTable({
           <tr className="border-b border-[var(--color-navy-700)] text-[var(--color-slate-400)] text-xs uppercase">
             <th className="text-left px-4 py-3 font-medium">{isRCA ? 'Root Cause' : 'Dimension'}</th>
             <th className="text-center px-4 py-3 font-medium">
-              {baselineStats !== null ? 'Previous' : 'Scenarios'}
+              {baselineStats !== null ? 'Previous' : 'Issue Rate'}
             </th>
             {baselineStats !== null && <th className="text-center px-4 py-3 font-medium">Current</th>}
             {baselineStats !== null && <th className="text-center px-4 py-3 font-medium">Change</th>}
@@ -305,7 +312,9 @@ function ComparisonTable({
         <tbody className="divide-y divide-[var(--color-navy-800)]">
           {rows.map((row, i) => {
             const baseline = baselineRows?.find((b) => b.key === row.key);
-            const delta = baseline !== undefined ? row.count - baseline.count : null;
+            const currRate = row.totalCalls > 0 ? +(row.affectedCalls / row.totalCalls * 100).toFixed(1) : 0;
+            const baseRate = baseline && baseline.totalCalls > 0 ? +(baseline.affectedCalls / baseline.totalCalls * 100).toFixed(1) : null;
+            const delta = baseRate !== null ? +(currRate - baseRate).toFixed(1) : null;
             const isG = !isRCA && row.key === 'G';
             const rcaMeta = isRCA ? RCA_CATEGORIES[row.key as RootCauseType] : null;
 
@@ -348,31 +357,31 @@ function ComparisonTable({
 
                 <td className="px-4 py-3 text-center">
                   <span className={`font-mono font-semibold ${
-                    baseline !== undefined
-                      ? baseline.count > 0 ? 'text-[var(--color-slate-300)]' : 'text-[var(--color-slate-600)]'
-                      : row.count > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'
+                    baseRate !== null
+                      ? baseRate > 0 ? 'text-[var(--color-slate-300)]' : 'text-[var(--color-slate-600)]'
+                      : currRate > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'
                   }`}>
-                    {baseline !== undefined ? baseline.count : row.count}
+                    {baseRate !== null ? `${baseRate}%` : `${currRate}%`}
                   </span>
                 </td>
 
                 {baselineStats !== null && (
                   <td className="px-4 py-3 text-center">
-                    <span className={`font-mono font-semibold ${row.count > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'}`}>
-                      {row.count}
+                    <span className={`font-mono font-semibold ${currRate > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'}`}>
+                      {currRate}%
                     </span>
                   </td>
                 )}
 
                 {baselineStats !== null && (
                   <td className="px-4 py-3 text-center">
-                    <DeltaCell delta={delta} />
+                    <DeltaCell delta={delta} suffix="%" />
                   </td>
                 )}
 
                 <td className="px-4 py-3 text-center">
                   <span className="text-[var(--color-slate-300)] font-mono text-sm">
-                    {row.affectedCalls > 0 ? `${row.affectedCalls}/${row.totalCalls}` : '—'}
+                    {row.affectedCalls > 0 ? `${row.affectedCalls} calls` : '—'}
                   </span>
                 </td>
 
@@ -401,6 +410,9 @@ const SEVERITY_BADGE: Record<Severity, string> = {
 
 function IssueRow({ pattern, showBaseline, i }: { pattern: IssuePattern; showBaseline: boolean; i: number }) {
   const dimLetter = pattern.dimension?.charAt(0).toUpperCase();
+  const bRate = pattern.baseTotalCalls > 0 ? +(pattern.baselineCalls / pattern.baseTotalCalls * 100).toFixed(1) : null;
+  const cRate = pattern.currTotalCalls > 0 ? +(pattern.currentCalls / pattern.currTotalCalls * 100).toFixed(1) : null;
+  const rateDelta = bRate !== null && cRate !== null ? +(cRate - bRate).toFixed(1) : null;
 
   return (
     <motion.div
@@ -447,32 +459,34 @@ function IssueRow({ pattern, showBaseline, i }: { pattern: IssuePattern; showBas
         </div>
       </div>
 
-      {/* Counts */}
+      {/* Rates */}
       <div className="flex items-center gap-3 flex-shrink-0 text-center">
         {showBaseline && (
           <>
-            <div className="w-12">
+            <div className="w-14">
               <div className="text-xs text-[var(--color-slate-500)]">prev</div>
-              <div className={`font-mono font-semibold text-sm ${pattern.baselineCount > 0 ? 'text-[var(--color-slate-300)]' : 'text-[var(--color-slate-600)]'}`}>
-                {pattern.baselineCount || '—'}
+              <div className={`font-mono font-semibold text-sm ${bRate && bRate > 0 ? 'text-[var(--color-slate-300)]' : 'text-[var(--color-slate-600)]'}`}>
+                {bRate !== null ? `${bRate}%` : '—'}
               </div>
             </div>
-            <div className="w-12">
+            <div className="w-14">
               <div className="text-xs text-[var(--color-slate-500)]">now</div>
-              <div className={`font-mono font-semibold text-sm ${pattern.currentCount > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'}`}>
-                {pattern.currentCount || '—'}
+              <div className={`font-mono font-semibold text-sm ${cRate && cRate > 0 ? 'text-white' : 'text-[var(--color-slate-600)]'}`}>
+                {cRate !== null ? `${cRate}%` : '—'}
               </div>
             </div>
-            <div className="w-12">
-              <div className="text-xs text-[var(--color-slate-500)]">delta</div>
-              <DeltaCell delta={pattern.currentCount - pattern.baselineCount} />
+            <div className="w-14">
+              <div className="text-xs text-[var(--color-slate-500)]">Δ rate</div>
+              <DeltaCell delta={rateDelta} suffix="%" />
             </div>
           </>
         )}
         {!showBaseline && (
-          <div className="w-12">
-            <div className="text-xs text-[var(--color-slate-500)]">count</div>
-            <div className="font-mono font-semibold text-sm text-white">{pattern.currentCount}</div>
+          <div className="w-14">
+            <div className="text-xs text-[var(--color-slate-500)]">call rate</div>
+            <div className="font-mono font-semibold text-sm text-white">
+              {cRate !== null ? `${cRate}%` : '—'}
+            </div>
           </div>
         )}
       </div>
@@ -541,13 +555,17 @@ function IssueSection({
 function IssuesTab({
   currentScenarios,
   baselineScenarios,
+  currentTotalCalls,
+  baselineTotalCalls,
 }: {
   currentScenarios: Scenario[];
   baselineScenarios: Scenario[] | null;
+  currentTotalCalls: number;
+  baselineTotalCalls: number;
 }) {
   if (!baselineScenarios) {
     // No baseline — just show current run issues grouped by status-equivalent (all "current")
-    const patterns = extractIssuePatterns([], currentScenarios);
+    const patterns = extractIssuePatterns([], currentScenarios, 0, currentTotalCalls);
     return (
       <div>
         <div className="px-4 py-3 border-b border-[var(--color-navy-700)] text-xs text-[var(--color-slate-400)]">
@@ -565,7 +583,7 @@ function IssuesTab({
     );
   }
 
-  const patterns = extractIssuePatterns(baselineScenarios, currentScenarios);
+  const patterns = extractIssuePatterns(baselineScenarios, currentScenarios, baselineTotalCalls, currentTotalCalls);
   const resolved = patterns.filter(p => p.status === 'resolved');
   const persistent = patterns.filter(p => p.status === 'persistent');
   const uptick = persistent.filter(p => p.isUptick);
@@ -690,8 +708,11 @@ export function ProgressPanel() {
 
   const totalCurrentIssues = currentScenarios.length;
   const totalBaselineIssues = baselineScenarios?.length ?? 0;
-  const totalDelta = baselineDimStats !== null ? totalCurrentIssues - totalBaselineIssues : null;
 
+  // Rate = issues per call (normalizes for different batch sizes)
+  const currentRate = currentCalls > 0 ? +(totalCurrentIssues / currentCalls).toFixed(2) : 0;
+  const baselineRate = baselineCalls > 0 ? +(totalBaselineIssues / baselineCalls).toFixed(2) : 0;
+  const rateChange = baselineDimStats !== null ? +(currentRate - baselineRate).toFixed(2) : null;
   const activeRows = activeTab === 'dimensions' ? currentDimStats : currentRCAStats;
   const activeBaselineRows = activeTab === 'dimensions' ? baselineDimStats : baselineRCAStats;
 
@@ -765,32 +786,32 @@ export function ProgressPanel() {
         >
           <div className="glass-card p-4 text-center">
             <div className="text-xs text-[var(--color-slate-400)] mb-1">Previous Run</div>
-            <div className="text-3xl font-bold text-white">{totalBaselineIssues}</div>
-            <div className="text-xs text-[var(--color-slate-500)] mt-1">total scenarios</div>
-            <div className="text-xs text-[var(--color-slate-500)]">{baselineCalls} calls · {baselineName}</div>
+            <div className="text-3xl font-bold text-white">{baselineRate}</div>
+            <div className="text-xs text-[var(--color-slate-500)] mt-1">issues per call</div>
+            <div className="text-xs text-[var(--color-slate-500)]">{totalBaselineIssues} scenarios · {baselineCalls} calls · {baselineName}</div>
           </div>
           <div className="glass-card p-4 text-center">
             <div className="text-xs text-[var(--color-slate-400)] mb-1">Current Run</div>
-            <div className="text-3xl font-bold text-white">{totalCurrentIssues}</div>
-            <div className="text-xs text-[var(--color-slate-500)] mt-1">total scenarios</div>
-            <div className="text-xs text-[var(--color-slate-500)]">{currentCalls} calls · {currentAnalysisName || 'This run'}</div>
+            <div className="text-3xl font-bold text-white">{currentRate}</div>
+            <div className="text-xs text-[var(--color-slate-500)] mt-1">issues per call</div>
+            <div className="text-xs text-[var(--color-slate-500)]">{totalCurrentIssues} scenarios · {currentCalls} calls · {currentAnalysisName || 'This run'}</div>
           </div>
           <div className="glass-card p-4 text-center">
             <div className="text-xs text-[var(--color-slate-400)] mb-1">Overall Change</div>
             <div className={`text-3xl font-bold ${
-              totalDelta === null ? 'text-[var(--color-slate-500)]' :
-              totalDelta < 0 ? 'text-green-400' :
-              totalDelta > 0 ? 'text-red-400' : 'text-[var(--color-slate-300)]'
+              rateChange === null ? 'text-[var(--color-slate-500)]' :
+              rateChange < 0 ? 'text-green-400' :
+              rateChange > 0 ? 'text-red-400' : 'text-[var(--color-slate-300)]'
             }`}>
-              {totalDelta === null ? '—' : totalDelta > 0 ? `+${totalDelta}` : `${totalDelta}`}
+              {rateChange === null ? '—' : rateChange > 0 ? `+${rateChange}` : `${rateChange}`}
             </div>
-            <div className="text-xs text-[var(--color-slate-500)] mt-1">scenario delta</div>
+            <div className="text-xs text-[var(--color-slate-500)] mt-1">issues/call change</div>
             <div className={`text-xs mt-1 font-medium ${
-              totalDelta === null ? '' :
-              totalDelta < 0 ? 'text-green-400' :
-              totalDelta > 0 ? 'text-red-400' : 'text-[var(--color-slate-400)]'
+              rateChange === null ? '' :
+              rateChange < 0 ? 'text-green-400' :
+              rateChange > 0 ? 'text-red-400' : 'text-[var(--color-slate-400)]'
             }`}>
-              {totalDelta === null ? '' : totalDelta < 0 ? 'Improved' : totalDelta > 0 ? 'Regressed' : 'No change'}
+              {rateChange === null ? '' : rateChange < 0 ? 'Improved' : rateChange > 0 ? 'Regressed' : 'No change'}
             </div>
           </div>
         </motion.div>
@@ -856,6 +877,8 @@ export function ProgressPanel() {
             <IssuesTab
               currentScenarios={currentScenarios}
               baselineScenarios={baselineScenarios}
+              currentTotalCalls={currentCalls}
+              baselineTotalCalls={baselineCalls}
             />
           ) : (
             <ComparisonTable
@@ -871,11 +894,11 @@ export function ProgressPanel() {
             <div className="px-4 py-3 border-t border-[var(--color-navy-700)] flex flex-wrap items-center gap-4 text-xs text-[var(--color-slate-400)]">
               <span className="flex items-center gap-1.5">
                 <TrendingDown className="w-3 h-3 text-green-400" />
-                Fewer scenarios = improvement
+                Lower issue rate = improvement
               </span>
               <span className="flex items-center gap-1.5">
                 <TrendingUp className="w-3 h-3 text-red-400" />
-                More scenarios = regression
+                Higher issue rate = regression
               </span>
               {activeTab === 'dimensions' && (
                 <span className="flex items-center gap-1.5">
