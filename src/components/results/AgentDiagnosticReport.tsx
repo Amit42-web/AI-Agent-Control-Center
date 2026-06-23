@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { Scenario } from '@/types';
 
@@ -127,14 +127,51 @@ function MetricCard({ label, value, icon, iconBg, color, fillPct, subtext, borde
 
 export default function AgentDiagnosticReport() {
   const { transcripts, scenarioResults, enhancedFixes, currentAnalysisName, goToStep, printReportOnLoad, setPrintReportOnLoad } = useAppStore();
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadAsPDF() {
+    if (!reportRef.current) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#EDF0F5',
+        logging: false,
+      });
+
+      const imgW = 210; // A4 width in mm
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const pdf = new jsPDF({ orientation: imgH > 297 ? 'p' : 'p', unit: 'mm', format: 'a4' });
+
+      let y = 0;
+      const pageH = 297;
+      while (y < imgH) {
+        if (y > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, -y, imgW, imgH);
+        y += pageH;
+      }
+
+      const name = currentAnalysisName ? `${currentAnalysisName.replace(/\s+/g, '_')}_diagnostic_report` : 'agent_diagnostic_report';
+      pdf.save(`${name}.pdf`);
+    } catch (err) {
+      console.error('PDF download failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     if (printReportOnLoad) {
       setPrintReportOnLoad(false);
-      const timer = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(timer);
+      setTimeout(() => downloadAsPDF(), 400);
     }
-  }, [printReportOnLoad, setPrintReportOnLoad]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printReportOnLoad]);
 
   const allScenarios  = scenarioResults?.scenarios ?? [];
   const allFixes      = enhancedFixes?.fixes ?? [];
@@ -233,8 +270,8 @@ export default function AgentDiagnosticReport() {
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 24px 40px' }}>
 
-        {/* Back */}
-        <div id="diagnostic-report-back-btn" style={{ marginBottom: 16 }}>
+        {/* Toolbar — hidden in captured PDF */}
+        <div id="diagnostic-report-back-btn" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => goToStep('fixes')} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             fontSize: 13, fontWeight: 600, color: '#475569',
@@ -244,7 +281,19 @@ export default function AgentDiagnosticReport() {
           }}>
             ← Back to Fixes
           </button>
+          <button onClick={downloadAsPDF} disabled={downloading} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 13, fontWeight: 600, color: downloading ? '#94A3B8' : '#0F172A',
+            background: downloading ? '#F1F5F9' : 'white', border: '1px solid #E2E8F0',
+            borderRadius: 8, padding: '8px 14px', cursor: downloading ? 'not-allowed' : 'pointer',
+            boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
+          }}>
+            {downloading ? '⏳ Generating PDF…' : '⬇ Download PDF'}
+          </button>
         </div>
+
+        {/* Report content captured for PDF */}
+        <div ref={reportRef}>
 
         {/* ── SECTION 1: Header ── */}
         <div style={{
@@ -555,6 +604,7 @@ export default function AgentDiagnosticReport() {
           </div>
         </div>
 
+        </div> {/* end reportRef */}
       </div>
     </div>
   );
