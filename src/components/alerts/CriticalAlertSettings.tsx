@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { CriticalAlertCategory, CriticalAlertConfig } from '@/types';
 
@@ -75,15 +75,15 @@ function AlertRow({
   alert: CriticalAlertConfig;
   onToggle: () => void;
 }) {
-  const [showPrompt, setShowPrompt] = useState(false);
   const isLLM = alert.detectionMethod === 'llm';
 
   return (
     <div className="px-4 py-3">
       <div className="flex items-start gap-3">
-        <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{alert.icon}</span>
+        <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{alert.icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Name + badge row */}
+          <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-sm font-medium text-white">{alert.name}</span>
             {isLLM ? (
               <span
@@ -100,45 +100,39 @@ function AlertRow({
                 Instant
               </span>
             )}
-            {isLLM && alert.prompt && (
-              <button
-                type="button"
-                onClick={() => setShowPrompt((v) => !v)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: showPrompt ? '#60a5fa' : 'var(--color-slate-400)',
-                }}
-                title="Show detection criteria"
-              >
-                <Info className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
-          <p
-            className="text-xs mt-0.5"
-            style={{ color: 'var(--color-slate-400)' }}
-          >
+
+          {/* Description */}
+          <p className="text-xs mb-2" style={{ color: 'var(--color-slate-400)', lineHeight: 1.5 }}>
             {alert.description}
           </p>
-          {isLLM && alert.prompt && showPrompt && (
+
+          {/* Detection criteria — always visible */}
+          {isLLM && alert.prompt ? (
             <div
-              className="mt-2 text-xs rounded-lg px-3 py-2"
+              className="text-xs rounded-lg px-3 py-2"
               style={{
-                background: 'rgba(59,130,246,0.08)',
-                border: '1px solid rgba(59,130,246,0.2)',
-                color: '#93c5fd',
-                lineHeight: 1.5,
+                background: 'rgba(59,130,246,0.07)',
+                border: '1px solid rgba(59,130,246,0.18)',
+                lineHeight: 1.6,
               }}
             >
-              <span style={{ color: '#60a5fa', fontWeight: 600, marginRight: 4 }}>Detection criteria:</span>
-              {alert.prompt}
+              <span style={{ color: '#60a5fa', fontWeight: 600, marginRight: 6 }}>AI criteria:</span>
+              <span style={{ color: '#93c5fd' }}>{alert.prompt}</span>
             </div>
-          )}
+          ) : !isLLM ? (
+            <div
+              className="text-xs rounded-lg px-3 py-2"
+              style={{
+                background: 'rgba(34,197,94,0.06)',
+                border: '1px solid rgba(34,197,94,0.15)',
+                lineHeight: 1.6,
+              }}
+            >
+              <span style={{ color: '#22c55e', fontWeight: 600, marginRight: 6 }}>Rule:</span>
+              <span style={{ color: '#86efac' }}>{alert.description}</span>
+            </div>
+          ) : null}
         </div>
         <ToggleSwitch enabled={alert.enabled} onChange={onToggle} />
       </div>
