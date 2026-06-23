@@ -387,6 +387,7 @@ export interface CriticalAlertConfig {
   id: CriticalAlertId;
   name: string;
   description: string;
+  prompt?: string;          // LLM detection criteria (shown in UI, used in API call)
   category: CriticalAlertCategory;
   detectionMethod: 'deterministic' | 'llm';
   enabled: boolean;
