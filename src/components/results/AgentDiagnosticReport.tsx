@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { Scenario } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -20,6 +21,9 @@ function normalizeDim(raw: string): string {
 }
 
 const SEV_P: Record<string, number> = { low: 3, medium: 8, high: 15, critical: 25 };
+const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+const SEV_COLOR: Record<string, string> = { critical: '#EF4444', high: '#F59E0B', medium: '#94A3B8', low: '#CBD5E1' };
+const SEV_LABEL: Record<string, string> = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
 
 function computeScore(scenarios: Array<{ severity: string }>): number {
   if (!scenarios.length) return 100;
@@ -55,6 +59,9 @@ function DonutGauge({ score }: { score: number }) {
         <text x={96} y={130} textAnchor="start" fill={color} fontSize={12} fontFamily="Plus Jakarta Sans, sans-serif">{label}</text>
       </svg>
       <span style={{ fontSize: 10, color: '#64748B', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>QA SCORE</span>
+      <span style={{ fontSize: 9, color: '#475569', textAlign: 'center', lineHeight: 1.4 }}>
+        Severity-weighted avg<br/>(low=3, med=8, high=15, crit=25)
+      </span>
     </div>
   );
 }
@@ -133,17 +140,19 @@ export default function AgentDiagnosticReport() {
     incidents: number; uniqueCalls: number; callRate: number;
     status: 'critical' | 'elevated' | 'clear';
     calls: Set<string>;
+    scenarios: Scenario[];
   }
 
   const dimMap: Record<string, DimData> = {};
   for (const [dimKey, meta] of Object.entries(DIMENSION_MAP)) {
-    dimMap[dimKey] = { key: dimKey, ...meta, incidents: 0, uniqueCalls: 0, callRate: 0, status: 'clear', calls: new Set() };
+    dimMap[dimKey] = { key: dimKey, ...meta, incidents: 0, uniqueCalls: 0, callRate: 0, status: 'clear', calls: new Set(), scenarios: [] };
   }
   for (const scenario of allScenarios) {
     const dim = normalizeDim(scenario.dimension || '');
     if (!dimMap[dim]) continue;
     dimMap[dim].incidents += 1;
     dimMap[dim].calls.add(scenario.callId);
+    dimMap[dim].scenarios.push(scenario);
     if (scenario.severity === 'critical') {
       dimMap[dim].status = 'critical';
     } else if (scenario.severity === 'high' && dimMap[dim].status !== 'critical') {
@@ -283,9 +292,13 @@ export default function AgentDiagnosticReport() {
                 const badgeBg    = isC ? '#FEE2E2'  : '#FEF3C7';
                 const badgeText  = isC ? '#EF4444'  : '#F59E0B';
                 const barWidth   = maxCallRate > 0 ? (dim.callRate / maxCallRate) * 100 : 0;
+                const topIssues  = [...dim.scenarios]
+                  .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9))
+                  .slice(0, 7);
 
                 return (
                   <div key={dim.key} style={{ padding: '10px 12px', borderRadius: 10, background: '#FAFAFA', border: '1px solid #F1F5F9' }}>
+                    {/* Header row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 6, background: badgeBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <span style={{ color: badgeText, fontWeight: 700, fontSize: 12 }}>{dim.letter}</span>
@@ -298,8 +311,27 @@ export default function AgentDiagnosticReport() {
                         {dim.callRate}%
                       </span>
                     </div>
-                    <div style={{ height: 6, background: trackColor, borderRadius: 3, overflow: 'hidden' }}>
+                    {/* Progress bar */}
+                    <div style={{ height: 6, background: trackColor, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
                       <div style={{ height: '100%', width: `${barWidth}%`, background: barColor, borderRadius: 3 }} />
+                    </div>
+                    {/* Top issues */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {topIssues.map((s) => (
+                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, color: SEV_COLOR[s.severity],
+                            background: `${SEV_COLOR[s.severity]}18`, borderRadius: 3,
+                            padding: '1px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em',
+                          }}>{SEV_LABEL[s.severity]}</span>
+                          <span style={{ fontSize: 11, color: '#475569', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{s.title}</span>
+                        </div>
+                      ))}
+                      {dim.scenarios.length > 7 && (
+                        <span style={{ fontSize: 10, color: '#94A3B8', paddingLeft: 2 }}>
+                          +{dim.scenarios.length - 7} more issues
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
