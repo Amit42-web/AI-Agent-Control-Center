@@ -16,6 +16,7 @@ import {
   CriticalAlertId,
   CriticalAlertSummary,
   DetectedCriticalAlert,
+  CallMetadataConfig,
 } from '@/types';
 import { DEFAULT_CRITICAL_ALERT_CONFIGS } from '@/data/criticalAlertConfigs';
 import { runDeterministicChecks, runLLMChecks } from '@/utils/criticalAlertDetection';
@@ -122,6 +123,7 @@ const initialState = {
   criticalAlertResults: null,
   criticalAlertsEnabled: true,
   printReportOnLoad: false,
+  callMetadataConfig: null,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -340,17 +342,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         console.log(`Starting parallel scenario analysis of ${totalTranscripts} transcripts with concurrency limit of 10`);
 
         // Analyze transcripts for scenarios in parallel with concurrency control
+        const { callMetadataConfig } = get();
         const allScenariosArrays = await processInParallel(
           transcripts,
           async (transcript, index) => {
             console.log(`Starting scenario analysis of transcript ${transcript.id} (${index + 1}/${totalTranscripts})`);
+            const callMetadata = callMetadataConfig
+              ? (callMetadataConfig.rows[transcript.id.trim().toLowerCase()] ?? null)
+              : null;
             const scenarios = await analyzeTranscriptScenarios(
               apiKey,
               openaiConfig.model,
               transcript,
               dimensionPrompts,
               referenceEnabled ? referenceScript : null,
-              knowledgeBaseEnabled ? knowledgeBase : null
+              knowledgeBaseEnabled ? knowledgeBase : null,
+              callMetadata
             );
             console.log(`Completed scenario analysis of transcript ${transcript.id}, found ${scenarios.length} scenarios`);
             return scenarios;
@@ -539,6 +546,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setPrintReportOnLoad: (v: boolean) => set({ printReportOnLoad: v }),
 
+  setCallMetadataConfig: (config: CallMetadataConfig | null) => set({ callMetadataConfig: config }),
+
   markFixesApplied: async () => {
     set({ fixesApplied: true });
     const state = get();
@@ -589,6 +598,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       aggregatedIssues: state.aggregatedIssues,
       criticalAlertConfigs: state.criticalAlertConfigs,
       criticalAlertResults: state.criticalAlertResults,
+      callMetadataConfig: state.callMetadataConfig,
     };
   },
 
@@ -613,6 +623,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       aggregatedScenarios: analysisState.aggregatedScenarios ?? null,
       criticalAlertConfigs: analysisState.criticalAlertConfigs ?? DEFAULT_CRITICAL_ALERT_CONFIGS,
       criticalAlertResults: analysisState.criticalAlertResults ?? null,
+      callMetadataConfig: analysisState.callMetadataConfig ?? null,
       selectedCallId: analysisState.selectedCallId,
       fixesApplied: analysisState.fixesApplied || false,
       currentStep: analysisState.enhancedFixes || analysisState.consolidatedFixes || analysisState.fixes

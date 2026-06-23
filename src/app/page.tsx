@@ -11,6 +11,7 @@ import { ReferenceScript } from '@/components/wizard/ReferenceScript';
 import { KnowledgeBase } from '@/components/wizard/KnowledgeBase';
 import { ChecksConfig } from '@/components/wizard/ChecksConfig';
 import { CriticalAlertSettings } from '@/components/alerts/CriticalAlertSettings';
+import { MetadataUpload } from '@/components/input/MetadataUpload';
 import { CriticalAlertsPanel } from '@/components/alerts/CriticalAlertsPanel';
 import { AuditPromptConfig } from '@/components/wizard/AuditPromptConfig';
 import { OpenAIConfig } from '@/components/wizard/OpenAIConfig';
@@ -94,6 +95,7 @@ function RunWizardPage() {
       ) : (
         <motion.div variants={itemVariants}><AuditPromptConfig /></motion.div>
       )}
+      <motion.div variants={itemVariants}><MetadataUpload /></motion.div>
       <motion.div variants={itemVariants}><CriticalAlertSettings /></motion.div>
       <motion.div variants={itemVariants}><RunButton /></motion.div>
     </motion.div>

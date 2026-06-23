@@ -267,6 +267,8 @@ export interface AnalysisState {
   // Critical alerts
   criticalAlertConfigs?: CriticalAlertConfig[];
   criticalAlertResults?: CriticalAlertSummary | null;
+  // Call metadata
+  callMetadataConfig?: CallMetadataConfig | null;
 }
 
 export type ResultsViewMode = 'detailed' | 'overview';
@@ -374,6 +376,19 @@ export interface AppState {
   // Report print trigger
   printReportOnLoad: boolean;
   setPrintReportOnLoad: (v: boolean) => void;
+
+  // Call metadata
+  callMetadataConfig: CallMetadataConfig | null;
+  setCallMetadataConfig: (config: CallMetadataConfig | null) => void;
+}
+
+// ─── Call Metadata ────────────────────────────────────────────────────────────
+
+export interface CallMetadataConfig {
+  columns: string[];                              // all column names from uploaded file
+  matchKey: string;                               // column used to match transcript ID
+  excludedColumns: string[];                      // columns excluded from audit injection
+  rows: Record<string, Record<string, string>>;   // normalised call ID → filtered attributes
 }
 
 // ─── Critical Alerts ──────────────────────────────────────────────────────────

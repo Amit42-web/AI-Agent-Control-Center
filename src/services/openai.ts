@@ -898,7 +898,8 @@ export async function analyzeTranscriptScenarios(
   transcript: Transcript,
   dimensionPrompts: DimensionPrompt[],
   referenceScript: string | null,
-  knowledgeBase: string | null = null
+  knowledgeBase: string | null = null,
+  callMetadata: Record<string, string> | null = null
 ): Promise<Scenario[]> {
   // Validate transcript has lines
   if (!transcript.lines || transcript.lines.length === 0) {
@@ -931,7 +932,11 @@ ${dimensionSection}
 ${referenceScript ? `\n---\n## Reference Script/Flow:\n${referenceScript}\n` : ''}
 ${knowledgeBase ? `\n---\n## Knowledge Base:\n${knowledgeBase}\n` : ''}`;
 
-  const userPrompt = `Transcript to analyze:\n${transcriptText}`;
+  const metadataBlock = callMetadata && Object.keys(callMetadata).length > 0
+    ? `CALL ATTRIBUTES (injected at runtime — use these to determine which conditional flow applies to this call):\n${Object.entries(callMetadata).map(([k, v]) => `- ${k}: ${v}`).join('\n')}\n\n`
+    : '';
+
+  const userPrompt = `${metadataBlock}Transcript to analyze:\n${transcriptText}`;
 
   try {
     console.log(`[SCENARIO ANALYSIS] Starting for ${transcript.id}`);
