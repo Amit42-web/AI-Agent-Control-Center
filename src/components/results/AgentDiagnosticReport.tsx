@@ -25,6 +25,40 @@ const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low
 const SEV_COLOR: Record<string, string> = { critical: '#EF4444', high: '#F59E0B', medium: '#94A3B8', low: '#CBD5E1' };
 const SEV_LABEL: Record<string, string> = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
 
+function titleWords(title: string): Set<string> {
+  const STOP = new Set(['the', 'and', 'for', 'with', 'not', 'was', 'did', 'to', 'of', 'in', 'a', 'an', 'is', 'on', 'by', 'at', 'from', 'that', 'this', 'or', 'but', 'are', 'be', 'has', 'had', 'have', 'its', 'it']);
+  return new Set(
+    title.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w))
+  );
+}
+
+function overlapRatio(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let count = 0;
+  a.forEach(w => { if (b.has(w)) count++; });
+  return count / Math.max(a.size, b.size);
+}
+
+interface DeduplicatedIssue { title: string; severity: string; count: number }
+
+function deduplicateIssues(scenarios: Scenario[]): DeduplicatedIssue[] {
+  // Sort by severity first so the most severe version becomes the group representative
+  const sorted = [...scenarios].sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
+  const groups: Array<DeduplicatedIssue & { words: Set<string> }> = [];
+
+  for (const s of sorted) {
+    const words = titleWords(s.title);
+    const match = groups.find(g => overlapRatio(words, g.words) >= 0.55);
+    if (match) {
+      match.count++;
+    } else {
+      groups.push({ title: s.title, severity: s.severity, count: 1, words });
+    }
+  }
+
+  return groups.map(({ title, severity, count }) => ({ title, severity, count }));
+}
+
 function computeScore(scenarios: Array<{ severity: string }>): number {
   if (!scenarios.length) return 100;
   const penalty = scenarios.reduce((sum, s) => sum + (SEV_P[s.severity] ?? 8), 0);
@@ -292,9 +326,8 @@ export default function AgentDiagnosticReport() {
                 const badgeBg    = isC ? '#FEE2E2'  : '#FEF3C7';
                 const badgeText  = isC ? '#EF4444'  : '#F59E0B';
                 const barWidth   = maxCallRate > 0 ? (dim.callRate / maxCallRate) * 100 : 0;
-                const topIssues  = [...dim.scenarios]
-                  .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9))
-                  .slice(0, 7);
+                const allDeduped = deduplicateIssues(dim.scenarios);
+                const topIssues  = allDeduped.slice(0, 7);
 
                 return (
                   <div key={dim.key} style={{ padding: '10px 12px', borderRadius: 10, background: '#FAFAFA', border: '1px solid #F1F5F9' }}>
@@ -315,21 +348,26 @@ export default function AgentDiagnosticReport() {
                     <div style={{ height: 6, background: trackColor, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
                       <div style={{ height: '100%', width: `${barWidth}%`, background: barColor, borderRadius: 3 }} />
                     </div>
-                    {/* Top issues */}
+                    {/* Top issues (deduplicated) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      {topIssues.map((s) => (
-                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {topIssues.map((issue, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{
-                            fontSize: 9, fontWeight: 700, color: SEV_COLOR[s.severity],
-                            background: `${SEV_COLOR[s.severity]}18`, borderRadius: 3,
+                            fontSize: 9, fontWeight: 700, color: SEV_COLOR[issue.severity],
+                            background: `${SEV_COLOR[issue.severity]}18`, borderRadius: 3,
                             padding: '1px 5px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em',
-                          }}>{SEV_LABEL[s.severity]}</span>
-                          <span style={{ fontSize: 11, color: '#475569', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{s.title}</span>
+                          }}>{SEV_LABEL[issue.severity]}</span>
+                          <span style={{ fontSize: 11, color: '#475569', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{issue.title}</span>
+                          {issue.count > 1 && (
+                            <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', background: '#F1F5F9', borderRadius: 3, padding: '1px 5px', flexShrink: 0 }}>
+                              ×{issue.count} calls
+                            </span>
+                          )}
                         </div>
                       ))}
-                      {dim.scenarios.length > 7 && (
+                      {allDeduped.length > 7 && (
                         <span style={{ fontSize: 10, color: '#94A3B8', paddingLeft: 2 }}>
-                          +{dim.scenarios.length - 7} more issues
+                          +{allDeduped.length - 7} more issue types
                         </span>
                       )}
                     </div>
