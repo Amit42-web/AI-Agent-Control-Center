@@ -72,59 +72,40 @@ export function runDeterministicChecks(
   const customerLines = lines.filter((l) => l.speaker === 'customer');
 
   // ── bot_silence ────────────────────────────────────────────────────────────
+  // Fires when a customer turn is followed by another customer turn with no
+  // agent turn in between — i.e., the bot structurally gave no response.
   if (enabledIds.has('bot_silence')) {
     const cfg = configMap['bot_silence'];
-    // Single-word responses that are valid acknowledgments — not silence
-    const ACKNOWLEDGMENTS = new Set([
-      'yes', 'no', 'ok', 'okay', 'sure', 'right', 'alright', 'correct',
-      'absolutely', 'certainly', 'definitely', 'understood', 'noted',
-      'hmm', 'mhm', 'uh-huh', 'yep', 'nope', 'yeah', 'good', 'great',
-      'perfect', 'thanks', 'thank', 'sorry', 'hello', 'hi', 'bye',
-      'goodbye', 'hold', 'please', 'moment', 'one', 'sec', 'second',
-    ]);
 
-    let silentCount = 0;
-    let isFirstAgentTurn = true;
-
+    // Collapse consecutive same-speaker lines into turns
+    const turns: Array<{ speaker: string; lineNums: number[]; text: string }> = [];
     lines.forEach((line, idx) => {
-      if (line.speaker !== 'agent') return;
-
-      const words = line.text.trim().split(/\s+/).filter(Boolean);
-
-      // Skip the very first agent turn — opening the call is not silence
-      if (isFirstAgentTurn) {
-        isFirstAgentTurn = false;
-        return;
+      const last = turns[turns.length - 1];
+      if (last && last.speaker === line.speaker) {
+        last.lineNums.push(idx + 1);
+        last.text += ' ' + line.text;
+      } else {
+        turns.push({ speaker: line.speaker, lineNums: [idx + 1], text: line.text });
       }
+    });
 
-      // Only flag if the immediately preceding customer turn was substantive (≥5 words)
-      let precedingCustomerWords = 0;
-      for (let i = idx - 1; i >= 0; i--) {
-        if (lines[i].speaker === 'customer') {
-          precedingCustomerWords = lines[i].text.trim().split(/\s+/).filter(Boolean).length;
-          break;
-        }
-      }
-      if (precedingCustomerWords < 5) return;
-
-      // Don't flag if the entire turn is just acknowledgment words
-      const isAllAcknowledgments = words.length > 0 && words.every(w => ACKNOWLEDGMENTS.has(w.toLowerCase().replace(/[^a-z-]/g, '')));
-      if (isAllAcknowledgments) return;
-
-      if (words.length <= 2 && silentCount < 3) {
+    // Two consecutive customer turns = bot gave no response
+    let silentCount = 0;
+    for (let i = 0; i + 1 < turns.length && silentCount < 3; i++) {
+      if (turns[i].speaker === 'customer' && turns[i + 1].speaker === 'customer') {
         silentCount++;
         alerts.push(
           makeAlert(
             'bot_silence',
             cfg,
             transcript.id,
-            `Line ${idx + 1}: "${line.text.trim()}" (customer had said: "${lines.slice(0, idx).reverse().find(l => l.speaker === 'customer')?.text.slice(0, 80) ?? ''}...")`,
-            90,
-            [idx + 1]
+            `Bot gave no response after: "${turns[i].text.trim().slice(0, 120)}"`,
+            98,
+            [...turns[i].lineNums, ...turns[i + 1].lineNums]
           )
         );
       }
-    });
+    }
   }
 
   // ── loop_detection ────────────────────────────────────────────────────────
