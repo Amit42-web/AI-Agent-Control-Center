@@ -130,45 +130,55 @@ export default function AgentDiagnosticReport() {
   const reportRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
-  async function downloadAsPDF() {
+  function openPrintWindow() {
     if (!reportRef.current) return;
     setDownloading(true);
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const jsPDF = (await import('jspdf')).default;
 
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#EDF0F5',
-        logging: false,
+    // Wait for any pending paints
+    requestAnimationFrame(() => {
+      const html = reportRef.current!.outerHTML;
+      const title = currentAnalysisName || 'Agent Diagnostic Report';
+
+      const w = window.open('', '_blank', 'width=1200,height=900');
+      if (!w) { setDownloading(false); return; }
+
+      w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; background: #EDF0F5; }
+    @media print {
+      @page { margin: 8mm; size: A3 portrait; }
+      body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+  </style>
+</head>
+<body>${html}</body>
+</html>`);
+      w.document.close();
+
+      w.addEventListener('load', () => {
+        setTimeout(() => {
+          w.focus();
+          w.print();
+          setDownloading(false);
+        }, 1200);
       });
 
-      const imgW = 210; // A4 width in mm
-      const imgH = (canvas.height * imgW) / canvas.width;
-      const pdf = new jsPDF({ orientation: imgH > 297 ? 'p' : 'p', unit: 'mm', format: 'a4' });
-
-      let y = 0;
-      const pageH = 297;
-      while (y < imgH) {
-        if (y > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, -y, imgW, imgH);
-        y += pageH;
-      }
-
-      const name = currentAnalysisName ? `${currentAnalysisName.replace(/\s+/g, '_')}_diagnostic_report` : 'agent_diagnostic_report';
-      pdf.save(`${name}.pdf`);
-    } catch (err) {
-      console.error('PDF download failed:', err);
-    } finally {
-      setDownloading(false);
-    }
+      // Fallback if load already fired
+      setTimeout(() => setDownloading(false), 5000);
+    });
   }
 
   useEffect(() => {
     if (printReportOnLoad) {
       setPrintReportOnLoad(false);
-      setTimeout(() => downloadAsPDF(), 400);
+      setTimeout(() => openPrintWindow(), 400);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printReportOnLoad]);
@@ -281,7 +291,7 @@ export default function AgentDiagnosticReport() {
           }}>
             ← Back to Fixes
           </button>
-          <button onClick={downloadAsPDF} disabled={downloading} style={{
+          <button onClick={openPrintWindow} disabled={downloading} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             fontSize: 13, fontWeight: 600, color: downloading ? '#94A3B8' : '#0F172A',
             background: downloading ? '#F1F5F9' : 'white', border: '1px solid #E2E8F0',
