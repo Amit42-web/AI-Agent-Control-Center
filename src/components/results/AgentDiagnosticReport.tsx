@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { Scenario } from '@/types';
 
@@ -126,7 +126,15 @@ function MetricCard({ label, value, icon, iconBg, color, fillPct, subtext, borde
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AgentDiagnosticReport() {
-  const { transcripts, scenarioResults, enhancedFixes, currentAnalysisName, goToStep } = useAppStore();
+  const { transcripts, scenarioResults, enhancedFixes, currentAnalysisName, goToStep, printReportOnLoad, setPrintReportOnLoad } = useAppStore();
+
+  useEffect(() => {
+    if (printReportOnLoad) {
+      setPrintReportOnLoad(false);
+      const timer = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [printReportOnLoad, setPrintReportOnLoad]);
 
   const allScenarios  = scenarioResults?.scenarios ?? [];
   const allFixes      = enhancedFixes?.fixes ?? [];
@@ -214,12 +222,19 @@ export default function AgentDiagnosticReport() {
 
   return (
     <div style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', background: '#EDF0F5', minHeight: '100vh' }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        @media print {
+          body > *:not(#diagnostic-report-root) { display: none !important; }
+          #diagnostic-report-back-btn { display: none !important; }
+          @page { margin: 0.5cm; size: A4; }
+        }
+      `}</style>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 24px 40px' }}>
 
         {/* Back */}
-        <div style={{ marginBottom: 16 }}>
+        <div id="diagnostic-report-back-btn" style={{ marginBottom: 16 }}>
           <button onClick={() => goToStep('fixes')} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             fontSize: 13, fontWeight: 600, color: '#475569',

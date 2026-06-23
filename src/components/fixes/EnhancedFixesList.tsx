@@ -15,7 +15,6 @@ import { useAppStore } from '@/store/useAppStore';
 import { EnhancedFixCard } from './EnhancedFixCard';
 import { FixType, RootCauseType } from '@/types';
 import { generateFixesExcel, generateFixesPDF } from '@/utils/fixesExport';
-import { generateHealthReportPDF } from '@/utils/healthReport';
 
 const fixTypeLabels: Record<FixType, string> = {
   script: 'Script/Prompt',
@@ -33,7 +32,7 @@ const rootCauseLabels: Record<RootCauseType, string> = {
 };
 
 export function EnhancedFixesList() {
-  const { enhancedFixes, scenarioResults, referenceScript, aggregatedScenarios, transcripts, currentAnalysisName } = useAppStore();
+  const { enhancedFixes, scenarioResults, referenceScript, aggregatedScenarios, transcripts, currentAnalysisName, goToStep, setPrintReportOnLoad } = useAppStore();
   const [fixTypeFilter, setFixTypeFilter] = useState<FixType | 'all'>('all');
   const [rcaFilter, setRcaFilter] = useState<RootCauseType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -258,14 +257,8 @@ export function EnhancedFixesList() {
           {/* Diagnostic Report */}
           <button
             onClick={() => {
-              generateHealthReportPDF({
-                scenarios: scenarioResults?.scenarios ?? [],
-                aggregatedScenarios: aggregatedScenarios ?? [],
-                fixes: enhancedFixes.fixes,
-                totalCalls: transcripts.length,
-                runName: currentAnalysisName ?? undefined,
-                analysisDate: new Date().toLocaleDateString(),
-              });
+              setPrintReportOnLoad(true);
+              goToStep('report');
             }}
             className="flex items-center justify-center gap-3 p-4 rounded-lg border border-teal-500/40 bg-teal-500/10 hover:bg-teal-500/20 transition-colors"
           >

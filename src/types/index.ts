@@ -370,6 +370,10 @@ export interface AppState {
   criticalAlertsEnabled: boolean;
   toggleCriticalAlert: (id: CriticalAlertId) => void;
   toggleCriticalAlertsEnabled: () => void;
+
+  // Report print trigger
+  printReportOnLoad: boolean;
+  setPrintReportOnLoad: (v: boolean) => void;
 }
 
 // ─── Critical Alerts ──────────────────────────────────────────────────────────

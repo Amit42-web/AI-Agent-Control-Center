@@ -121,6 +121,7 @@ const initialState = {
   criticalAlertConfigs: DEFAULT_CRITICAL_ALERT_CONFIGS,
   criticalAlertResults: null,
   criticalAlertsEnabled: true,
+  printReportOnLoad: false,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -535,6 +536,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleCriticalAlertsEnabled: () => {
     set({ criticalAlertsEnabled: !get().criticalAlertsEnabled });
   },
+
+  setPrintReportOnLoad: (v: boolean) => set({ printReportOnLoad: v }),
 
   markFixesApplied: async () => {
     set({ fixesApplied: true });
