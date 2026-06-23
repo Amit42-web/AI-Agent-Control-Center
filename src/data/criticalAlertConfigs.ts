@@ -5,7 +5,7 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
   {
     id: 'bot_silence',
     name: 'Bot Said Nothing',
-    description: 'Customer spoke but bot gave no response — another customer turn followed with no agent turn in between',
+    description: 'Bot missed at least one full exchange — 3+ consecutive customer turns with no agent response (2 back-to-back is normal ASR chunking)',
     category: 'bot_failure',
     detectionMethod: 'deterministic',
     enabled: true,

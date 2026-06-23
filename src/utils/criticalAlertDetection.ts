@@ -72,8 +72,10 @@ export function runDeterministicChecks(
   const customerLines = lines.filter((l) => l.speaker === 'customer');
 
   // ── bot_silence ────────────────────────────────────────────────────────────
-  // Fires when a customer turn is followed by another customer turn with no
-  // agent turn in between — i.e., the bot structurally gave no response.
+  // ASR chunks break one customer utterance into multiple consecutive lines,
+  // so 2 back-to-back customer turns after collapsing is normal chunking.
+  // We only fire when 3+ consecutive customer turns exist after collapsing —
+  // meaning the bot missed at least one full exchange, not just a chunk split.
   if (enabledIds.has('bot_silence')) {
     const cfg = configMap['bot_silence'];
 
@@ -89,22 +91,35 @@ export function runDeterministicChecks(
       }
     });
 
-    // Two consecutive customer turns = bot gave no response
+    // Find runs of 3+ consecutive customer turns
     let silentCount = 0;
-    for (let i = 0; i + 1 < turns.length && silentCount < 3; i++) {
-      if (turns[i].speaker === 'customer' && turns[i + 1].speaker === 'customer') {
+    let i = 0;
+    while (i < turns.length && silentCount < 3) {
+      if (turns[i].speaker !== 'customer') { i++; continue; }
+
+      // Count how many consecutive customer turns start here
+      let run = 0;
+      while (i + run < turns.length && turns[i + run].speaker === 'customer') run++;
+
+      if (run >= 3) {
         silentCount++;
+        const runTurns = turns.slice(i, i + run);
+        const allLineNums = runTurns.flatMap(t => t.lineNums);
+        const firstText = runTurns[0].text.trim().slice(0, 100);
+        const lastText  = runTurns[run - 1].text.trim().slice(0, 80);
         alerts.push(
           makeAlert(
             'bot_silence',
             cfg,
             transcript.id,
-            `Bot gave no response after: "${turns[i].text.trim().slice(0, 120)}"`,
-            98,
-            [...turns[i].lineNums, ...turns[i + 1].lineNums]
+            `Bot gave no response across ${run} customer turns: "${firstText}" … "${lastText}"`,
+            95,
+            allLineNums
           )
         );
       }
+
+      i += run;
     }
   }
 
