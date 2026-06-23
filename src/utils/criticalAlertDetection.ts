@@ -74,10 +74,43 @@ export function runDeterministicChecks(
   // ── bot_silence ────────────────────────────────────────────────────────────
   if (enabledIds.has('bot_silence')) {
     const cfg = configMap['bot_silence'];
+    // Single-word responses that are valid acknowledgments — not silence
+    const ACKNOWLEDGMENTS = new Set([
+      'yes', 'no', 'ok', 'okay', 'sure', 'right', 'alright', 'correct',
+      'absolutely', 'certainly', 'definitely', 'understood', 'noted',
+      'hmm', 'mhm', 'uh-huh', 'yep', 'nope', 'yeah', 'good', 'great',
+      'perfect', 'thanks', 'thank', 'sorry', 'hello', 'hi', 'bye',
+      'goodbye', 'hold', 'please', 'moment', 'one', 'sec', 'second',
+    ]);
+
     let silentCount = 0;
+    let isFirstAgentTurn = true;
+
     lines.forEach((line, idx) => {
       if (line.speaker !== 'agent') return;
+
       const words = line.text.trim().split(/\s+/).filter(Boolean);
+
+      // Skip the very first agent turn — opening the call is not silence
+      if (isFirstAgentTurn) {
+        isFirstAgentTurn = false;
+        return;
+      }
+
+      // Only flag if the immediately preceding customer turn was substantive (≥5 words)
+      let precedingCustomerWords = 0;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (lines[i].speaker === 'customer') {
+          precedingCustomerWords = lines[i].text.trim().split(/\s+/).filter(Boolean).length;
+          break;
+        }
+      }
+      if (precedingCustomerWords < 5) return;
+
+      // Don't flag if the entire turn is just acknowledgment words
+      const isAllAcknowledgments = words.length > 0 && words.every(w => ACKNOWLEDGMENTS.has(w.toLowerCase().replace(/[^a-z-]/g, '')));
+      if (isAllAcknowledgments) return;
+
       if (words.length <= 2 && silentCount < 3) {
         silentCount++;
         alerts.push(
@@ -85,8 +118,8 @@ export function runDeterministicChecks(
             'bot_silence',
             cfg,
             transcript.id,
-            `Line ${idx + 1}: "${line.text.trim()}"`,
-            95,
+            `Line ${idx + 1}: "${line.text.trim()}" (customer had said: "${lines.slice(0, idx).reverse().find(l => l.speaker === 'customer')?.text.slice(0, 80) ?? ''}...")`,
+            90,
             [idx + 1]
           )
         );
