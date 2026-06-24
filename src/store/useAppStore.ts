@@ -51,8 +51,9 @@ async function processInParallel<T, R>(
   processFn: (item: T, index: number) => Promise<R>,
   concurrency: number = 10,
   onProgress?: (completed: number, total: number) => void
-): Promise<R[]> {
+): Promise<{ results: R[]; errors: Error[] }> {
   const results: R[] = [];
+  const errors: Error[] = [];
   let completed = 0;
 
   // Process items in batches with concurrency limit
@@ -70,7 +71,9 @@ async function processInParallel<T, R>(
       if (result.status === 'fulfilled') {
         results.push(result.value);
       } else {
-        console.error(`Error processing item ${i + batchIndex}:`, result.reason);
+        const err = result.reason instanceof Error ? result.reason : new Error(String(result.reason));
+        console.error(`Error processing item ${i + batchIndex}:`, err);
+        errors.push(err);
       }
 
       // Update progress after each item completes
@@ -80,7 +83,7 @@ async function processInParallel<T, R>(
     });
   }
 
-  return results;
+  return { results, errors };
 }
 
 const initialState = {
@@ -262,7 +265,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         console.log(`Starting parallel analysis of ${totalTranscripts} transcripts with concurrency limit of 10`);
 
         // Analyze transcripts in parallel with concurrency control
-        const allIssuesArrays = await processInParallel(
+        const { results: allIssuesArrays, errors: issueErrors } = await processInParallel(
           transcripts,
           async (transcript, index) => {
             console.log(`Starting analysis of transcript ${transcript.id} (${index + 1}/${totalTranscripts})`);
@@ -284,6 +287,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             set({ runProgress: progress });
           }
         );
+
+        if (issueErrors.length > 0 && allIssuesArrays.length === 0) {
+          throw new Error(`All transcript analyses failed. First error: ${issueErrors[0].message}`);
+        }
 
         // Flatten all issues into a single array
         const allIssues = allIssuesArrays.flat();
@@ -343,7 +350,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         // Analyze transcripts for scenarios in parallel with concurrency control
         const { callMetadataConfig } = get();
-        const allScenariosArrays = await processInParallel(
+        const { results: allScenariosArrays, errors: scenarioErrors } = await processInParallel(
           transcripts,
           async (transcript, index) => {
             console.log(`Starting scenario analysis of transcript ${transcript.id} (${index + 1}/${totalTranscripts})`);
@@ -369,6 +376,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             set({ runProgress: progress });
           }
         );
+
+        if (scenarioErrors.length > 0 && allScenariosArrays.length === 0) {
+          throw new Error(`Dimensional audit failed for all transcripts. Error: ${scenarioErrors[0].message}`);
+        } else if (scenarioErrors.length > 0) {
+          console.warn(`${scenarioErrors.length} transcript(s) failed scenario analysis:`, scenarioErrors.map(e => e.message));
+        }
 
         // Flatten all scenarios into a single array
         const allScenarios = allScenariosArrays.flat();
@@ -424,7 +437,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           const llmEnabledConfigs = enabledConfigs.filter((c) => c.detectionMethod === 'llm');
           let llmAlerts: DetectedCriticalAlert[] = [];
           if (llmEnabledConfigs.length > 0) {
-            const llmResultArrays = await processInParallel(
+            const { results: llmResultArrays } = await processInParallel(
               transcripts,
               (t) => runLLMChecks(t, llmEnabledConfigs, apiKey, openaiConfig.model),
               5
