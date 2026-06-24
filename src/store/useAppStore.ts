@@ -346,6 +346,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         // Open-Ended Flow: Scenario-based analysis
         const totalTranscripts = transcripts.length;
 
+        const enabledDimensionCount = dimensionPrompts.filter(d => d.enabled).length;
+        console.log(`[runAnalysis] Open-ended: ${enabledDimensionCount}/${dimensionPrompts.length} dimensions enabled`);
+        if (enabledDimensionCount === 0) {
+          set({ isRunning: false, runProgress: 0 });
+          alert('No audit dimensions are enabled. Please enable at least one dimension in the Audit Config settings before running analysis.');
+          return;
+        }
+
         console.log(`Starting parallel scenario analysis of ${totalTranscripts} transcripts with concurrency limit of 10`);
 
         // Analyze transcripts for scenarios in parallel with concurrency control
@@ -625,7 +633,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       knowledgeBaseEnabled: analysisState.knowledgeBaseEnabled,
       checks: analysisState.checks,
       auditPrompt: analysisState.auditPrompt || defaultAuditPrompt,
-      dimensionPrompts: analysisState.dimensionPrompts || DEFAULT_DIMENSION_PROMPTS.map(d => ({ ...d, prompt: d.defaultPrompt, enabled: true })),
+      dimensionPrompts: (analysisState.dimensionPrompts || DEFAULT_DIMENSION_PROMPTS.map(d => ({ ...d, prompt: d.defaultPrompt, enabled: true }))).map(d => ({ ...d, enabled: d.enabled ?? true })),
       openaiConfig: analysisState.openaiConfig,
       results: analysisState.results,
       fixes: analysisState.fixes,

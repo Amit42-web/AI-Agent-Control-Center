@@ -915,6 +915,11 @@ export async function analyzeTranscriptScenarios(
   console.log(`Analyzing transcript ${transcript.id} for scenarios with ${transcript.lines.length} lines`);
 
   const enabledDimensions = dimensionPrompts.filter(d => d.enabled);
+  console.log(`[SCENARIO ANALYSIS] Enabled dimensions: ${enabledDimensions.length}/${dimensionPrompts.length}`, enabledDimensions.map(d => d.id));
+  if (enabledDimensions.length === 0) {
+    console.error('[SCENARIO ANALYSIS] No dimensions are enabled — skipping API call, returning []');
+    return [];
+  }
   const dimensionSection = enabledDimensions
     .map(d => `## DIMENSION ${d.id} — ${d.label.toUpperCase()}\n\n${d.prompt}`)
     .join('\n\n---\n\n');
