@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { CriticalAlertCategory, CriticalAlertConfig, CriticalAlertPriority } from '@/types';
+import { CriticalAlertCategory, CriticalAlertConfig } from '@/types';
 
 const CATEGORY_META: Record<
   CriticalAlertCategory,
@@ -68,12 +68,6 @@ function ToggleSwitch({
   );
 }
 
-const PRIORITY_STYLE: Record<CriticalAlertPriority, { bg: string; color: string }> = {
-  P0: { bg: 'rgba(239,68,68,0.18)', color: '#f87171' },
-  P1: { bg: 'rgba(245,158,11,0.18)', color: '#fbbf24' },
-  P2: { bg: 'rgba(100,116,139,0.18)', color: '#94a3b8' },
-};
-
 function AlertRow({
   alert,
   onToggle,
@@ -82,7 +76,6 @@ function AlertRow({
   onToggle: () => void;
 }) {
   const isLLM = alert.detectionMethod === 'llm';
-  const priorityStyle = alert.priority ? PRIORITY_STYLE[alert.priority] : PRIORITY_STYLE['P2'];
 
   return (
     <div className="px-4 py-3">
@@ -92,12 +85,6 @@ function AlertRow({
           {/* Name + badge row */}
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-sm font-medium text-white">{alert.name}</span>
-            <span
-              className="text-xs px-1.5 py-0.5 rounded font-semibold"
-              style={{ background: priorityStyle.bg, color: priorityStyle.color }}
-            >
-              {alert.priority}
-            </span>
             {isLLM ? (
               <span
                 className="text-xs px-1.5 py-0.5 rounded"

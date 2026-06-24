@@ -4,7 +4,6 @@ import {
   DetectedCriticalAlert,
   CriticalAlertId,
   CriticalAlertCategory,
-  CriticalAlertPriority,
 } from '@/types';
 
 function randomId(): string {
@@ -28,7 +27,6 @@ function makeAlert(
     callId,
     alertName: config.name,
     category: config.category,
-    priority: config.priority,
     evidence,
     lineNumbers,
     confidence,
@@ -375,7 +373,6 @@ Return a JSON array (empty array [] if nothing found):
           callId: transcript.id,
           alertName: cfg.name,
           category: CATEGORY_MAP[item.alertId as CriticalAlertId] ?? cfg.category,
-          priority: cfg.priority as CriticalAlertPriority,
           evidence: item.evidence,
           lineNumbers: item.lineNumbers,
           confidence: item.confidence,

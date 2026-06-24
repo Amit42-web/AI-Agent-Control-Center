@@ -32,7 +32,7 @@ function parseJSON(text: string): Record<string, string>[] {
 }
 
 export function MetadataUpload() {
-  const { callMetadataConfig, setCallMetadataConfig, transcripts } = useAppStore();
+  const { callMetadataConfig, setCallMetadataConfig, callMetadataEnabled, setCallMetadataEnabled, transcripts } = useAppStore();
 
   const [isExpanded, setIsExpanded] = useState(!!callMetadataConfig);
   const [dragOver, setDragOver] = useState(false);
@@ -56,7 +56,8 @@ export function MetadataUpload() {
       );
     }
     setCallMetadataConfig({ columns: cols, matchKey: mk, excludedColumns: [...excluded], rows: lookup });
-  }, [setCallMetadataConfig]);
+    setCallMetadataEnabled(true);
+  }, [setCallMetadataConfig, setCallMetadataEnabled]);
 
   const handleFile = useCallback((file: File) => {
     setError(null);
@@ -92,7 +93,9 @@ export function MetadataUpload() {
     return { matched, unmatched: transcripts.length - matched, total: transcripts.length };
   })();
 
-  const headerSummary = callMetadataConfig
+  const headerSummary = !callMetadataEnabled
+    ? 'Disabled — transcript + dimensions sent without call attributes'
+    : callMetadataConfig
     ? [
         `${Object.keys(callMetadataConfig.rows).length} rows`,
         `match key: ${callMetadataConfig.matchKey}`,
@@ -114,16 +117,37 @@ export function MetadataUpload() {
           </div>
           <div>
             <h3 className="font-semibold text-white">Call Metadata</h3>
-            <p className="text-xs" style={{ color: 'var(--color-slate-400)' }}>{headerSummary}</p>
+            <p className="text-xs" style={{ color: callMetadataEnabled ? 'var(--color-slate-400)' : 'var(--color-slate-500)' }}>{headerSummary}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Enable/disable toggle */}
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              setCallMetadataEnabled(!callMetadataEnabled);
+            }}
+            style={{
+              width: 40, height: 22, borderRadius: 11,
+              background: callMetadataEnabled ? '#6366f1' : '#334155',
+              border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+            }}
+            aria-checked={callMetadataEnabled}
+            role="switch"
+          >
+            <span style={{
+              position: 'absolute', top: 3, left: callMetadataEnabled ? 21 : 3,
+              width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+            }} />
+          </button>
           {callMetadataConfig && (
             <button
               type="button"
               onClick={e => {
                 e.stopPropagation();
                 setCallMetadataConfig(null);
+                setCallMetadataEnabled(false);
                 setParsedRows(null);
                 setColumns([]);
                 setMatchKey('');

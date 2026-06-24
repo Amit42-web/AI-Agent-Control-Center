@@ -10,7 +10,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'deterministic',
     enabled: true,
     icon: '🔇',
-    priority: 'P0',
   },
   {
     id: 'loop_detection',
@@ -20,7 +19,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'deterministic',
     enabled: true,
     icon: '🔁',
-    priority: 'P0',
   },
   {
     id: 'one_sided_call',
@@ -30,7 +28,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'deterministic',
     enabled: true,
     icon: '📵',
-    priority: 'P0',
   },
   {
     id: 'call_ended_customer',
@@ -40,7 +37,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'deterministic',
     enabled: true,
     icon: '📴',
-    priority: 'P0',
   },
   {
     id: 'no_greeting',
@@ -50,7 +46,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'deterministic',
     enabled: true,
     icon: '🙊',
-    priority: 'P1',
   },
   {
     id: 'wrong_language',
@@ -60,7 +55,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'deterministic',
     enabled: true,
     icon: '🌐',
-    priority: 'P0',
   },
 
   // ── Escalation (LLM) ────────────────────────────────────────────────────
@@ -73,7 +67,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '🚫',
-    priority: 'P1',
   },
   {
     id: 'cancel_ignored',
@@ -84,7 +77,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '❌',
-    priority: 'P1',
   },
   {
     id: 'repeated_unresolved',
@@ -95,7 +87,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '🔄',
-    priority: 'P1',
   },
   {
     id: 'frustration_ignored',
@@ -106,7 +97,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '😤',
-    priority: 'P1',
   },
   {
     id: 'customer_hung_up',
@@ -117,7 +107,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '📞',
-    priority: 'P1',
   },
 
   // ── Deception (LLM) ─────────────────────────────────────────────────────
@@ -130,7 +119,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '🤖',
-    priority: 'P1',
   },
   {
     id: 'impersonated_human',
@@ -141,7 +129,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '👤',
-    priority: 'P1',
   },
   {
     id: 'false_urgency',
@@ -152,7 +139,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '⏰',
-    priority: 'P2',
   },
 
   // ── Compliance (LLM) ────────────────────────────────────────────────────
@@ -165,7 +151,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '💸',
-    priority: 'P1',
   },
   {
     id: 'shared_data_no_verification',
@@ -176,7 +161,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '🔓',
-    priority: 'P1',
   },
   {
     id: 'identity_skip',
@@ -187,7 +171,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '🪪',
-    priority: 'P1',
   },
   {
     id: 'skipped_mandatory_disclosure',
@@ -198,7 +181,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '📋',
-    priority: 'P1',
   },
   {
     id: 'continued_after_optout',
@@ -209,7 +191,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '🛑',
-    priority: 'P1',
   },
   {
     id: 'out_of_scope_advice',
@@ -220,7 +201,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '⚖️',
-    priority: 'P2',
   },
   {
     id: 'wrong_price',
@@ -231,7 +211,6 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '💰',
-    priority: 'P2',
   },
 
   // ── Flow (LLM) ──────────────────────────────────────────────────────────
@@ -244,6 +223,5 @@ export const DEFAULT_CRITICAL_ALERT_CONFIGS: CriticalAlertConfig[] = [
     detectionMethod: 'llm',
     enabled: true,
     icon: '❓',
-    priority: 'P2',
   },
 ];

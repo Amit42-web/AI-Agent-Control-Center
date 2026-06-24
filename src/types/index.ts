@@ -379,7 +379,9 @@ export interface AppState {
 
   // Call metadata
   callMetadataConfig: CallMetadataConfig | null;
+  callMetadataEnabled: boolean;
   setCallMetadataConfig: (config: CallMetadataConfig | null) => void;
+  setCallMetadataEnabled: (enabled: boolean) => void;
 
   // Last run debug info (not persisted)
   lastRunDebug: LastRunDebug | null;
@@ -419,8 +421,6 @@ export type CriticalAlertId =
   | 'unauthorized_commitment' | 'shared_data_no_verification' | 'identity_skip'
   | 'skipped_mandatory_disclosure' | 'continued_after_optout' | 'out_of_scope_advice' | 'wrong_price' | 'no_resolution';
 
-export type CriticalAlertPriority = 'P0' | 'P1' | 'P2';
-
 export interface CriticalAlertConfig {
   id: CriticalAlertId;
   name: string;
@@ -430,7 +430,6 @@ export interface CriticalAlertConfig {
   detectionMethod: 'deterministic' | 'llm';
   enabled: boolean;
   icon: string;
-  priority: CriticalAlertPriority;
 }
 
 export interface DetectedCriticalAlert {
@@ -439,7 +438,6 @@ export interface DetectedCriticalAlert {
   callId: string;
   alertName: string;
   category: CriticalAlertCategory;
-  priority: CriticalAlertPriority;
   evidence: string;
   lineNumbers?: number[];
   confidence: number;

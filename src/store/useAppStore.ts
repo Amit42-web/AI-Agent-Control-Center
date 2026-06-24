@@ -129,6 +129,7 @@ const initialState = {
   criticalAlertsEnabled: true,
   printReportOnLoad: false,
   callMetadataConfig: null,
+  callMetadataEnabled: false,
   lastRunDebug: null,
 };
 
@@ -247,7 +248,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysis: async () => {
-    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig, flowType, auditPrompt, dimensionPrompts } = get();
+    const { transcripts, checks, referenceEnabled, referenceScript, knowledgeBaseEnabled, knowledgeBase, openaiConfig, flowType, auditPrompt, dimensionPrompts, callMetadataEnabled } = get();
 
     // Get API key from environment variable - check both possible names
     const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '';
@@ -366,7 +367,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           transcripts,
           async (transcript, index) => {
             console.log(`Starting scenario analysis of transcript ${transcript.id} (${index + 1}/${totalTranscripts})`);
-            const callMetadata = callMetadataConfig
+            const callMetadata = callMetadataEnabled && callMetadataConfig
               ? (callMetadataConfig.rows[transcript.id.trim().toLowerCase()] ?? null)
               : null;
             const scenarios = await analyzeTranscriptScenarios(
@@ -599,6 +600,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPrintReportOnLoad: (v: boolean) => set({ printReportOnLoad: v }),
 
   setCallMetadataConfig: (config: CallMetadataConfig | null) => set({ callMetadataConfig: config }),
+
+  setCallMetadataEnabled: (enabled: boolean) => set({ callMetadataEnabled: enabled }),
 
   markFixesApplied: async () => {
     set({ fixesApplied: true });
