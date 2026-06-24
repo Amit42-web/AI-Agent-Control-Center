@@ -45,29 +45,14 @@ You are judging sufficiency of evidence, not polish of execution.
 
 ---
 
-## TRANSCRIPT RELIABILITY GATE
+## MATERIALITY THRESHOLD
 
-Before judging behavior, assess transcript reliability.
+Flag issues that a senior QA reviewer would consider worth actioning — this includes:
+- Clear failures (customer unresolved, wrong information, skipped steps)
+- Meaningful quality issues (language problems, context drops, pacing failures)
+- Low-confidence findings are acceptable — use confidence 60–75 for uncertain cases
 
-If the transcript shows clipped/partial confirmations, ASR artifacts, merged/compressed turns, or loss of conversational connectors:
-- Do NOT infer failure
-- Do NOT penalize the agent
-- Mark Transcript Limitation
-- Set Confidence Level: Low
-
-Transcript limitations are NOT agent performance issues.
-
----
-
-## MATERIALITY GATE
-
-Flag an issue ONLY if a senior human reviewer would clearly say:
-- "This changed customer expectation"
-- "This exposed risk"
-- "This left the customer unresolved or misled"
-
-If outcome, expectation, or risk did NOT change → Do NOT flag.
-If intent or sequence cannot be reliably determined → materiality is NOT met.
+If the transcript has ASR artifacts or merged turns, note it in context but still evaluate based on what is visible.
 
 ---
 
@@ -178,15 +163,4 @@ Return ONLY a valid JSON array. Each scenario object must have:
 
 Do NOT include raw transcript excerpts in the JSON — use line numbers only.
 
-Quality over quantity. Each scenario must be meaningful, evidence-backed, and tied to a specific dimension.
-
-Return an empty array [] if no material issues are found.
-
----
-
-## FINAL VALIDATION
-
-Before declaring "No material issues observed", explicitly confirm:
-- What was reviewed
-- Why evidence was sufficient
-- Why no material risk or expectation change occurred`;
+Quality over quantity. Each scenario must be evidence-backed and tied to a specific dimension. Return [] only if the call is genuinely excellent with no actionable findings across any dimension.`;
