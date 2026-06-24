@@ -5,10 +5,30 @@ import { Play, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
 export function RunButton() {
-  const { isRunning, runProgress, transcripts, checks, runAnalysis } = useAppStore();
+  const { isRunning, runProgress, transcripts, checks, flowType, dimensionPrompts, runAnalysis } = useAppStore();
 
   const enabledChecks = checks.filter((c) => c.enabled);
-  const canRun = transcripts.length > 0 && enabledChecks.length > 0;
+  const enabledDimensions = dimensionPrompts.filter((d) => d.enabled);
+
+  const isOpenEnded = flowType === 'open-ended';
+
+  // Open-ended flow only needs transcripts + at least one active dimension
+  // Objective flow needs transcripts + at least one enabled check
+  const canRun = isOpenEnded
+    ? transcripts.length > 0 && enabledDimensions.length > 0
+    : transcripts.length > 0 && enabledChecks.length > 0;
+
+  const readyLabel = isOpenEnded
+    ? `${transcripts.length} call${transcripts.length !== 1 ? 's' : ''}, ${enabledDimensions.length} dimension${enabledDimensions.length !== 1 ? 's' : ''} active`
+    : `${transcripts.length} call${transcripts.length !== 1 ? 's' : ''}, ${enabledChecks.length} check${enabledChecks.length !== 1 ? 's' : ''} enabled`;
+
+  const runningLabel = isOpenEnded
+    ? `Analyzing ${transcripts.length} call${transcripts.length !== 1 ? 's' : ''} across ${enabledDimensions.length} dimension${enabledDimensions.length !== 1 ? 's' : ''}...`
+    : `Analyzing ${transcripts.length} call${transcripts.length !== 1 ? 's' : ''} with ${enabledChecks.length} check${enabledChecks.length !== 1 ? 's' : ''}...`;
+
+  const blockedLabel = isOpenEnded
+    ? 'Please load at least one transcript and enable at least one audit dimension.'
+    : 'Please load at least one transcript and enable at least one check.';
 
   return (
     <motion.div
@@ -36,19 +56,13 @@ export function RunButton() {
               transition={{ duration: 0.3 }}
             />
           </div>
-          <p className="text-xs text-[var(--color-slate-400)]">
-            Analyzing {transcripts.length} call{transcripts.length !== 1 ? 's' : ''} with{' '}
-            {enabledChecks.length} check{enabledChecks.length !== 1 ? 's' : ''}...
-          </p>
+          <p className="text-xs text-[var(--color-slate-400)]">{runningLabel}</p>
         </div>
       ) : (
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-white font-semibold mb-1">Ready to Run</h3>
-            <p className="text-sm text-[var(--color-slate-400)]">
-              {transcripts.length} call{transcripts.length !== 1 ? 's' : ''},{' '}
-              {enabledChecks.length} check{enabledChecks.length !== 1 ? 's' : ''} enabled
-            </p>
+            <p className="text-sm text-[var(--color-slate-400)]">{readyLabel}</p>
           </div>
           <button
             className="btn-primary flex items-center gap-2 text-lg px-8"
@@ -62,9 +76,7 @@ export function RunButton() {
       )}
 
       {!canRun && !isRunning && (
-        <p className="text-xs text-rose-400 mt-3">
-          Please load at least one transcript and enable at least one check.
-        </p>
+        <p className="text-xs text-rose-400 mt-3">{blockedLabel}</p>
       )}
     </motion.div>
   );

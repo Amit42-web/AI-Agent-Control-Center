@@ -4,6 +4,7 @@ import {
   DetectedCriticalAlert,
   CriticalAlertId,
   CriticalAlertCategory,
+  CriticalAlertPriority,
 } from '@/types';
 
 function randomId(): string {
@@ -27,6 +28,7 @@ function makeAlert(
     callId,
     alertName: config.name,
     category: config.category,
+    priority: config.priority,
     evidence,
     lineNumbers,
     confidence,
@@ -263,6 +265,7 @@ function mode(arr: string[]): string | null {
 // ─── LLM checks ──────────────────────────────────────────────────────────────
 
 const CATEGORY_MAP: Record<CriticalAlertId, CriticalAlertCategory> = {
+  // used as fallback if config not found in LLM results
   bot_silence: 'bot_failure',
   loop_detection: 'bot_failure',
   one_sided_call: 'bot_failure',
@@ -372,6 +375,7 @@ Return a JSON array (empty array [] if nothing found):
           callId: transcript.id,
           alertName: cfg.name,
           category: CATEGORY_MAP[item.alertId as CriticalAlertId] ?? cfg.category,
+          priority: cfg.priority as CriticalAlertPriority,
           evidence: item.evidence,
           lineNumbers: item.lineNumbers,
           confidence: item.confidence,

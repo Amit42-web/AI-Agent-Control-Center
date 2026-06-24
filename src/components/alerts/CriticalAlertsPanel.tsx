@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { CriticalAlertCategory, DetectedCriticalAlert } from '@/types';
+import { CriticalAlertCategory, CriticalAlertPriority, DetectedCriticalAlert } from '@/types';
 
 const CATEGORY_META: Record<
   CriticalAlertCategory,
@@ -24,6 +24,12 @@ const CATEGORY_ORDER: CriticalAlertCategory[] = [
   'flow',
 ];
 
+const PRIORITY_STYLE: Record<CriticalAlertPriority, { bg: string; color: string }> = {
+  P0: { bg: 'rgba(239,68,68,0.18)', color: '#f87171' },
+  P1: { bg: 'rgba(245,158,11,0.18)', color: '#fbbf24' },
+  P2: { bg: 'rgba(100,116,139,0.18)', color: '#94a3b8' },
+};
+
 function ConfidenceBadge({ confidence }: { confidence: number }) {
   const color =
     confidence >= 90 ? '#ef4444' : confidence >= 80 ? '#f59e0b' : '#64748b';
@@ -40,6 +46,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 function AlertRow({ alert }: { alert: DetectedCriticalAlert }) {
   const [expanded, setExpanded] = useState(false);
   const meta = CATEGORY_META[alert.category];
+  const priorityStyle = alert.priority ? PRIORITY_STYLE[alert.priority] : PRIORITY_STYLE['P2'];
 
   return (
     <div
@@ -48,12 +55,19 @@ function AlertRow({ alert }: { alert: DetectedCriticalAlert }) {
     >
       <div className="flex items-start gap-3">
         <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>
-          {/* Look up icon from name via simple map — we'll use category icon as fallback */}
           {meta.icon}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-sm font-semibold text-white">{alert.alertName}</span>
+            {alert.priority && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0"
+                style={{ background: priorityStyle.bg, color: priorityStyle.color }}
+              >
+                {alert.priority}
+              </span>
+            )}
             <ConfidenceBadge confidence={alert.confidence} />
           </div>
           <p
