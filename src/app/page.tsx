@@ -27,6 +27,7 @@ import { ProgressPanel } from '@/components/progress/ProgressPanel';
 import { AnalysisManager } from '@/components/analyses/AnalysisManager';
 import { AggregateResults } from '@/components/results/AggregateResults';
 import { ComprehensiveExport } from '@/components/results/ComprehensiveExport';
+import { RunDebugPanel } from '@/components/results/RunDebugPanel';
 import { aggregateScenarios } from '@/utils/aggregateScenarios';
 import {
   exportScenariosToCSV,
@@ -526,6 +527,7 @@ function ResultsPage() {
       ) : (
         // Open-ended Flow - show based on view mode
         <>
+          <motion.div variants={itemVariants}><RunDebugPanel /></motion.div>
           {resultsViewMode === 'detailed' ? (
             <>
               <motion.div variants={itemVariants}><ScenarioTable /></motion.div>

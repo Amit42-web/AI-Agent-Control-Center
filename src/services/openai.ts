@@ -1,6 +1,19 @@
 import { Transcript, DetectedIssue, CheckConfig, IssueType, Severity, Fix, Scenario, EnhancedFix, FixType, AggregatedIssue, AggregatedScenario, RootCauseType, DimensionPrompt } from '@/types';
 import { FIXED_SYSTEM_PROMPT } from '@/data/systemPrompt';
 
+// ─── Debug capture (session-only, read by store after each run) ───────────────
+export interface ScenarioAnalysisDebug {
+  transcriptId: string;
+  systemPromptLength: number;
+  enabledDimensions: { id: string; label: string }[];
+  disabledDimensions: { id: string; label: string }[];
+  rawResponseSnippet: string;
+  scenariosFound: number;
+}
+let _lastScenarioDebug: ScenarioAnalysisDebug | null = null;
+export function getLastScenarioDebug(): ScenarioAnalysisDebug | null { return _lastScenarioDebug; }
+export function clearLastScenarioDebug(): void { _lastScenarioDebug = null; }
+
 export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -953,6 +966,18 @@ ${knowledgeBase ? `\n---\n## Knowledge Base:\n${knowledgeBase}\n` : ''}`;
       { role: 'user', content: userPrompt },
     ]);
 
+    // Capture debug info for the first transcript processed
+    if (!_lastScenarioDebug) {
+      _lastScenarioDebug = {
+        transcriptId: transcript.id,
+        systemPromptLength: systemPrompt.length,
+        enabledDimensions: enabledDimensions.map(d => ({ id: d.id, label: d.label })),
+        disabledDimensions: dimensionPrompts.filter(d => !d.enabled).map(d => ({ id: d.id, label: d.label })),
+        rawResponseSnippet: response.substring(0, 800),
+        scenariosFound: 0, // updated below
+      };
+    }
+
     console.log(`[SCENARIO ANALYSIS] Received response (first 500 chars):`, response.substring(0, 500));
 
     // Try to extract JSON array
@@ -1084,6 +1109,9 @@ ${knowledgeBase ? `\n---\n## Knowledge Base:\n${knowledgeBase}\n` : ''}`;
     }
 
     console.log(`Found ${scenarios.length} scenarios in transcript ${transcript.id}`);
+    if (_lastScenarioDebug && _lastScenarioDebug.transcriptId === transcript.id) {
+      _lastScenarioDebug.scenariosFound = scenarios.length;
+    }
 
     // Valid root cause types
     const validRootCauseTypes = ['knowledge', 'instruction', 'execution', 'conversation', 'model'];

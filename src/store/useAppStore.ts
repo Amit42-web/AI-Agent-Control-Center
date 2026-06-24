@@ -35,6 +35,8 @@ import {
   generateEnhancedFixSuggestions,
   generateEnhancedFixesByRCACategory,
   aggregateScenariosWithLLM,
+  getLastScenarioDebug,
+  clearLastScenarioDebug,
 } from '@/services/openai';
 
 const STORAGE_KEY = 'voicebot-qa-storage-v1';
@@ -127,6 +129,7 @@ const initialState = {
   criticalAlertsEnabled: true,
   printReportOnLoad: false,
   callMetadataConfig: null,
+  lastRunDebug: null,
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -255,7 +258,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    set({ isRunning: true, runProgress: 0, currentStep: 'running', aggregatedIssues: null, aggregatedScenarios: null, criticalAlertResults: null });
+    clearLastScenarioDebug();
+    set({ isRunning: true, runProgress: 0, currentStep: 'running', aggregatedIssues: null, aggregatedScenarios: null, criticalAlertResults: null, lastRunDebug: null });
 
     try {
       if (flowType === 'objective') {
@@ -426,7 +430,34 @@ export const useAppStore = create<AppState>((set, get) => ({
           severityDistribution,
         };
 
-        set({ scenarioResults });
+        // Capture debug info for the run
+        const scenarioDebug = getLastScenarioDebug();
+        const lastRunDebug = scenarioDebug ? {
+          timestamp: new Date().toISOString(),
+          flowType,
+          model: openaiConfig.model,
+          transcriptCount: transcripts.length,
+          enabledDimensions: scenarioDebug.enabledDimensions,
+          disabledDimensions: scenarioDebug.disabledDimensions,
+          systemPromptLength: scenarioDebug.systemPromptLength,
+          firstTranscriptId: scenarioDebug.transcriptId,
+          firstTranscriptLines: transcripts.find(t => t.id === scenarioDebug.transcriptId)?.lines?.length ?? 0,
+          rawResponseSnippet: scenarioDebug.rawResponseSnippet,
+          scenariosFound: allScenarios.length,
+        } : {
+          timestamp: new Date().toISOString(),
+          flowType,
+          model: openaiConfig.model,
+          transcriptCount: transcripts.length,
+          enabledDimensions: dimensionPrompts.filter(d => d.enabled).map(d => ({ id: d.id, label: d.label })),
+          disabledDimensions: dimensionPrompts.filter(d => !d.enabled).map(d => ({ id: d.id, label: d.label })),
+          systemPromptLength: 0,
+          firstTranscriptId: transcripts[0]?.id ?? '',
+          firstTranscriptLines: transcripts[0]?.lines?.length ?? 0,
+          rawResponseSnippet: '(API was not called — 0 enabled dimensions)',
+          scenariosFound: 0,
+        };
+        set({ scenarioResults, lastRunDebug });
       }
 
       // ── Critical Alert Detection (runs for both flow types) ─────────────────

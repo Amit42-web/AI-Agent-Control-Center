@@ -380,6 +380,23 @@ export interface AppState {
   // Call metadata
   callMetadataConfig: CallMetadataConfig | null;
   setCallMetadataConfig: (config: CallMetadataConfig | null) => void;
+
+  // Last run debug info (not persisted)
+  lastRunDebug: LastRunDebug | null;
+}
+
+export interface LastRunDebug {
+  timestamp: string;
+  flowType: string;
+  model: string;
+  transcriptCount: number;
+  enabledDimensions: { id: string; label: string }[];
+  disabledDimensions: { id: string; label: string }[];
+  systemPromptLength: number;
+  firstTranscriptId: string;
+  firstTranscriptLines: number;
+  rawResponseSnippet: string; // first 800 chars of LLM response for first transcript
+  scenariosFound: number;
 }
 
 // ─── Call Metadata ────────────────────────────────────────────────────────────
