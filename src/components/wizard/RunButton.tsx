@@ -15,7 +15,7 @@ export function RunButton() {
   // Open-ended flow only needs transcripts + at least one active dimension
   // Objective flow needs transcripts + at least one enabled check
   const canRun = isOpenEnded
-    ? transcripts.length > 0 && enabledDimensions.length > 0
+    ? transcripts.length > 0
     : transcripts.length > 0 && enabledChecks.length > 0;
 
   const readyLabel = isOpenEnded

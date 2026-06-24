@@ -82,7 +82,7 @@ function AlertRow({
   onToggle: () => void;
 }) {
   const isLLM = alert.detectionMethod === 'llm';
-  const priorityStyle = PRIORITY_STYLE[alert.priority];
+  const priorityStyle = alert.priority ? PRIORITY_STYLE[alert.priority] : PRIORITY_STYLE['P2'];
 
   return (
     <div className="px-4 py-3">
